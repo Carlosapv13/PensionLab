@@ -1,0 +1,137 @@
+{
+  "id": "vigente-2026",
+  "descripcion": "Normativa pensional colombiana efectivamente aplicable en 2026 (Ley 100 de 1993 / Ley 797 de 2003, más Sentencia C-197 de 2023). La reforma pensional 2024 (Ley 2381) queda deliberadamente fuera: sigue suspendida por la Corte Constitucional (Auto 841 de 2025).",
+  "estado": "borrador",
+  "listoParaProduccion": false,
+  "notas": "Borrador bloqueado: 13 de 14 entradas están validadas contra trazabilidad-normativa.md. La entrada 'smlv' queda con estadoJuridico='transitorio' (Decreto 1469/2025 suspendido provisionalmente por el Consejo de Estado, valor sostenido por Decreto 0159/2026) y por eso resolverReglasVigentes() la excluye por defecto. No marcar 'publicado' hasta que el SMLV 2026 quede firme y se verifique el texto oficial de cada artículo contra Diario Oficial/SUIN-Juriscol.",
+  "entradas": [
+    {
+      "id": "edad-pension-mujer",
+      "campo": "edadPensionMujer",
+      "valor": 57,
+      "unidad": "años",
+      "fuente": "Ley 100 de 1993",
+      "articulo": "Art. 33 Ley 100 de 1993, modificado por Art. 9 Ley 797 de 2003",
+      "vigencia": { "desde": "2003-01-29", "hasta": null }
+    },
+    {
+      "id": "edad-pension-hombre",
+      "campo": "edadPensionHombre",
+      "valor": 62,
+      "unidad": "años",
+      "fuente": "Ley 100 de 1993",
+      "articulo": "Art. 33 Ley 100 de 1993, modificado por Art. 9 Ley 797 de 2003",
+      "vigencia": { "desde": "2003-01-29", "hasta": null }
+    },
+    {
+      "id": "semanas-minimas-pension-hombre",
+      "campo": "semanasMinimasPensionHombre",
+      "valor": 1300,
+      "unidad": "semanas",
+      "fuente": "Ley 100 de 1993",
+      "articulo": "Art. 33 Ley 100 de 1993, modificado por Art. 9 Ley 797 de 2003",
+      "vigencia": { "desde": "2003-01-29", "hasta": null }
+    },
+    {
+      "id": "semanas-minimas-pension-mujer-pre-2026",
+      "campo": "semanasMinimasPensionMujer",
+      "valor": 1300,
+      "unidad": "semanas",
+      "fuente": "Ley 100 de 1993",
+      "articulo": "Art. 9 Ley 797 de 2003, antes de que surtieran efecto los efectos diferidos de la Sentencia C-197 de 2023",
+      "vigencia": { "desde": "2003-01-29", "hasta": "2025-12-31" }
+    },
+    {
+      "id": "semanas-minimas-pension-mujer-cronograma-2026",
+      "campo": "semanasMinimasPensionMujer",
+      "valor": { "tipo": "cronograma-lineal", "base": 1250, "decrementoAnual": 25, "piso": 1000, "fechaInicio": "2026-01-01" },
+      "unidad": "semanas",
+      "fuente": "Sentencia C-197 de 2023 (Corte Constitucional)",
+      "articulo": "Sentencia C-197 de 2023, declara inexequible Art. 9 Ley 797 de 2003 en cuanto exige las mismas semanas a mujeres; efectos diferidos desde 2026-01-01, reducción de 50 semanas iniciales y 25 semanas adicionales cada año hasta un piso de 1000",
+      "vigencia": { "desde": "2026-01-01", "hasta": null }
+    },
+    {
+      "id": "tasa-cotizacion",
+      "campo": "tasaCotizacion",
+      "valor": 16,
+      "unidad": "%",
+      "fuente": "Ley 100 de 1993",
+      "articulo": "Art. 20 Ley 100 de 1993, modificado por Art. 7 Ley 797 de 2003",
+      "vigencia": { "desde": "2006-01-01", "hasta": null }
+    },
+    {
+      "id": "tope-maximo-ibc",
+      "campo": "topeMaximoIBC",
+      "valor": 25,
+      "unidad": "SMLMV",
+      "fuente": "Ley 100 de 1993; condición de ampliación a 45 SMLMV del Decreto 2322 de 2022 no cumplida (crecimiento PIB DANE 2023/2024/2025: 0.8%/2.5%/2.6%, ninguno supera el umbral de 4% exigido)",
+      "articulo": "Art. 18 Ley 100 de 1993, modificado por Art. 5 Ley 797 de 2003",
+      "vigencia": { "desde": "2003-01-29", "hasta": null }
+    },
+    {
+      "id": "smlv-2026",
+      "campo": "smlv",
+      "valor": 1750905,
+      "unidad": "COP",
+      "fuente": "Decreto del Gobierno Nacional (Ministerio del Trabajo)",
+      "articulo": "Decreto 1469 de 2025, suspendido provisionalmente por el Consejo de Estado (auto 12-feb-2026); valor sostenido transitoriamente por el Decreto 0159 de 2026 mientras se resuelve el litigio de fondo",
+      "vigencia": { "desde": "2026-01-01", "hasta": null },
+      "periodo": 2026,
+      "estadoJuridico": "transitorio"
+    },
+    {
+      "id": "tasa-reemplazo-constante",
+      "campo": "tasaReemplazoConstante",
+      "valor": 65.5,
+      "unidad": "puntos porcentuales",
+      "fuente": "Ley 100 de 1993",
+      "articulo": "Art. 34 Ley 100 de 1993, modificado por Art. 10 Ley 797 de 2003",
+      "vigencia": { "desde": "2003-01-29", "hasta": null }
+    },
+    {
+      "id": "tasa-reemplazo-pendiente",
+      "campo": "tasaReemplazoPendiente",
+      "valor": 0.5,
+      "unidad": "adimensional",
+      "fuente": "Ley 100 de 1993",
+      "articulo": "Art. 34 Ley 100 de 1993, modificado por Art. 10 Ley 797 de 2003",
+      "vigencia": { "desde": "2003-01-29", "hasta": null }
+    },
+    {
+      "id": "tasa-reemplazo-minima",
+      "campo": "tasaReemplazoMinima",
+      "valor": 55,
+      "unidad": "%",
+      "fuente": "Ley 100 de 1993",
+      "articulo": "Art. 34 Ley 100 de 1993, modificado por Art. 10 Ley 797 de 2003",
+      "vigencia": { "desde": "2003-01-29", "hasta": null }
+    },
+    {
+      "id": "tasa-reemplazo-maxima",
+      "campo": "tasaReemplazoMaxima",
+      "valor": 80,
+      "unidad": "%",
+      "fuente": "Ley 100 de 1993",
+      "articulo": "Art. 34 Ley 100 de 1993, modificado por Art. 10 Ley 797 de 2003",
+      "vigencia": { "desde": "2003-01-29", "hasta": null }
+    },
+    {
+      "id": "semanas-por-incremento-adicional",
+      "campo": "semanasPorIncrementoAdicional",
+      "valor": 50,
+      "unidad": "semanas",
+      "fuente": "Ley 100 de 1993",
+      "articulo": "Art. 34 Ley 100 de 1993, modificado por Art. 10 Ley 797 de 2003",
+      "vigencia": { "desde": "2003-01-29", "hasta": null }
+    },
+    {
+      "id": "incremento-porcentual-por-tramo",
+      "campo": "incrementoPorcentualPorTramo",
+      "valor": 1.5,
+      "unidad": "puntos porcentuales",
+      "fuente": "Ley 100 de 1993",
+      "articulo": "Art. 34 Ley 100 de 1993, modificado por Art. 10 Ley 797 de 2003",
+      "vigencia": { "desde": "2003-01-29", "hasta": null }
+    }
+  ]
+}

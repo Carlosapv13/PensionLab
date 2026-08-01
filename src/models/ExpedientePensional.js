@@ -13,12 +13,13 @@
  * Próximos pasos del documento de arquitectura).
  *
  * Tampoco incluye Resultados, Contexto de Evaluación ni Historia Pensional como
- * campos propios del Expediente. Hoy, Persona e Historia Pensional se representan
- * de forma parcial mediante UserProfile, y Resultados se representa mediante
- * Simulation; ContextoEvaluacion ya tiene contrato propio (ver
- * src/domain/contracts/ContextoEvaluacion.js) pero todavía no ha sido incorporado a
- * Simulation. Cuando esas extensiones pendientes se implementen, no deben
- * duplicarse como campos propios del ExpedientePensional.
+ * campos propios del Expediente. Persona e Historia Pensional se representan
+ * actualmente de forma parcial mediante UserProfile, y Resultados se representan
+ * mediante Simulation. PerfilDecision y ContextoEvaluacion ya se incorporan como
+ * copias embebidas e inmutables dentro de Simulation, mediante
+ * perfilDecisionUtilizado y contextoEvaluacionUtilizado (ver
+ * src/models/Simulation.js). Estos bloques no deben duplicarse como campos
+ * propios del ExpedientePensional.
  *
  * El campo `id` identifica el expediente en sí, no a la persona — la forma técnica
  * de garantizar unicidad por persona sigue pendiente (ver Decisión 2 y Próximos

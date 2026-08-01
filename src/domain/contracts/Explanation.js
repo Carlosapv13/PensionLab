@@ -4,8 +4,12 @@
  * Responsabilidad: representar la explicación legible de un resultado de cálculo —
  * datos usados, fórmula aplicada, normas legales con su vigencia, supuestos de
  * modelado y limitaciones conocidas. Construida por
- * domain/transparency/explainCalculation.js a partir de un CalculationTrace, resolviendo
- * normasUsadasIds/supuestosUsadosIds contra data/legal y data/assumptions.
+ * domain/transparency/explainCalculation.js a partir de dos fuentes ya resueltas,
+ * sin volver a resolver nada directamente contra data/legal ni data/assumptions:
+ * el CalculationTrace correspondiente, para saber qué entradas (normasUsadasIds/
+ * supuestosUsadosIds) utilizó la fórmula, y el contextoEvaluacionUtilizado de esa
+ * misma Simulation (ver src/domain/contracts/ContextoEvaluacion.js), que es la
+ * fuente autoritativa de los valores y metadatos ya resueltos de esas entradas.
  *
  * @typedef {Object} Explanation
  * @property {Object} datosUsados

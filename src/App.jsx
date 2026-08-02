@@ -4,7 +4,8 @@ import AppShell from './components/layout/AppShell.jsx'
 import Bienvenida from './pages/Bienvenida.jsx'
 import Objetivo from './pages/Objetivo.jsx'
 import DatosIniciales from './pages/DatosIniciales.jsx'
-import SituacionPensionalTemporal from './pages/SituacionPensionalTemporal.jsx'
+import SituacionPensional from './pages/SituacionPensional.jsx'
+import HistorialLaboralTemporal from './pages/HistorialLaboralTemporal.jsx'
 
 function App() {
   const [vista, setVista] = useState('bienvenida')
@@ -12,6 +13,7 @@ function App() {
   const [fechaNacimiento, setFechaNacimiento] = useState('')
   const [sexo, setSexo] = useState(null)
   const [lugarResidencia, setLugarResidencia] = useState(null)
+  const [regimenActual, setRegimenActual] = useState(null)
 
   return (
     <AppShell>
@@ -42,12 +44,22 @@ function App() {
       )}
 
       {vista === 'situacionPensional' && (
-        <SituacionPensionalTemporal
+        <SituacionPensional
+          regimenActual={regimenActual}
+          onCambiarRegimenActual={setRegimenActual}
+          onContinuar={() => setVista('historialLaboral')}
+          onVolver={() => setVista('datosIniciales')}
+        />
+      )}
+
+      {vista === 'historialLaboral' && (
+        <HistorialLaboralTemporal
           objetivoSeleccionado={objetivoSeleccionado}
           fechaNacimiento={fechaNacimiento}
           sexo={sexo}
           lugarResidencia={lugarResidencia}
-          onVolver={() => setVista('datosIniciales')}
+          regimenActual={regimenActual}
+          onVolver={() => setVista('situacionPensional')}
         />
       )}
     </AppShell>

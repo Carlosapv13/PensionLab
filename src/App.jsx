@@ -1,33 +1,21 @@
+import { useState } from 'react'
+import './App.css'
+import AppShell from './components/layout/AppShell.jsx'
+import Bienvenida from './pages/Bienvenida.jsx'
+import ObjetivoTemporal from './pages/ObjetivoTemporal.jsx'
+
 function App() {
+  const [vista, setVista] = useState('bienvenida')
+
   return (
-    <div style={{
-      maxWidth: "900px",
-      margin: "40px auto",
-      fontFamily: "Arial, sans-serif",
-      textAlign: "center"
-    }}>
-      <h1>🏦 PensionLab</h1>
-
-      <h2>Simulador Inteligente de Pensión Colombiana</h2>
-
-      <p>
-        Bienvenido.
-      </p>
-
-      <p>
-        Muy pronto podrás calcular tu pensión y recibir recomendaciones
-        personalizadas con inteligencia artificial.
-      </p>
-
-      <hr />
-
-      <h3>Versión 0.1</h3>
-
-      <p>
-        Proyecto creado por Carlos Peraza.
-      </p>
-    </div>
-  );
+    <AppShell>
+      {vista === 'bienvenida' ? (
+        <Bienvenida onComenzar={() => setVista('objetivo')} />
+      ) : (
+        <ObjetivoTemporal onVolver={() => setVista('bienvenida')} />
+      )}
+    </AppShell>
+  )
 }
 
-export default App;
+export default App

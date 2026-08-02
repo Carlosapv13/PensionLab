@@ -211,6 +211,115 @@ fragmentarlo. Sin push realizado — el commit permanece local en
 
 ---
 
+## Slice S3-003 — Pantalla de Datos iniciales
+
+**Estado:** ✅ Cerrado y aprobado — commit `64960d8` en `sprint-3-mvp-headless`.
+
+### Objetivo
+
+Reemplazar la vista temporal de Datos iniciales por una pantalla funcional que
+capture la fecha de nacimiento, el sexo para efectos pensionales y el lugar de
+residencia del usuario.
+
+### Alcance aprobado
+
+- Pantalla funcional "Datos iniciales" con tres campos: fecha de nacimiento
+  (`input type="date"`), sexo para efectos pensionales (Mujer/Hombre) y lugar
+  de residencia (Colombia/Exterior), estos dos últimos implementados como
+  grupos de selección única (`<fieldset>`/`<legend>` + `input type="radio"`,
+  mismo patrón accesible ya usado en `Objetivo.jsx`).
+- Ayuda breve bajo "Sexo para efectos pensionales": *"Este dato es necesario
+  porque algunos requisitos pensionales pueden variar."*
+- Sin captura ni cálculo de edad, sin ciudad, régimen, semanas, IBC, historial
+  laboral ni aportes — explícitamente fuera de alcance de este Slice.
+- Campos construidos directamente dentro de `DatosIniciales.jsx`; no se
+  implementaron `InputField.jsx` ni `SelectField.jsx`, ni se modificó ningún
+  componente compartido existente.
+- `fechaNacimiento`, `sexo` y `lugarResidencia` como estado en `App.jsx` (mismo
+  patrón que `objetivoSeleccionado`), sin usar `context/` todavía; los tres
+  valores persisten al navegar entre "Datos iniciales" y "Situación
+  pensional".
+- "Continuar" deshabilitado hasta que los tres campos sean válidos; la fecha de
+  nacimiento no puede ser futura.
+- `SituacionPensionalTemporal.jsx` reemplaza a `DatosInicialesTemporal.jsx`
+  como vista temporal, mostrando el resumen de los cuatro datos capturados
+  hasta ahora (objetivo, fecha de nacimiento, sexo, lugar de residencia).
+- Sin dependencias instaladas, sin cambios en `domain/`, `models/`, `data/`,
+  `context/` ni en `PersonalInfoForm.jsx`.
+
+### Archivos creados
+
+- `src/pages/DatosIniciales.jsx`
+- `src/pages/SituacionPensionalTemporal.jsx`
+
+### Archivos modificados
+
+- `src/App.jsx` — nuevos estados `fechaNacimiento`, `sexo`, `lugarResidencia` y
+  cuarto valor de `vista` (`'situacionPensional'`).
+- `src/App.css` — estilos nuevos: `.field`, `.field__label`, `.field__input`,
+  `.options legend` (leyendas visibles, a diferencia de la leyenda oculta de
+  `Objetivo.jsx`) y `.summary`.
+
+### Archivos eliminados
+
+- `src/pages/DatosInicialesTemporal.jsx` — reemplazado por `DatosIniciales.jsx`.
+
+### Correcciones y ajustes realizados durante el Slice
+
+Ninguno — a diferencia de S3-001 y S3-002, este Slice se aprobó en su primera
+versión implementada, sin rondas adicionales de ajuste visual o de redacción.
+
+### Verificación
+
+- `npm run lint` — sin errores.
+- `npm test` — 2 archivos de test, 18/18 pruebas en verde, sin regresiones.
+- `npm run build` — build de producción exitoso, sin advertencias.
+- `git diff --check` — sin errores de contenido (solo advertencias de
+  conversión de line-ending LF→CRLF, normales en Windows).
+- Revisión manual confirmó: sin imports ni componentes duplicados, un solo
+  `export default App`, `DatosInicialesTemporal.jsx` eliminado, fecha futura
+  bloqueada (`max` del input + validación en `esFechaNacimientoValida`), y los
+  tres datos conservados al avanzar y volver.
+
+### Commit
+
+```
+64960d8 ui: implementar pantalla de Datos iniciales (Slice S3-003)
+```
+
+Sin push realizado — el commit permanece local en `sprint-3-mvp-headless`.
+
+### Decisiones tomadas en este Slice
+
+1. Sexo y lugar de residencia se capturan como grupos de radio buttons
+   (`<fieldset>`/`<legend>`), reutilizando el mismo patrón accesible de
+   `Objetivo.jsx`, en vez de usar `<select>` — consistencia visual y de
+   interacción entre pantallas de selección única.
+2. A diferencia de `Objetivo.jsx` (donde el `<legend>` se oculta porque
+   duplica la pregunta ya mostrada en el `<h1>`), aquí los `<legend>` quedan
+   visibles porque cada uno es la única etiqueta de su campo — no hay
+   duplicación con el título de la pantalla ("Datos iniciales").
+3. La validación de fecha futura se implementa en dos capas: el atributo
+   `max` del input (restricción a nivel de UI/navegador) y una función pura
+   `esFechaNacimientoValida` (restricción explícita en el estado de
+   habilitación de "Continuar"), sin depender únicamente del control nativo
+   del navegador.
+4. `fechaNacimiento`, `sexo` y `lugarResidencia` se mantienen en `App.jsx`, sin
+   introducir todavía `context/`, por la misma razón que
+   `objetivoSeleccionado` en S3-002: el estado solo se utiliza dentro de este
+   flujo local y aún no justifica una solución global.
+
+### Pendiente para el siguiente Slice
+
+- Implementar la pantalla real de "Situación pensional" (S3-004), reemplazando
+  `SituacionPensionalTemporal.jsx`.
+- Evaluar si los cuatro valores de estado acumulados en `App.jsx`
+  (`objetivoSeleccionado`, `fechaNacimiento`, `sexo`, `lugarResidencia`) siguen
+  siendo manejables ahí a medida que se agreguen más campos, o si ya se
+  justifica introducir `context/` o una librería de ruteo.
+
+---
+
 ## Slices pendientes de Sprint 3
 
 Por definir a medida que el sprint avance.

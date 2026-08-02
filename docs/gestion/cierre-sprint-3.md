@@ -320,6 +320,128 @@ Sin push realizado — el commit permanece local en `sprint-3-mvp-headless`.
 
 ---
 
+## Slice S3-004 — Pantalla de Situación pensional
+
+**Estado:** ✅ Cerrado y aprobado — commit `bd2852b` en `sprint-3-mvp-headless`.
+
+### Objetivo
+
+Implementar la primera pantalla funcional de "Situación pensional",
+reemplazando `SituacionPensionalTemporal.jsx`. Con este Slice comienza la
+construcción del expediente pensional, sin asumir todavía semanas, IBC,
+salario, aportes ni ningún cálculo pensional.
+
+### Alcance aprobado
+
+- Pantalla funcional "Situación pensional" con una única pregunta —"¿Dónde
+  estás afiliado actualmente?"— y un texto de apoyo, implementada como grupo
+  de selección única (`<fieldset>`/`<legend>` visible + `input type="radio"`),
+  mismo patrón accesible ya usado en `Objetivo.jsx` y `DatosIniciales.jsx`.
+- Tres opciones: "Colpensiones" (con ayuda "Régimen público de prima media
+  (RPM)."), "Estoy afiliado a un fondo privado (Porvenir, Protección,
+  Colfondos o Skandia)" (con ayuda "Régimen de ahorro individual (RAIS).") y
+  "No estoy seguro" (con ayuda "No te preocupes si no lo sabes. PensionLab te
+  ayudará a identificarlo.").
+- Los valores se almacenan internamente como `'RPM'`, `'RAIS'` y
+  `'desconocido'`, desacoplados del texto mostrado al usuario.
+- Sin captura de fecha de inicio de cotización, semanas cotizadas, salario,
+  IBC, aportes, historial laboral, traslados ni cálculos pensionales —
+  explícitamente fuera de alcance de este Slice.
+- `regimenActual` como estado en `App.jsx` (mismo patrón que los campos
+  anteriores), sin usar `context/` todavía; persiste al navegar entre
+  "Situación pensional" y "Historial laboral".
+- "Continuar" deshabilitado hasta seleccionar exactamente una opción; botón
+  "Volver" presente.
+- `HistorialLaboralTemporal.jsx` reemplaza a `SituacionPensionalTemporal.jsx`
+  como vista temporal, mostrando el resumen de los cinco datos capturados
+  hasta ahora (objetivo, fecha de nacimiento, sexo, lugar de residencia,
+  régimen actual — este último traducido a su texto comprensible para el
+  usuario).
+- Sin dependencias instaladas, sin componentes compartidos nuevos, sin
+  cambios en `domain/`, `models/`, `data/`, `context/` ni en
+  `LaborHistoryForm.jsx`.
+
+### Archivos creados
+
+- `src/pages/SituacionPensional.jsx`
+- `src/pages/HistorialLaboralTemporal.jsx`
+
+### Archivos modificados
+
+- `src/App.jsx` — nuevo estado `regimenActual` y quinto valor de `vista`
+  (`'historialLaboral'`).
+
+`src/App.css` no requirió cambios — se reutilizaron `.options legend` y
+`.screen__subtitle` ya existentes.
+
+### Archivos eliminados
+
+- `src/pages/SituacionPensionalTemporal.jsx` — reemplazado por
+  `SituacionPensional.jsx`.
+
+### Correcciones y ajustes realizados durante el Slice
+
+- **Ajustes de redacción** (previos a la aprobación final): texto de la
+  opción "Fondo privado" ampliado a "Estoy afiliado a un fondo privado
+  (Porvenir, Protección, Colfondos o Skandia)"; ayuda de la opción "No estoy
+  seguro" cambiada a "No te preocupes si no lo sabes. PensionLab te ayudará a
+  identificarlo." Sin cambios de arquitectura, estado ni comportamiento.
+
+### Verificación
+
+- `npm run lint` — sin errores, en cada iteración del Slice.
+- `npm test` — 2 archivos de test, 18/18 pruebas en verde, sin regresiones.
+- `npm run build` — build de producción exitoso en cada verificación, sin
+  advertencias.
+- `git diff --check` — sin errores de contenido (solo advertencias de
+  conversión de line-ending LF→CRLF, normales en Windows).
+- Revisión manual confirmó: sin imports duplicados, un solo componente
+  `SituacionPensional` en `App.jsx`, `HistorialLaboralTemporal` con un único
+  `onVolver`, un solo `export default App`,
+  `SituacionPensionalTemporal.jsx` eliminado, `regimenActual` conservado al
+  avanzar y volver, y "Continuar" deshabilitado hasta seleccionar una opción.
+
+### Commit
+
+```
+bd2852b ui: implementar pantalla de Situación pensional (Slice S3-004)
+```
+
+Sin push realizado — el commit permanece local en `sprint-3-mvp-headless`.
+
+### Decisiones tomadas en este Slice
+
+1. Del Bloque 2 (Historia Pensional) del Expediente Pensional
+   (`docs/tecnico/arquitectura/expediente-pensional.md`), este Slice captura
+   únicamente el régimen actual — el resto del bloque (semanas, IBC, salario,
+   fecha de inicio de cotización, traslados, bonos) queda explícitamente
+   diferido a slices posteriores.
+2. El régimen se presenta al usuario en lenguaje cotidiano ("Colpensiones",
+   "fondo privado") en vez de la nomenclatura técnica (RPM/RAIS), reservando
+   esta última para el valor interno almacenado en el estado — separación
+   entre lo que el usuario reconoce y lo que el dominio necesita.
+3. A diferencia de `Objetivo.jsx` (donde el `<legend>` se oculta porque
+   duplica la pregunta ya mostrada en el `<h1>`), aquí el título ("Situación
+   pensional") y la pregunta ("¿Dónde estás afiliado actualmente?") son
+   textos distintos, por lo que el `<legend>` queda visible — mismo criterio
+   ya aplicado en `DatosIniciales.jsx`.
+4. `regimenActual` se mantiene en `App.jsx`, sin introducir todavía
+   `context/`, por la misma razón que los campos de los Slices anteriores: el
+   estado solo se utiliza dentro de este flujo local y aún no justifica una
+   solución global.
+
+### Pendiente para el siguiente Slice
+
+- Implementar la pantalla real de "Historial laboral" (S3-005), reemplazando
+  `HistorialLaboralTemporal.jsx`.
+- Evaluar si los cinco valores de estado acumulados en `App.jsx`
+  (`objetivoSeleccionado`, `fechaNacimiento`, `sexo`, `lugarResidencia`,
+  `regimenActual`) siguen siendo manejables ahí a medida que se agreguen más
+  campos, o si ya se justifica introducir `context/` o una librería de
+  ruteo.
+
+---
+
 ## Slices pendientes de Sprint 3
 
 Por definir a medida que el sprint avance.

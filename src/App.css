@@ -358,6 +358,28 @@
   flex-shrink: 0;
 }
 
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+}
+
+.date-fields {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+}
+
+.date-fields .field {
+  flex: 1;
+  gap: 4px;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -382,6 +404,10 @@
   .screen__actions {
     flex-direction: column;
     width: 100%;
+  }
+
+  .date-fields {
+    flex-direction: column;
   }
 }
 

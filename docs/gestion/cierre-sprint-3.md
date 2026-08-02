@@ -318,6 +318,52 @@ Sin push realizado — el commit permanece local en `sprint-3-mvp-headless`.
   siendo manejables ahí a medida que se agreguen más campos, o si ya se
   justifica introducir `context/` o una librería de ruteo.
 
+### Mejora posterior al cierre — captura de fecha por Día/Mes/Año
+
+**Commit:** `b101a10` en `sprint-3-mvp-headless`.
+
+Tras el cierre de S3-003 (y ya con S3-004 también cerrado), se identificó un
+problema de usabilidad en el único `input type="date"` original: el selector
+nativo del navegador obliga a navegar mes a mes (o año a año, según el
+navegador) para llegar a la fecha de nacimiento, lo cual es especialmente
+costoso para usuarios de mayor edad que deben retroceder varias décadas —
+justo el perfil de usuario para quien el año de nacimiento suele estar más
+lejos del presente. Es una mejora de accesibilidad y usabilidad, no un cambio
+de alcance funcional: el dato capturado y su significado no cambian.
+
+**Cambio realizado**: el `input type="date"` se reemplazó por tres campos
+independientes y explícitos —Día (`input type="number"`, 1-31), Mes
+(`<select>` con los 12 meses en español) y Año (`input type="number"`
+editable directamente, sin lista larga, entre 1900 y el año actual)—,
+dispuestos en una sola fila en escritorio y apilados en pantallas pequeñas
+(`.date-fields`, con `flex-direction: column` bajo `max-width: 600px`).
+
+**Validación**: la combinación de los tres campos debe representar una fecha
+real (se valida reconstruyendo un objeto `Date` y comparando año/mes/día
+resultantes contra los ingresados, para detectar desbordamientos como el 30 de
+febrero o el 31 de abril) y no puede ser futura. "Continuar" permanece
+deshabilitado mientras la fecha no sea completa y válida — mismo criterio que
+ya regía con el selector nativo.
+
+**Persistencia y contrato**: `fechaNacimiento` en `App.jsx` no cambió de
+forma ni de tipo — sigue siendo un único string `YYYY-MM-DD`. `DatosIniciales.jsx`
+mantiene un estado local `{ dia, mes, anio }`, inicializado a partir de ese
+mismo string; como solo es posible avanzar con una fecha completa y válida,
+al volver a la pantalla los tres campos se reconstruyen correctamente desde
+`fechaNacimiento`.
+
+**Verificación**: `npm run lint`, `npm test` (18/18) y `npm run build`
+exitosos; `git diff --check` sin errores de contenido. Se verificaron
+manualmente los casos límite: 29 de febrero de 2024 (válido, año bisiesto),
+29 de febrero de 2023 (inválido), 31 de abril de 1970 (inválido, abril tiene
+30 días), fecha futura (inválida), 1 de enero de 1900 (válido, límite
+inferior) y año 1899 (inválido, fuera del límite inferior).
+
+Alcance estrictamente limitado a `src/pages/DatosIniciales.jsx` y
+`src/App.css`; sin cambios en sexo, lugar de residencia, navegación, ninguna
+otra pantalla, ni en `domain/`, `models/`, `data/` o `context/`. Sin
+dependencias instaladas.
+
 ---
 
 ## Slice S3-004 — Pantalla de Situación pensional

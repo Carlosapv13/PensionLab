@@ -6,7 +6,8 @@ import Objetivo from './pages/Objetivo.jsx'
 import DatosIniciales from './pages/DatosIniciales.jsx'
 import SituacionPensional from './pages/SituacionPensional.jsx'
 import HistorialLaboral from './pages/HistorialLaboral.jsx'
-import ResumenCasoTemporal from './pages/ResumenCasoTemporal.jsx'
+import ExpedientePensional from './pages/ExpedientePensional.jsx'
+import CompletarExpedienteTemporal from './pages/CompletarExpedienteTemporal.jsx'
 
 function App() {
   const [vista, setVista] = useState('bienvenida')
@@ -64,13 +65,13 @@ function App() {
           onCambiarLugarCotizacion={setLugarCotizacion}
           cotizaActualmente={cotizaActualmente}
           onCambiarCotizaActualmente={setCotizaActualmente}
-          onContinuar={() => setVista('resumenCaso')}
+          onContinuar={() => setVista('expedientePensional')}
           onVolver={() => setVista('situacionPensional')}
         />
       )}
 
-      {vista === 'resumenCaso' && (
-        <ResumenCasoTemporal
+      {vista === 'expedientePensional' && (
+        <ExpedientePensional
           objetivoSeleccionado={objetivoSeleccionado}
           fechaNacimiento={fechaNacimiento}
           sexo={sexo}
@@ -79,7 +80,14 @@ function App() {
           tipoCotizante={tipoCotizante}
           lugarCotizacion={lugarCotizacion}
           cotizaActualmente={cotizaActualmente}
+          onComenzarExpediente={() => setVista('completarExpediente')}
           onVolver={() => setVista('historialLaboral')}
+        />
+      )}
+
+      {vista === 'completarExpediente' && (
+        <CompletarExpedienteTemporal
+          onVolver={() => setVista('expedientePensional')}
         />
       )}
     </AppShell>

@@ -1,6 +1,8 @@
-// Vista temporal de Expediente pensional: destino provisional del botón
-// "Continuar" de Historial laboral hasta que el Slice correspondiente
-// implemente la pantalla real.
+// Pantalla funcional de Expediente pensional: primera versión real de esta
+// vista (Slice S3-006). Presenta el resumen de lo capturado hasta ahora,
+// organizado por bloques, y da paso a continuar completando el expediente.
+// No captura datos nuevos, no modifica estados existentes y no implementa
+// reglas ni cálculos pensionales.
 
 const MESES_LARGOS = [
   'enero',
@@ -56,9 +58,10 @@ function formatearFecha(fecha) {
  * @param {string | null} props.tipoCotizante
  * @param {string | null} props.lugarCotizacion
  * @param {string | null} props.cotizaActualmente
+ * @param {() => void} props.onComenzarExpediente
  * @param {() => void} props.onVolver
  */
-function ResumenCasoTemporal({
+function ExpedientePensional({
   objetivoSeleccionado,
   fechaNacimiento,
   sexo,
@@ -67,6 +70,7 @@ function ResumenCasoTemporal({
   tipoCotizante,
   lugarCotizacion,
   cotizaActualmente,
+  onComenzarExpediente,
   onVolver,
 }) {
   return (
@@ -74,7 +78,17 @@ function ResumenCasoTemporal({
       <h1 className="screen__title">Expediente pensional</h1>
 
       <p className="screen__subtitle">
-        Esta pantalla se implementará en el siguiente Slice.
+        Ya conocemos la información básica de tu caso.
+      </p>
+
+      <p className="screen__subtitle">
+        A partir de ahora comenzaremos a construir tu expediente pensional.
+      </p>
+
+      <p className="screen__subtitle">
+        No necesitas tener toda la información desde el principio. PensionLab
+        te indicará paso a paso qué información hace falta y por qué es
+        importante.
       </p>
 
       <div className="summary">
@@ -103,11 +117,20 @@ function ResumenCasoTemporal({
         </section>
       </div>
 
-      <button type="button" className="btn btn-secondary" onClick={onVolver}>
-        Volver
-      </button>
+      <div className="screen__actions">
+        <button type="button" className="btn btn-secondary" onClick={onVolver}>
+          Volver
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={onComenzarExpediente}
+        >
+          Comenzar expediente
+        </button>
+      </div>
     </div>
   )
 }
 
-export default ResumenCasoTemporal
+export default ExpedientePensional

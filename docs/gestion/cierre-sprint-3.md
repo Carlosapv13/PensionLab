@@ -488,6 +488,145 @@ Sin push realizado — el commit permanece local en `sprint-3-mvp-headless`.
 
 ---
 
+## Slice S3-005 — Pantalla de Historial laboral
+
+**Estado:** ✅ Cerrado y aprobado — commit `9bb0631` en `sprint-3-mvp-headless`.
+
+### Objetivo
+
+Reemplazar la vista temporal de Historial laboral por una pantalla funcional
+que capture información estructural sobre la forma en que el usuario ha
+cotizado, sin asumir todavía fecha de inicio de cotización, semanas, salario,
+IBC, aportes ni ningún cálculo pensional.
+
+### Alcance aprobado
+
+- Pantalla funcional "Historial laboral" con tres preguntas de selección
+  única, mismo patrón accesible (`<fieldset>`/`<legend>` visible +
+  `input type="radio"`) ya usado en `Objetivo.jsx`, `DatosIniciales.jsx` y
+  `SituacionPensional.jsx`:
+  1. "¿Cómo has realizado tus cotizaciones?" — Como empleado / Como
+     independiente / De ambas formas (valores internos `empleado` /
+     `independiente` / `ambos`), cada opción con su ayuda.
+  2. "¿Dónde has realizado cotizaciones?" — Solo en Colombia / Desde el
+     exterior / En Colombia y desde el exterior (valores internos `colombia`
+     / `exterior` / `ambos`), cada opción con su ayuda.
+  3. "¿Actualmente realizas aportes al sistema pensional colombiano?" — Sí /
+     No (valores internos `si` / `no`).
+- Sin captura de fecha de inicio de cotización, semanas, salario, IBC,
+  aportes ni historia salarial — explícitamente fuera de alcance.
+- `tipoCotizante`, `lugarCotizacion` y `cotizaActualmente` como estado en
+  `App.jsx` (mismo patrón que los campos anteriores), sin usar `context/`
+  todavía; los tres persisten al navegar entre "Historial laboral" y la
+  vista siguiente.
+- "Continuar" deshabilitado hasta responder las tres preguntas; botón
+  "Volver" presente.
+- Sin componentes compartidos nuevos, sin dependencias instaladas, sin
+  cambios en `domain/`, `models/`, `data/`, `context/` ni en
+  `LaborHistoryForm.jsx`.
+
+### Archivos creados
+
+- `src/pages/HistorialLaboral.jsx`
+- `src/pages/ResumenCasoTemporal.jsx`
+
+### Archivos modificados
+
+- `src/App.jsx` — tres nuevos estados (`tipoCotizante`, `lugarCotizacion`,
+  `cotizaActualmente`) y sexto valor de `vista` (`'resumenCaso'`).
+- `src/App.css` — clases nuevas `.summary__block` y `.summary__block-title`
+  para la reorganización del resumen en bloques (ver correcciones más abajo);
+  ajuste de `gap` en `.summary` (4px → 20px) para separar los bloques.
+
+### Archivos eliminados
+
+- `src/pages/HistorialLaboralTemporal.jsx` — reemplazado por
+  `HistorialLaboral.jsx`.
+
+### Correcciones y ajustes realizados durante el Slice
+
+- **Ajustes de redacción en `HistorialLaboral.jsx`**: subtítulo final fijado
+  a *"Cuéntanos, de forma general, cómo has realizado tus cotizaciones. Más
+  adelante podrás ingresar información más detallada."*; la tercera pregunta
+  se reescribió de "¿Actualmente estás cotizando?" a "¿Actualmente realizas
+  aportes al sistema pensional colombiano?"; se eliminó la opción "No estoy
+  seguro" de esa pregunta, dejando únicamente Sí/No.
+- **Placeholder "Expediente pensional"**: el título de la vista temporal
+  siguiente cambió de "Resumen del caso" a "Expediente pensional".
+- **Reorganización del resumen en bloques**: la lista continua de párrafos de
+  `ResumenCasoTemporal.jsx` se reestructuró en cuatro bloques con subtítulo
+  (`<h2 className="summary__block-title">`) — Objetivo, Datos personales,
+  Situación pensional, Historial laboral —, sin agregar ni quitar ningún dato
+  ya capturado; solo se retiró el prefijo redundante "Objetivo seleccionado:"
+  del bloque Objetivo, ya que el subtítulo del bloque cumple esa función.
+- **Formato amigable de fecha**: la fecha de nacimiento se presenta en
+  `ResumenCasoTemporal.jsx` como "13 de septiembre de 1972" en vez de
+  `YYYY-MM-DD`, mediante una función pura de formateo (`formatearFecha`) que
+  no modifica el valor almacenado en `App.jsx`.
+
+### Verificación
+
+- `npm run lint` — sin errores, en cada iteración del Slice.
+- `npm test` — 2 archivos de test, 18/18 pruebas en verde, sin regresiones.
+- `npm run build` — build de producción exitoso en cada verificación, sin
+  advertencias.
+- `git diff --check` — sin errores de contenido (solo advertencias de
+  conversión de line-ending LF→CRLF, normales en Windows).
+- Revisión manual confirmó, en dos rondas: sin imports duplicados, un solo
+  componente `HistorialLaboral` en `App.jsx`, `ResumenCasoTemporal` con un
+  único `onVolver`, un solo `export default App`,
+  `HistorialLaboralTemporal.jsx` eliminado, los tres campos conservados al
+  avanzar y volver, "Continuar" deshabilitado hasta responder las tres
+  preguntas, selección única por pregunta (un `name` de grupo distinto por
+  `fieldset`), un solo `<h1>` con el texto correcto, ausencia de la lista
+  antigua de párrafos, los cuatro bloques exactos y en orden, cada dato
+  mostrado una sola vez, y sin referencias obsoletas al valor `"desconocido"`
+  ya inalcanzable desde `HistorialLaboral.jsx`.
+
+### Commit
+
+```
+9bb0631 ui: implementar pantalla de Historial laboral (Slice S3-005)
+```
+
+Sin push realizado — el commit permanece local en `sprint-3-mvp-headless`.
+
+### Decisiones tomadas en este Slice
+
+1. Del Bloque 2 (Historia Pensional) del Expediente Pensional, este Slice
+   captura únicamente información estructural sobre la forma de cotización
+   (tipo de cotizante, lugar de cotización, si cotiza actualmente) — no la
+   fecha de inicio de cotización, que había sido la propuesta inicial y se
+   descartó explícitamente a favor de este alcance distinto.
+2. Las tres preguntas se presentan en lenguaje cotidiano, con ayuda breve en
+   las dos primeras; la tercera se simplificó a una decisión binaria (Sí/No)
+   tras retirar la opción "No estoy seguro", por ser menos ambigua para el
+   usuario que para el régimen actual (donde sí tiene sentido no saberlo).
+3. `tipoCotizante`, `lugarCotizacion` y `cotizaActualmente` se mantienen en
+   `App.jsx`, sin introducir todavía `context/`, por la misma razón que los
+   campos de los Slices anteriores: el estado solo se utiliza dentro de este
+   flujo local y aún no justifica una solución global.
+4. El resumen temporal se organiza en bloques temáticos en vez de una lista
+   plana, anticipando la estructura que tendrá el Expediente Pensional real,
+   sin implementar todavía ese contrato. Se trata únicamente de una mejora de
+   legibilidad de una vista temporal, no de una decisión de dominio.
+5. No se extrajo un componente compartido de captura de fecha ni de bloque de
+   resumen — cada pantalla y vista temporal sigue construyendo su propio
+   marcado, consistente con el criterio ya aplicado de generalizar solo ante
+   evidencia clara de reutilización.
+
+### Pendiente para el siguiente Slice
+
+- Implementar la pantalla real de "Expediente pensional" (S3-006),
+  reemplazando `ResumenCasoTemporal.jsx`.
+- Continuar evaluando si el crecimiento del estado en `App.jsx` sigue siendo
+  manejable o si ya se justifica introducir `context/` o una solución de
+  gestión de estado.
+- Decidir si la fecha de inicio de cotización, aplazada en este Slice, se
+  incorpora en un Slice posterior y bajo qué pantalla.
+
+---
+
 ## Slices pendientes de Sprint 3
 
 Por definir a medida que el sprint avance.

@@ -5,7 +5,8 @@ import Bienvenida from './pages/Bienvenida.jsx'
 import Objetivo from './pages/Objetivo.jsx'
 import DatosIniciales from './pages/DatosIniciales.jsx'
 import SituacionPensional from './pages/SituacionPensional.jsx'
-import HistorialLaboralTemporal from './pages/HistorialLaboralTemporal.jsx'
+import HistorialLaboral from './pages/HistorialLaboral.jsx'
+import ResumenCasoTemporal from './pages/ResumenCasoTemporal.jsx'
 
 function App() {
   const [vista, setVista] = useState('bienvenida')
@@ -14,6 +15,9 @@ function App() {
   const [sexo, setSexo] = useState(null)
   const [lugarResidencia, setLugarResidencia] = useState(null)
   const [regimenActual, setRegimenActual] = useState(null)
+  const [tipoCotizante, setTipoCotizante] = useState(null)
+  const [lugarCotizacion, setLugarCotizacion] = useState(null)
+  const [cotizaActualmente, setCotizaActualmente] = useState(null)
 
   return (
     <AppShell>
@@ -53,13 +57,29 @@ function App() {
       )}
 
       {vista === 'historialLaboral' && (
-        <HistorialLaboralTemporal
+        <HistorialLaboral
+          tipoCotizante={tipoCotizante}
+          onCambiarTipoCotizante={setTipoCotizante}
+          lugarCotizacion={lugarCotizacion}
+          onCambiarLugarCotizacion={setLugarCotizacion}
+          cotizaActualmente={cotizaActualmente}
+          onCambiarCotizaActualmente={setCotizaActualmente}
+          onContinuar={() => setVista('resumenCaso')}
+          onVolver={() => setVista('situacionPensional')}
+        />
+      )}
+
+      {vista === 'resumenCaso' && (
+        <ResumenCasoTemporal
           objetivoSeleccionado={objetivoSeleccionado}
           fechaNacimiento={fechaNacimiento}
           sexo={sexo}
           lugarResidencia={lugarResidencia}
           regimenActual={regimenActual}
-          onVolver={() => setVista('situacionPensional')}
+          tipoCotizante={tipoCotizante}
+          lugarCotizacion={lugarCotizacion}
+          cotizaActualmente={cotizaActualmente}
+          onVolver={() => setVista('historialLaboral')}
         />
       )}
     </AppShell>

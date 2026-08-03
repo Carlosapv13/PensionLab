@@ -743,6 +743,149 @@ Sin push realizado — el commit permanece local en `sprint-3-mvp-headless`.
 
 ---
 
+## Slice S3-007 — Pantalla "Completemos tu expediente"
+
+**Estado:** ✅ Cerrado y aprobado — commit `c4c13b1` en `sprint-3-mvp-headless`.
+
+### Objetivo
+
+Reemplazar la vista temporal `CompletarExpedienteTemporal.jsx` por la primera
+versión funcional de esa pantalla, sin capturar datos nuevos y sin introducir
+lógica de negocio, reglas ni cálculos pensionales.
+
+### Alcance aprobado
+
+- Pantalla funcional "Completemos tu expediente" que muestra un **checklist de
+  progreso** del expediente pensional — no repite el detalle de datos ya
+  mostrado en `ExpedientePensional.jsx` (S3-006), sino que resume qué bloques
+  ya tienen información y cuál es el siguiente.
+- Cuatro bloques ya recorridos —Objetivo, Datos personales, Situación
+  pensional, Historial laboral— marcados con la etiqueta "Información básica
+  registrada" (deliberadamente no "Completado", para no sugerir que esos
+  bloques no podrían requerir más información más adelante).
+- Un quinto elemento, "Información pensional esencial", marcado como
+  "Siguiente paso" con tratamiento visual diferenciado (borde y fondo de
+  acento), sin anticipar todavía si su contenido detallado será fecha de
+  inicio de cotización, Perfil de Decisión, u otro — esa definición queda
+  explícitamente para S3-008.
+- Dos botones: "Volver" (a `ExpedientePensional`) y "Continuar con mi
+  expediente" (a un nuevo placeholder temporal).
+- `CompletarExpediente.jsx` no recibe los 8 valores de estado capturados
+  hasta ahora como props — no los muestra ni los necesita para ninguna
+  validación real, y pasarlos habría sido *prop drilling* sin propósito.
+- `InformacionPensionalTemporal.jsx` reemplaza a `CompletarExpedienteTemporal.jsx`
+  como vista temporal, con título "Información pensional esencial".
+- Sin tocar `ProgressStepper.jsx` (todavía sin evidencia de un segundo caso
+  real que justifique implementarlo), sin dependencias instaladas, sin
+  cambios en `domain/`, `models/`, `data/`, `context/` ni en Slices
+  anteriores.
+
+### Archivos creados
+
+- `src/pages/CompletarExpediente.jsx`
+- `src/pages/InformacionPensionalTemporal.jsx`
+
+### Archivos modificados
+
+- `src/App.jsx` — swap de import (`CompletarExpedienteTemporal` →
+  `CompletarExpediente`), nuevo import de `InformacionPensionalTemporal`,
+  octavo valor de `vista` (`'informacionPensional'`), y eliminación del paso
+  de los 8 valores de estado como props a `CompletarExpediente` (ya no
+  aplica: recibe únicamente `onVolver` y `onContinuar`).
+- `src/App.css` — clases nuevas: `.checklist`, `.checklist__item`,
+  `.checklist__item--siguiente`, `.checklist__label`, `.badge`,
+  `.badge--registrado`, `.badge--siguiente`; y dos clases exclusivas de
+  título (`.screen__title--completar-expediente`,
+  `.screen__title--informacion-pensional`) para la corrección de
+  superposición descrita abajo.
+
+### Archivos eliminados
+
+- `src/pages/CompletarExpedienteTemporal.jsx` — reemplazado por
+  `CompletarExpediente.jsx`.
+
+### Correcciones y ajustes realizados durante el Slice
+
+- **Corrección visual — títulos superpuestos**: mismo bug de herencia de
+  `line-height: 145%` ya identificado y corregido en S3-001 y S3-002
+  (`index.css`), presente esta vez en `CompletarExpediente.jsx` e
+  `InformacionPensionalTemporal.jsx`. Corregido con dos clases exclusivas
+  (`screen__title--completar-expediente`, `screen__title--informacion-pensional`,
+  ambas `line-height: 1.15`), sin tocar `.screen__title` compartido — mismo
+  patrón ya usado en `Bienvenida.jsx` y `Objetivo.jsx`.
+- **Ajuste de redacción en `InformacionPensionalTemporal.jsx`**: el texto
+  placeholder genérico ("Esta pantalla se implementará en el siguiente
+  Slice.") se reemplazó por dos párrafos específicos: *"En este bloque
+  comenzaremos a construir la historia pensional que servirá de base para
+  evaluar tus alternativas."* y *"PensionLab te acompañará paso a paso para
+  registrar únicamente la información necesaria."*
+
+### Verificación
+
+- `npm run lint` — sin errores, en cada iteración del Slice.
+- `npm test` — 2 archivos de test, 18/18 pruebas en verde, sin regresiones.
+- `npm run build` — build de producción exitoso en cada verificación, sin
+  advertencias.
+- `git diff --check` — sin errores de contenido (solo advertencias de
+  conversión de line-ending LF→CRLF, normales en Windows).
+- Revisión manual confirmó: sin imports duplicados, cada componente
+  renderizado una sola vez, `InformacionPensionalTemporal` con un único
+  `onVolver`, `CompletarExpediente` con únicamente `onContinuar`/`onVolver`,
+  `CompletarExpedienteTemporal.jsx` eliminado, y la navegación completa
+  (adelante y atrás) verificada contra el flujo esperado.
+
+### Commit
+
+```
+c4c13b1 ui: implementar pantalla Completemos tu expediente (Slice S3-007)
+```
+
+Sin push realizado — el commit permanece local en `sprint-3-mvp-headless`.
+
+### Decisiones tomadas en este Slice
+
+1. El nombre del siguiente bloque se fija como "Información pensional
+   esencial", sin comprometerse todavía a su contenido detallado (fecha de
+   inicio de cotización, Perfil de Decisión, u otro) — esa definición se
+   difiere explícitamente a S3-008.
+2. Los cuatro bloques ya recorridos se etiquetan "Información básica
+   registrada", no "Completado", por decisión explícita de producto: evita
+   sugerir que esos bloques no podrían requerir más información más
+   adelante, coherente con el Principio 5 del proyecto (declarar
+   limitaciones, no ocultarlas).
+3. `CompletarExpediente.jsx` no recibe los 8 valores de estado capturados
+   como props — al no mostrarlos ni usarlos para validación real, pasarlos
+   habría sido *prop drilling* sin propósito; llegar a esta pantalla ya
+   implica que los pasos anteriores completaron su propia validación.
+4. La pantalla no queda solo con "Volver": incluye "Continuar con mi
+   expediente" hacia un nuevo placeholder temporal, en vez de convertirse en
+   un punto muerto del flujo — mantiene el mismo patrón de avance progresivo
+   ya usado en todos los Slices anteriores.
+5. `ProgressStepper.jsx` no se implementa en este Slice pese a ser
+   conceptualmente afín (checklist de progreso) — se mantiene el criterio ya
+   aplicado en Sprint 3 de generalizar solo con evidencia de un segundo caso
+   real, no en el primer uso.
+6. Se consolida el cambio de enfoque del flujo del MVP: a partir de este
+   Slice el usuario deja de recorrer únicamente pantallas y comienza a
+   construir progresivamente su Expediente Pensional. Las pantallas
+   posteriores deberán priorizar la explicación del propósito de cada dato
+   solicitado, evitando formularios sin contexto.
+
+### Pendiente para el siguiente Slice
+
+- Implementar la primera versión funcional de "Información pensional
+  esencial", iniciando la construcción guiada de la historia pensional y
+  explicando al usuario por qué cada dato solicitado es necesario para
+  evaluar posteriormente sus alternativas pensionales.
+- Continuar evaluando si el crecimiento del estado en `App.jsx` (8 valores
+  más `vista`) sigue siendo manejable o si ya se justifica introducir
+  `context/` o una solución de gestión de estado.
+- Evaluar, con un segundo caso real, si `ProgressStepper.jsx` debe
+  implementarse para unificar la representación de progreso entre
+  `CompletarExpediente.jsx` y el resto del flujo.
+
+---
+
 ## Slices pendientes de Sprint 3
 
 Por definir a medida que el sprint avance.

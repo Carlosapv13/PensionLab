@@ -886,6 +886,198 @@ Sin push realizado — el commit permanece local en `sprint-3-mvp-headless`.
 
 ---
 
+## Slice S3-008 — Pantalla "Información pensional esencial"
+
+**Estado:** ✅ Cerrado y aprobado — commit `d586750` en `sprint-3-mvp-headless`.
+
+### Objetivo
+
+Implementar la primera versión funcional de "Información pensional
+esencial", con una experiencia conversacional (no un formulario tradicional)
+que capture como máximo dos datos, explicando siempre al usuario por qué se
+necesitan y sin bloquear el flujo cuando declara explícitamente que no los
+conoce.
+
+### Alcance aprobado
+
+- Pantalla funcional con dos preguntas presentadas **una a la vez** dentro de
+  la misma pantalla (estado interno de paso, sin nuevo valor de `vista` por
+  pregunta): (1) año en que empezó a cotizar, con opción "No lo recuerdo con
+  exactitud"; (2) nivel de conocimiento de las semanas cotizadas ("Sí,
+  conozco el número." / "Tengo una idea aproximada." / "No las conozco."),
+  con campo numérico condicional para las dos primeras opciones.
+- Cada pregunta incluye una explicación de por qué PensionLab la necesita y
+  cómo ayuda a evaluar estrategias más adelante — texto aprobado
+  explícitamente antes de implementar.
+- **Validación básica de formato**: año de 4 dígitos entre el año de
+  nacimiento y el año actual (o `'desconocido'`); semanas como entero no
+  negativo, sin decimales ni negativos, sin tope máximo artificial.
+- **Validación de coherencia cronológica** entre los dos datos, incorporada
+  durante la revisión del Slice, con tres niveles:
+  - *Imposible* (bloquea sin excepción): año anterior al de nacimiento, año
+    futuro, o semanas que exceden el máximo cronológicamente posible según el
+    año de inicio declarado.
+  - *Extraordinario* (requiere confirmación explícita, no bloquea): año de
+    inicio antes de los 15 años; o, cuando el año de inicio es
+    `'desconocido'`, semanas que exceden el tiempo aproximado transcurrido
+    desde los 15 años de edad.
+  - *Válido*: cualquier combinación que no caiga en los dos casos anteriores.
+- Los cálculos de días usan `Date.UTC(...)` y diferencia en milisegundos,
+  para no depender de zona horaria ni horario de verano.
+- Las confirmaciones de casos extraordinarios (edad temprana, semanas
+  extraordinarias) se conservan en `App.jsx` mientras el dato correspondiente
+  no cambie, y se **invalidan explícitamente** (no solo por comparación
+  derivada) ante cualquier edición relacionada — evita que una confirmación
+  antigua reviva al volver a escribir un valor ya editado antes.
+- `CompletarExpediente.jsx` (Slice S3-007) se modifica de forma autorizada y
+  acotada para que su checklist refleje el estado real capturado
+  (`infoEsencialCompletada`), no una etiqueta fija — antes de completar
+  S3-008 muestra "Información pensional esencial" como "Siguiente paso";
+  después, la marca como "Información básica registrada" y muestra "Historia
+  pensional" como el nuevo "Siguiente paso".
+- `HistoriaPensionalTemporal.jsx` reemplaza a `InformacionPensionalTemporal.jsx`
+  como vista temporal, con título "Continuemos con tu historia pensional".
+- Sin componentes compartidos genéricos nuevos (ni de wizard/conversación, ni
+  de mensajes), sin dependencias instaladas, sin cambios en `domain/`,
+  `models/`, `data/`, `context/`, ni en traslados de régimen, edad de
+  pensión, o si la persona ya está pensionada — explícitamente fuera de
+  alcance.
+
+### Archivos creados
+
+- `src/pages/InformacionPensionalEsencial.jsx`
+- `src/pages/HistoriaPensionalTemporal.jsx`
+
+### Archivos modificados
+
+- `src/App.jsx` — seis estados nuevos (`anioInicioCotizacion`,
+  `nivelConocimientoSemanas`, `semanasCotizadas`, `infoEsencialCompletada`,
+  `anioConfirmadoEdadTemprana`, `semanasConfirmadasPara`), wrappers que
+  invalidan `infoEsencialCompletada` y las confirmaciones de coherencia ante
+  cualquier edición relacionada, y el nuevo valor de `vista`
+  (`'historiaPensional'`).
+- `src/App.css` — clases nuevas: `.checkbox-option`, `.field__warning`,
+  `.field__input:disabled`, y las clases exclusivas de título
+  `screen__title--historia-pensional` (corrección proactiva de superposición,
+  mismo patrón ya usado en Slices anteriores).
+- `src/pages/CompletarExpediente.jsx` — checklist dinámico según
+  `infoEsencialCompletada`, en vez de una lista fija (cambio autorizado
+  explícitamente sobre un Slice ya cerrado, ver Decisión 5).
+
+### Archivos eliminados
+
+- `src/pages/InformacionPensionalTemporal.jsx` — reemplazado por
+  `InformacionPensionalEsencial.jsx`.
+
+### Correcciones y ajustes realizados durante el Slice
+
+- **Corrección de consistencia**: se detectó que `infoEsencialCompletada`
+  podía quedar en `true` aunque el usuario modificara una respuesta ya
+  registrada después de completar el bloque. Se corrigió envolviendo los
+  setters de los tres datos capturados para que cualquier edición reinicie
+  `infoEsencialCompletada` a `false` — el checklist de `CompletarExpediente`
+  nunca queda desactualizado.
+- **Ajuste de redacción**: la pregunta de semanas cambió de "¿Conoces...?" a
+  "¿Sabes...?", y su explicación se reescribió para un tono más
+  conversacional, por decisión explícita de UX ("PensionLab debe conversar
+  con la persona, no interrogarla").
+- **Incorporación de la validación cronológica** (año vs. fecha de
+  nacimiento, con advertencia no bloqueante antes de los 15 años): agregada
+  tras la aprobación inicial, a partir de una observación explícita sobre no
+  imponer una edad mínima de 18 años.
+- **Incorporación de la validación de coherencia de semanas**: propuesta en
+  dos iteraciones — la primera versión usaba una resta de años que
+  sobreestimaba el máximo (contaba el año en curso como completo); se
+  corrigió a un cálculo basado en fechas exactas con `Date.UTC`. La
+  clasificación también se ajustó: el caso de año desconocido pasó de
+  "máximo absoluto bloqueante" a "extraordinario con confirmación", para no
+  contradecir la decisión ya aprobada de permitir, con confirmación, inicios
+  de cotización antes de los 15 años.
+- **Corrección de persistencia de confirmaciones**: la primera versión
+  dependía solo de comparación derivada (`valorConfirmado === valorActual`),
+  lo que permitía que una confirmación antigua "reviviera" si el usuario
+  volvía a escribir un valor ya editado antes. Se corrigió agregando
+  invalidación explícita en cada wrapper de `App.jsx`, además de la
+  comparación derivada.
+- **Refactor de arquitectura previo al cierre**: se agregó una nota técnica
+  explícita marcando la lógica de coherencia como temporal (candidata a
+  migrar a un futuro "Motor de Coherencia del Expediente"), se agruparon las
+  constantes de la regla de coherencia en un solo bloque, y se extrajeron los
+  textos visibles de las advertencias de coherencia a constantes nombradas
+  dentro del mismo archivo — sin crear todavía un sistema de mensajes
+  compartido.
+
+### Verificación
+
+- `npm run lint` — sin errores, en cada iteración del Slice.
+- `npm test` — 2 archivos de test, 18/18 pruebas en verde, sin regresiones.
+- `npm run build` — build de producción exitoso en cada verificación, sin
+  advertencias.
+- `git diff --check` — sin errores de contenido (solo advertencias de
+  conversión de line-ending LF→CRLF, normales en Windows).
+
+### Commit
+
+```
+d586750 ui: implementar pantalla Información pensional esencial con validación de coherencia (Slice S3-008)
+```
+
+Sin push realizado — el commit permanece local en `sprint-3-mvp-headless`.
+
+### Decisiones tomadas en este Slice
+
+1. La captura se limita a dos datos, presentados en una conversación de dos
+   pasos dentro de una misma pantalla (estado interno del componente), no un
+   formulario con ambos campos visibles a la vez — primer caso de este
+   patrón en el MVP; no se extrae un componente de wizard genérico (Principio
+   9).
+2. Ningún dato bloquea el flujo por sí solo cuando el usuario declara
+   explícitamente que no lo conoce (`'desconocido'` para el año, "No las
+   conozco." para las semanas) — pero sí se valida la **coherencia entre
+   ambos datos**, porque dos respuestas del usuario no pueden contradecirse
+   matemáticamente sin que el sistema lo señale.
+3. No se impone una edad mínima fija de 18 años para el año de inicio de
+   cotización — se distingue lo cronológicamente imposible (antes de nacer,
+   en el futuro) de lo extraordinario (antes de los 15 años), que solo
+   requiere confirmación explícita, nunca bloqueo automático.
+4. La validación de coherencia de semanas se limita a dos niveles (imposible
+   / extraordinario), sin introducir todavía un umbral legal o estadístico de
+   "muchas semanas" — eso pertenece a una etapa posterior con evidencia real,
+   no a este Slice.
+5. `CompletarExpediente.jsx`, de un Slice ya cerrado (S3-007), se modifica de
+   forma explícita y acotada para que su checklist deje de depender de una
+   etiqueta fija y refleje el estado real capturado — autorizado
+   explícitamente como integración necesaria de S3-008, no como una
+   reapertura general de Slices cerrados.
+6. Las confirmaciones de casos extraordinarios se persisten en `App.jsx`
+   (sin `context/` ni reducer) mediante un valor que registra exactamente
+   qué se confirmó, comparado por igualdad contra el valor actual, **más**
+   una invalidación explícita en cada wrapper de edición — la comparación
+   derivada por sí sola no bastaba, porque permitía revivir una confirmación
+   antigua al volver a escribir un valor ya editado.
+7. La lógica de coherencia permanece temporalmente dentro de
+   `InformacionPensionalEsencial.jsx`, con una nota de arquitectura explícita
+   marcándola como candidata a migrar a un futuro **Motor de Coherencia del
+   Expediente** — un componente de dominio responsable de evaluar relaciones
+   entre datos del expediente, que deberá ejecutarse antes del Motor de
+   Decisión (`PL-230`). No se implementa como componente separado en este
+   Slice, consistente con el Principio 9 (este es su primer caso real y
+   acotado).
+
+### Pendiente para el siguiente Slice
+
+- Definir el alcance funcional de "Historia pensional" (siguiente Slice),
+  reemplazando `HistoriaPensionalTemporal.jsx`.
+- Diseñar formalmente el "Motor de Coherencia del Expediente" identificado en
+  la Decisión 7, cuando exista un segundo caso real de validación de
+  coherencia entre datos del expediente (Principio 9) — en ese momento,
+  migrar la lógica hoy temporal en `InformacionPensionalEsencial.jsx`.
+- Continuar evaluando si el crecimiento del estado en `App.jsx` (15 valores
+  entre `vista` y los datos capturados) sigue siendo manejable o si ya se
+  justifica introducir `context/` o una solución de gestión de estado.
+
+---
+
 ## Slices pendientes de Sprint 3
 
 Por definir a medida que el sprint avance.

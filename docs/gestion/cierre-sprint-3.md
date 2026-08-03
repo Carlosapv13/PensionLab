@@ -627,6 +627,122 @@ Sin push realizado — el commit permanece local en `sprint-3-mvp-headless`.
 
 ---
 
+## Slice S3-006 — Pantalla de Expediente pensional
+
+**Estado:** ✅ Cerrado y aprobado — commit `3c2e867` en `sprint-3-mvp-headless`.
+
+### Objetivo
+
+Reemplazar la vista temporal `ResumenCasoTemporal.jsx` por la primera versión
+real de la pantalla "Expediente pensional", sin capturar datos nuevos y sin
+introducir lógica de negocio, reglas o cálculos pensionales.
+
+### Alcance aprobado
+
+- Título "Expediente pensional" (sin cambios respecto al placeholder).
+- Mensaje introductorio de tres párrafos que explica que ya se conoce la
+  información básica del caso, que a partir de aquí se construye el
+  expediente, y que no es necesario tener toda la información desde el
+  principio.
+- Resumen mantenido tal cual, organizado en los mismos cuatro bloques con
+  subtítulo ya definidos en S3-005 —Objetivo, Datos personales, Situación
+  pensional, Historial laboral—, sin agregar ni quitar ningún dato.
+- El botón único "Volver" se reemplaza por dos botones: "Volver" (secundario)
+  y "Comenzar expediente" (primario, siempre habilitado, sin validación,
+  porque esta pantalla no captura datos nuevos).
+- "Comenzar expediente" navega a un nuevo placeholder temporal,
+  `CompletarExpedienteTemporal.jsx`, con título "Completemos tu expediente".
+- Sin `context/`, sin dependencias instaladas, sin cambios en `domain/`,
+  `models/`, `data/` ni componentes compartidos.
+
+### Archivos creados
+
+- `src/pages/ExpedientePensional.jsx`
+- `src/pages/CompletarExpedienteTemporal.jsx`
+
+### Archivos modificados
+
+- `src/App.jsx` — swap de import (`ResumenCasoTemporal` →
+  `ExpedientePensional`), nuevo import de `CompletarExpedienteTemporal`, el
+  valor de `vista` `'resumenCaso'` renombrado a `'expedientePensional'` y
+  séptimo valor nuevo `'completarExpediente'`.
+
+`src/App.css` no requirió cambios — se reutilizaron `.screen`,
+`.screen__subtitle`, `.summary*`, `.screen__actions`, `.btn-secondary` y
+`.btn-primary` ya existentes.
+
+### Archivos eliminados
+
+- `src/pages/ResumenCasoTemporal.jsx` — reemplazado por
+  `ExpedientePensional.jsx`.
+
+### Correcciones y ajustes realizados durante el Slice
+
+- **Nombre del placeholder siguiente**: se descartó `PerfilDecisionTemporal.jsx`
+  (nombre orientado a la estructura interna del dominio, propuesto
+  inicialmente) en favor de `CompletarExpedienteTemporal.jsx` con título
+  "Completemos tu expediente" — nombre orientado al proceso desde la
+  perspectiva del usuario, sin comprometer contenido específico de slices
+  futuros, por decisión explícita.
+- **Ajustes de redacción en `CompletarExpedienteTemporal.jsx`**: el texto
+  placeholder genérico ("Esta pantalla se implementará en el siguiente
+  Slice.") se reemplazó, en dos rondas sucesivas, por un mensaje de tres
+  párrafos orientado al usuario, con la frase final ajustada de "identificar
+  todas las estrategias pensionales que podrían aplicar para ti" a "construir
+  las estrategias pensionales que mejor se adapten a tu situación".
+
+### Verificación
+
+- `npm run lint` — sin errores, en cada iteración del Slice.
+- `npm test` — 2 archivos de test, 18/18 pruebas en verde, sin regresiones.
+- `npm run build` — build de producción exitoso en cada verificación, sin
+  advertencias.
+- `git diff --check` — sin errores de contenido (solo advertencias de
+  conversión de line-ending LF→CRLF, normales en Windows).
+
+### Commit
+
+```
+3c2e867 ui: implementar pantalla de Expediente pensional (Slice S3-006)
+```
+
+Sin push realizado — el commit permanece local en `sprint-3-mvp-headless`.
+
+### Decisiones tomadas en este Slice
+
+1. `ExpedientePensional.jsx` es únicamente una vista de UI que resume los
+   datos ya capturados — no instancia ni implementa el contrato de dominio
+   `src/models/ExpedientePensional.js` (Sprint 2). La coincidencia de nombre
+   entre la página y el contrato fue evaluada explícitamente como riesgo
+   conceptual antes de aprobarse; se decidió mantenerla porque no genera
+   colisión técnica (carpetas distintas) y el propósito de cada archivo es
+   inequívoco por su ubicación.
+2. El nombre y contenido del placeholder que sucede a "Comenzar expediente"
+   se decide desde la experiencia del usuario, no desde la arquitectura
+   interna del dominio — un placeholder llamado por su estructura de dominio
+   (ej. `PerfilDecisionTemporal`) habría anticipado contenido de un Slice
+   futuro sin evidencia todavía de que ese sea el orden correcto.
+3. "Comenzar expediente" no tiene condición de validación, a diferencia de
+   "Continuar" en las pantallas de captura de datos — esta pantalla no
+   recoge información nueva, solo confirma y da paso a continuar.
+4. El mensaje introductorio se redactó evitando implicar capacidades que el
+   sistema todavía no tiene (el sistema todavía no implementa el motor de
+   evaluación pensional ni una instancia real del expediente) — se mantiene
+   coherente con la
+   filosofía del proyecto de no mostrar falsa precisión ni prometer más de
+   lo que el sistema puede hacer hoy.
+
+### Pendiente para el siguiente Slice
+
+- Implementar la pantalla real de "Completemos tu expediente" (S3-007),
+  reemplazando `CompletarExpedienteTemporal.jsx`, una vez definido su alcance
+  funcional.
+- Continuar evaluando si el crecimiento del estado en `App.jsx` sigue siendo
+  manejable o si ya se justifica introducir `context/` o una solución de
+  gestión de estado.
+
+---
+
 ## Slices pendientes de Sprint 3
 
 Por definir a medida que el sprint avance.

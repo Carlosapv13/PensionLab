@@ -3,8 +3,12 @@
 // información básica registrada y cuál es el siguiente — sin repetir el
 // detalle ya mostrado en ExpedientePensional.jsx. No captura datos nuevos,
 // no implementa reglas ni cálculos.
+//
+// Desde S3-008, el bloque "Información pensional esencial" y el siguiente
+// bloque mostrado dependen del estado real capturado (infoEsencialCompletada),
+// no de una etiqueta fija.
 
-const BLOQUES_REGISTRADOS = [
+const BLOQUES_BASE = [
   'Objetivo',
   'Datos personales',
   'Situación pensional',
@@ -13,10 +17,19 @@ const BLOQUES_REGISTRADOS = [
 
 /**
  * @param {Object} props
+ * @param {boolean} props.infoEsencialCompletada
  * @param {() => void} props.onVolver
  * @param {() => void} props.onContinuar
  */
-function CompletarExpediente({ onVolver, onContinuar }) {
+function CompletarExpediente({ infoEsencialCompletada, onVolver, onContinuar }) {
+  const bloquesRegistrados = infoEsencialCompletada
+    ? [...BLOQUES_BASE, 'Información pensional esencial']
+    : BLOQUES_BASE
+
+  const bloqueSiguiente = infoEsencialCompletada
+    ? 'Historia pensional'
+    : 'Información pensional esencial'
+
   return (
     <div className="screen">
       <h1 className="screen__title screen__title--completar-expediente">Completemos tu expediente</h1>
@@ -32,7 +45,7 @@ function CompletarExpediente({ onVolver, onContinuar }) {
       </p>
 
       <ul className="checklist">
-        {BLOQUES_REGISTRADOS.map((bloque) => (
+        {bloquesRegistrados.map((bloque) => (
           <li key={bloque} className="checklist__item">
             <span className="checklist__label">{bloque}</span>
             <span className="badge badge--registrado">Información básica registrada</span>
@@ -40,7 +53,7 @@ function CompletarExpediente({ onVolver, onContinuar }) {
         ))}
 
         <li className="checklist__item checklist__item--siguiente">
-          <span className="checklist__label">Información pensional esencial</span>
+          <span className="checklist__label">{bloqueSiguiente}</span>
           <span className="badge badge--siguiente">Siguiente paso</span>
         </li>
       </ul>

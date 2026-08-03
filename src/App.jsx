@@ -8,7 +8,8 @@ import SituacionPensional from './pages/SituacionPensional.jsx'
 import HistorialLaboral from './pages/HistorialLaboral.jsx'
 import ExpedientePensional from './pages/ExpedientePensional.jsx'
 import CompletarExpediente from './pages/CompletarExpediente.jsx'
-import InformacionPensionalTemporal from './pages/InformacionPensionalTemporal.jsx'
+import InformacionPensionalEsencial from './pages/InformacionPensionalEsencial.jsx'
+import HistoriaPensionalTemporal from './pages/HistoriaPensionalTemporal.jsx'
 
 function App() {
   const [vista, setVista] = useState('bienvenida')
@@ -20,6 +21,45 @@ function App() {
   const [tipoCotizante, setTipoCotizante] = useState(null)
   const [lugarCotizacion, setLugarCotizacion] = useState(null)
   const [cotizaActualmente, setCotizaActualmente] = useState(null)
+  const [anioInicioCotizacion, setAnioInicioCotizacion] = useState('')
+  const [nivelConocimientoSemanas, setNivelConocimientoSemanas] = useState(null)
+  const [semanasCotizadas, setSemanasCotizadas] = useState('')
+  const [infoEsencialCompletada, setInfoEsencialCompletada] = useState(false)
+  const [anioConfirmadoEdadTemprana, setAnioConfirmadoEdadTemprana] = useState(null)
+  const [semanasConfirmadasPara, setSemanasConfirmadasPara] = useState(null)
+
+  function actualizarAnioInicioCotizacion(valor) {
+    setAnioInicioCotizacion(valor)
+    setInfoEsencialCompletada(false)
+    setAnioConfirmadoEdadTemprana(null)
+    // Cambiar el año también invalida la coherencia ya evaluada de las
+    // semanas, porque el máximo/la referencia se calculan a partir de él.
+    setSemanasConfirmadasPara(null)
+  }
+
+  function actualizarNivelConocimientoSemanas(valor) {
+    setNivelConocimientoSemanas(valor)
+    setInfoEsencialCompletada(false)
+    setSemanasConfirmadasPara(null)
+  }
+
+  function actualizarSemanasCotizadas(valor) {
+    setSemanasCotizadas(valor)
+    setInfoEsencialCompletada(false)
+    setSemanasConfirmadasPara(null)
+  }
+
+  function confirmarEdadTemprana(confirmado) {
+    setAnioConfirmadoEdadTemprana(confirmado ? anioInicioCotizacion : null)
+  }
+
+  function confirmarSemanasExtraordinarias(confirmado) {
+    setSemanasConfirmadasPara(
+      confirmado
+        ? `${nivelConocimientoSemanas}||${semanasCotizadas}||${anioInicioCotizacion}`
+        : null
+    )
+  }
 
   return (
     <AppShell>
@@ -88,14 +128,36 @@ function App() {
 
       {vista === 'completarExpediente' && (
         <CompletarExpediente
+          infoEsencialCompletada={infoEsencialCompletada}
           onContinuar={() => setVista('informacionPensional')}
           onVolver={() => setVista('expedientePensional')}
         />
       )}
 
       {vista === 'informacionPensional' && (
-        <InformacionPensionalTemporal
+        <InformacionPensionalEsencial
+          fechaNacimiento={fechaNacimiento}
+          anioInicioCotizacion={anioInicioCotizacion}
+          onCambiarAnioInicioCotizacion={actualizarAnioInicioCotizacion}
+          anioConfirmadoEdadTemprana={anioConfirmadoEdadTemprana}
+          onConfirmarEdadTemprana={confirmarEdadTemprana}
+          nivelConocimientoSemanas={nivelConocimientoSemanas}
+          onCambiarNivelConocimientoSemanas={actualizarNivelConocimientoSemanas}
+          semanasCotizadas={semanasCotizadas}
+          onCambiarSemanasCotizadas={actualizarSemanasCotizadas}
+          semanasConfirmadasPara={semanasConfirmadasPara}
+          onConfirmarSemanasExtraordinarias={confirmarSemanasExtraordinarias}
           onVolver={() => setVista('completarExpediente')}
+          onContinuar={() => {
+            setInfoEsencialCompletada(true)
+            setVista('historiaPensional')
+          }}
+        />
+      )}
+
+      {vista === 'historiaPensional' && (
+        <HistoriaPensionalTemporal
+          onVolver={() => setVista('informacionPensional')}
         />
       )}
     </AppShell>

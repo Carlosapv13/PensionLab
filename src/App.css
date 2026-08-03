@@ -226,6 +226,10 @@
   line-height: 1.15;
 }
 
+.screen__title--historia-pensional {
+  line-height: 1.15;
+}
+
 .screen__subtitle {
   font-size: 18px;
   line-height: 150%;
@@ -323,6 +327,38 @@
 .field__input:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+.field__input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.checkbox-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.checkbox-option input[type='checkbox'] {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+}
+
+.field__warning {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent-bg);
+  text-align: left;
 }
 
 .summary {

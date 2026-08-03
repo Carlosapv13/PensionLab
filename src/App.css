@@ -218,6 +218,14 @@
   line-height: 1.15;
 }
 
+.screen__title--completar-expediente {
+  line-height: 1.15;
+}
+
+.screen__title--informacion-pensional {
+  line-height: 1.15;
+}
+
 .screen__subtitle {
   font-size: 18px;
   line-height: 150%;
@@ -391,6 +399,55 @@
 .date-fields .field {
   flex: 1;
   gap: 4px;
+}
+
+.checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.checklist__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-align: left;
+}
+
+.checklist__item--siguiente {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.checklist__label {
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.badge {
+  font-size: 13px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.badge--registrado {
+  background: var(--border);
+  color: var(--text-h);
+}
+
+.badge--siguiente {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
 }
 
 .visually-hidden {

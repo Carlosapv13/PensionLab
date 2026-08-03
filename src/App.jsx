@@ -7,7 +7,8 @@ import DatosIniciales from './pages/DatosIniciales.jsx'
 import SituacionPensional from './pages/SituacionPensional.jsx'
 import HistorialLaboral from './pages/HistorialLaboral.jsx'
 import ExpedientePensional from './pages/ExpedientePensional.jsx'
-import CompletarExpedienteTemporal from './pages/CompletarExpedienteTemporal.jsx'
+import CompletarExpediente from './pages/CompletarExpediente.jsx'
+import InformacionPensionalTemporal from './pages/InformacionPensionalTemporal.jsx'
 
 function App() {
   const [vista, setVista] = useState('bienvenida')
@@ -86,8 +87,15 @@ function App() {
       )}
 
       {vista === 'completarExpediente' && (
-        <CompletarExpedienteTemporal
+        <CompletarExpediente
+          onContinuar={() => setVista('informacionPensional')}
           onVolver={() => setVista('expedientePensional')}
+        />
+      )}
+
+      {vista === 'informacionPensional' && (
+        <InformacionPensionalTemporal
+          onVolver={() => setVista('completarExpediente')}
         />
       )}
     </AppShell>

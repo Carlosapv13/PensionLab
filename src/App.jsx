@@ -10,7 +10,8 @@ import ExpedientePensional from './pages/ExpedientePensional.jsx'
 import CompletarExpediente from './pages/CompletarExpediente.jsx'
 import InformacionPensionalEsencial from './pages/InformacionPensionalEsencial.jsx'
 import HistoriaPensional from './pages/HistoriaPensional.jsx'
-import ContinuarHistoriaTemporal from './pages/ContinuarHistoriaTemporal.jsx'
+import PrimeraLectura from './pages/PrimeraLectura.jsx'
+import SiguientePasoTemporal from './pages/SiguientePasoTemporal.jsx'
 
 function App() {
   const [vista, setVista] = useState('bienvenida')
@@ -176,13 +177,24 @@ function App() {
           trasladoRegimen={trasladoRegimen}
           onCambiarTrasladoRegimen={setTrasladoRegimen}
           onVolver={() => setVista('informacionPensional')}
-          onContinuar={() => setVista('continuarHistoria')}
+          onContinuar={() => setVista('primeraLectura')}
         />
       )}
 
-      {vista === 'continuarHistoria' && (
-        <ContinuarHistoriaTemporal
+      {vista === 'primeraLectura' && (
+        <PrimeraLectura
+          sexo={sexo}
+          regimenActual={regimenActual}
+          nivelConocimientoSemanas={nivelConocimientoSemanas}
+          semanasCotizadas={semanasCotizadas}
           onVolver={() => setVista('historiaPensional')}
+          onContinuar={() => setVista('siguientePaso')}
+        />
+      )}
+
+      {vista === 'siguientePaso' && (
+        <SiguientePasoTemporal
+          onVolver={() => setVista('primeraLectura')}
         />
       )}
     </AppShell>

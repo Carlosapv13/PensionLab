@@ -43,6 +43,25 @@ registrados aquí como referencia permanente.
 10. **Minimización y transparencia de datos personales.** Solo se recolecta lo
     estrictamente necesario para el cálculo, con consentimiento explícito, y con
     la menor exposición posible de datos sensibles.
+11. **Validación en capas — todo dato se considera potencialmente inválido hasta
+    que la capa que lo consume lo valida por sí misma.** La interfaz ayuda a la
+    persona a ingresar información correcta, pero nunca es la única barrera que
+    protege los motores de negocio: cuando un dato llega por primera vez a un
+    componente de `domain/`, ese componente debe volver a validar sus entradas y
+    fallar de forma explícita ante datos inválidos, aunque la interfaz ya los
+    haya validado. Distinto del Principio 4 (que rige qué hacer ante ambigüedad
+    ya detectada): este principio exige que cada capa detecte esa ambigüedad por
+    sí misma, en vez de heredar la confianza de la capa anterior. Ya aplicado por
+    `evaluarSemanasMinimas.js` (Sprint 3) sobre `semanasCotizadas`, con el mismo
+    criterio pendiente para `fechaNacimiento` en cuanto tenga su primer
+    consumidor de dominio (ver nota en `UserProfile.js`). Regla de origen —
+    adoptada el 2026-08-03 tras detectar validación insuficiente de fecha de
+    nacimiento en `DatosIniciales.jsx` (Sprint 3): toda pantalla que capture
+    datos del usuario se diseña, desde la propuesta, considerando formato,
+    longitud, rango, caracteres permitidos, coherencia entre campos, fechas
+    imposibles, valores negativos sin sentido, casos límite, y validaciones que
+    deben repetirse en `domain/` — no se espera a que esos casos se descubran en
+    pruebas manuales.
 
 ## Diagrama general — todas las capas del sistema
 

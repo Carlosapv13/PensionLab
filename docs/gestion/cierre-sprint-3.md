@@ -364,6 +364,59 @@ Alcance estrictamente limitado a `src/pages/DatosIniciales.jsx` y
 otra pantalla, ni en `domain/`, `models/`, `data/` o `context/`. Sin
 dependencias instaladas.
 
+### Segunda mejora posterior al cierre — escritura numérica del mes y validación estricta de día/año
+
+Detectadas en revisión funcional durante el trabajo de S3-009/Primera
+Lectura, sin relación con esas pantallas — ambas viven exclusivamente en
+`src/pages/DatosIniciales.jsx`.
+
+**1. Escritura numérica del mes.** El `<select>` de Mes solo aceptaba
+selección por mouse o por el typeahead nativo del navegador (que busca por
+texto de la opción — "Enero", "Julio" — nunca por dígitos). Se agregó un
+buffer de dígitos vía `onKeyDown` (referencias estables con `useRef`, pausa
+de 600 ms, `event.preventDefault()` solo sobre teclas numéricas) que permite
+escribir `7` o `07` y que el `<select>` salte a "Julio" — sin reemplazar el
+elemento nativo ni afectar su navegación por teclado, mouse o typeahead por
+letra. El buffer se limpia al perder el foco, al seleccionar con
+mouse/flechas, y al desmontar el componente.
+
+**2. Validación estricta de Día y Año.** Ambos campos pasaron de
+`type="number"` (que no impide `-`, `.`, `e`, ni longitudes arbitrarias) a
+`type="text"` + `inputMode="numeric"`, con el valor filtrado en `onChange`
+para aceptar solo dígitos y truncado a la longitud máxima (2 para Día, 4 para
+Año) — nunca se corrige el valor a otra cosa, solo se descarta lo que no es
+dígito. Se agregó `diasMaximosEnMes` (vía `Date.UTC`, respeta bisiestos sin
+tabla manual) con dos mensajes visibles y específicos ("Ingresa un día entre
+1 y 31.", "Febrero de {año} tiene máximo {N} días.") que nunca corrigen el
+día ya escrito. Se agregó también una edad mínima funcional de 15 años
+(`EDAD_MINIMA_FUNCIONAL`, documentada explícitamente en el código como
+decisión de producto del MVP, no como requisito legal), calculada con
+`calcularEdadCumplida` a partir de la fecha completa —nunca
+`añoActual - añoNacimiento`, que falla antes del cumpleaños—, con su propio
+mensaje visible.
+
+**Origen de una regla permanente.** Esta corrección expuso que las
+validaciones de captura no se estaban considerando sistemáticamente desde el
+diseño de cada pantalla, sino descubriéndose en pruebas manuales. Se adoptó,
+a partir de este momento, la regla **"Validación desde el origen"** —
+documentada en `docs/ia/metodologia-de-desarrollo-con-ia.md`— y el
+**Principio de Arquitectura 11** ("validación en capas") en
+`plan-implementacion-prerrequisitos-pension-engine.md`: toda pantalla que
+capture datos analiza sus validaciones desde la propuesta, no después de
+probarla, y ningún componente de `domain/` puede asumir que la interfaz ya
+validó lo que recibe. Se dejó registrado, en `UserProfile.js` y en el
+"Pendiente" de la sección de evidencia de este mismo documento, que
+`fechaNacimiento` deberá validarse de nuevo, de forma autónoma, en cuanto
+tenga su primer consumidor real en `domain/`.
+
+**Verificación**: `npm run lint`, `npm test` (47/47) y `npm run build`
+exitosos en cada ronda; `git diff --check` sin errores de contenido.
+Alcance limitado a `src/pages/DatosIniciales.jsx`, más las tres ediciones de
+documentación ya referenciadas (`UserProfile.js`,
+`plan-implementacion-prerrequisitos-pension-engine.md`,
+`metodologia-de-desarrollo-con-ia.md`) y la nota pendiente en este cierre.
+Sin cambios en `domain/`, `data/`, `context/`, ni en ninguna otra pantalla.
+
 ---
 
 ## Slice S3-004 — Pantalla de Situación pensional
@@ -1397,6 +1450,13 @@ evidencia real y ejecutable del sistema.
   evaluable.
 - S3-010 (salario/IBC) permanece pausado; se retoma después de que esta
   primera orientación esté visible para el usuario.
+- Cuando `fechaNacimiento` tenga su primer consumidor real en `domain/` (el
+  candidato más probable: una futura evidencia de edad mínima de pensión,
+  análoga a esta de semanas mínimas, comparando contra `edadPensionMujer`/
+  `edadPensionHombre` ya presentes en `data/legal`), esa función deberá
+  validar la fecha de forma autónoma —real, no futura, con su propio
+  `no_evaluable` explícito— sin asumir que `DatosIniciales.jsx` ya la validó
+  (Principio de Arquitectura 11, ver nota en `UserProfile.js`).
 
 ---
 

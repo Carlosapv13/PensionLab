@@ -234,6 +234,14 @@
   line-height: 1.15;
 }
 
+.screen__title--primera-lectura {
+  line-height: 1.15;
+}
+
+.screen__title--siguiente-paso {
+  line-height: 1.15;
+}
+
 .screen__subtitle {
   font-size: 18px;
   line-height: 150%;
@@ -389,6 +397,18 @@
 .insight__message {
   margin: 0;
   font-size: 16px;
+}
+
+.legal-detail summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.legal-detail p {
+  margin: 6px 0 0;
+  font-size: 14px;
 }
 
 .summary {

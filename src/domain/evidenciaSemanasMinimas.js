@@ -39,8 +39,9 @@ function construirLimitaciones(normaUsada) {
     {
       codigo: 'REGIMEN_TRANSICION_NO_EVALUADO',
       mensaje:
-        'Esta comparación utiliza el requisito general y no determina si la persona ' +
-        'está cobijada por un régimen de transición.',
+        'Esta lectura utiliza el requisito general de semanas. Todavía no evalúa ' +
+        'si en tu caso aplica alguna regla de transición, un régimen anterior o ' +
+        'una condición especial que pueda modificar este requisito.',
     },
   ]
 

@@ -1143,8 +1143,8 @@ siguiendo el mismo método ya usado para PL-230:
 
 ## Slice S3-009 — Pantalla "Esto es lo que ya sabemos de tu historia"
 
-**Estado:** ✅ Cerrado y aprobado (pendiente de commit hasta revisión funcional
-y visual) en `sprint-3-mvp-headless`.
+**Estado:** ✅ Cerrado y aprobado — commit local en `sprint-3-mvp-headless`,
+sin push.
 
 ### Objetivo
 
@@ -1222,12 +1222,26 @@ expediente.
   implicar años efectivamente cotizados (no reabre el problema ya corregido
   de falsa precisión).
 - **El bloque destacado del Tiempo 2 se prepara como componente reutilizable
-  futuro**: se le agrega el encabezado fijo "Lo que entendemos hasta ahora"
-  (clase `.insight__label`) sobre el mensaje (`.insight__message`) — mismo
-  comportamiento, sin nueva funcionalidad ni props nuevos, dejando la
-  estructura lista para que en el futuro el mismo bloque muestre
-  observaciones, riesgos u oportunidades sin rediseñarse (Principio 9: se
-  prepara la lectura, no se generaliza el componente todavía).
+  futuro**: se le agrega el encabezado fijo (clase `.insight__label`) sobre
+  el mensaje (`.insight__message`) — mismo comportamiento, sin nueva
+  funcionalidad ni props nuevos, dejando la estructura lista para que en el
+  futuro el mismo bloque muestre observaciones, riesgos u oportunidades sin
+  rediseñarse (Principio 9: se prepara la lectura, no se generaliza el
+  componente todavía).
+- **Segunda ronda de ajustes de lenguaje**, detectada en una revisión
+  funcional posterior, sin cambiar lógica, cálculo, navegación ni alcance:
+  - Tiempo 1: de *"Hasta ahora sabemos que..."* a *"Hasta ahora hemos
+    comprendido que..."* — evita repetir "sabemos" (ya usado en el título) y
+    refuerza que PensionLab comprende la historia, no solo registra datos.
+  - Encabezado del bloque destacado: de "Lo que hemos comprendido" a **"Lo
+    que esto nos dice"** — el bloque no resume información, interpreta lo
+    que significan los datos ya compartidos; este título también evita
+    repetir "comprendido", ya usado en el Tiempo 1.
+  - Transición hacia la pregunta del Tiempo 3: de *"Esa trayectoria puede
+    haber pasado por un solo camino o por más de uno. Para entenderla
+    mejor:"* a *"Hay algo más que nos ayudará a comprender mejor esa
+    historia."* — transición más natural hacia la pregunta de traslado, que
+    no cambia.
 
 ### Decisiones tomadas en este Slice
 
@@ -1265,6 +1279,18 @@ expediente.
    aprobación, siguiendo la decisión ya tomada en la pausa de Sprint 3 previa
    a este Slice.
 
+### Verificación
+
+- `npm run lint` — sin errores, en cada una de las tres rondas de ajuste
+  (implementación inicial, refinamiento de Tiempo 2/bloque destacado,
+  segunda ronda de lenguaje).
+- `npm test` — 2 archivos de test, 18/18 pruebas en verde, sin regresiones en
+  ninguna ronda.
+- `npm run build` — build de producción exitoso en cada ronda, sin
+  advertencias.
+- `git diff --check` — sin errores de contenido (solo advertencias de
+  conversión de line-ending LF→CRLF, normales en Windows).
+
 ### Pendiente para el siguiente Slice
 
 - Definir el alcance funcional del Slice que reemplace
@@ -1273,6 +1299,16 @@ expediente.
   verificadas mediante historia laboral oficial. Ninguno decidido todavía.
 - Diseñar formalmente la clasificación de "trayectoria pensional" (Decisión
   3) cuando exista un segundo caso real que la justifique.
+- **Observación de producto registrada para el futuro Motor de Coherencia
+  del Expediente** (mismo componente todavía sin diseñar formalmente, ya
+  anticipado en la Decisión 7 de S3-008): evaluar la coherencia entre lugar
+  de residencia (`lugarResidencia`), lugar de cotización (`lugarCotizacion`)
+  y la condición de colombiano en el exterior — por ejemplo, una persona que
+  declara residir en Colombia pero cotiza exclusivamente desde el exterior,
+  o viceversa. No cambia el alcance de S3-009 ni se implementa ahora; queda
+  registrada como candidata para cuando ese componente se diseñe
+  formalmente, con el mismo criterio ya establecido de advertir explicando,
+  no bloquear salvo lo imposible.
 
 ---
 

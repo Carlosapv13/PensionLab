@@ -36,9 +36,9 @@ function textoComprension(regimenActual, tipoCotizante, nivelConocimientoSemanas
   const semanas = textoSemanas(nivelConocimientoSemanas)
 
   if (regimen === null) {
-    return `Hasta ahora sabemos que todavía no tienes claro en qué régimen estás cotizando, que lo has hecho ${tipo}, y que ${semanas}.`
+    return `Hasta ahora hemos comprendido que todavía no tienes claro en qué régimen estás cotizando, que lo has hecho ${tipo}, y que ${semanas}.`
   }
-  return `Hasta ahora sabemos que cotizas en ${regimen}, que lo has hecho ${tipo}, y que ${semanas}.`
+  return `Hasta ahora hemos comprendido que cotizas en ${regimen}, que lo has hecho ${tipo}, y que ${semanas}.`
 }
 
 function textoValorPersonalizado(anioInicioCotizacion) {
@@ -105,15 +105,14 @@ function HistoriaPensional({
       </p>
 
       <div className="insight">
-        <p className="insight__label">Lo que entendemos hasta ahora</p>
+        <p className="insight__label">Lo que esto nos dice</p>
         <p className="insight__message">
           {textoValorPersonalizado(anioInicioCotizacion)}
         </p>
       </div>
 
       <p className="screen__subtitle">
-        Esa trayectoria puede haber pasado por un solo camino o por más de
-        uno. Para entenderla mejor:
+        Hay algo más que nos ayudará a comprender mejor esa historia.
       </p>
 
       <fieldset className="options">

@@ -1312,6 +1312,94 @@ expediente.
 
 ---
 
+## Pausa de Sprint 3 — Primera evidencia ejecutable: semanas mínimas RPM
+
+**Estado:** ✅ Implementado y probado — commit local en `sprint-3-mvp-headless`,
+sin push.
+
+### Por qué se pausó S3-010
+
+Antes de continuar con S3-010 (salario/IBC), se hizo un análisis crítico del
+MVP desde la perspectiva del usuario, usando PL-230 y PL-240 como referencia.
+El hallazgo central: después de 9 Slices y al menos 6 pantallas de captura
+real, el sistema nunca había producido una observación evaluativa —solo
+comprensión narrativa (S3-009)—, porque `pensionEngine` y el Motor de
+Decisión de PL-230 siguen sin implementarse. Al revisar el código (no solo
+los documentos), se encontró que `data/legal/versions/vigente-2026.json` ya
+tiene, con fuente y artículo citados, los parámetros necesarios para una
+primera lectura estructural (edad legal de pensión, semanas mínimas por
+sexo, incluido el cronograma decreciente para mujeres de la Sentencia
+C-197/2023) — el cuello de botella no era falta de dato, era la ausencia
+total de un componente que lo interpretara. Se decidió pausar la cadena de
+captura y construir, antes de seguir agregando preguntas, la primera
+evidencia real y ejecutable del sistema.
+
+### Qué se construyó
+
+- `obtenerSemanasMinimas` (`src/data/legal/index.js`) modificada para
+  devolver trazabilidad completa (`id`, `fuente`, `articulo`, `vigenciaDesde`,
+  `vigenciaHasta`, `estado`, `listoParaProduccion`) en vez de un número
+  suelto — sin consumidores previos, cambio seguro y verificado antes de
+  aplicarlo.
+- `resolverReglasVigentes` ahora propaga `metadataFuente` (`estado`,
+  `listoParaProduccion`) desde el archivo de versión de origen hacia cada
+  entrada individual, ya que esos campos viven a nivel de archivo, no de
+  entrada (`schema.js`).
+- Pruebas nuevas para `obtenerSemanasMinimas` (`src/data/legal/index.test.js`),
+  que no tenía cobertura pese a estar implementada desde antes de Sprint 3.
+- `evaluarSemanasMinimas` (`src/domain/evidenciaSemanasMinimas.js`): compara
+  las semanas cotizadas declaradas contra el requisito legal general de
+  semanas mínimas en RPM, con estados `cumple` / `no_cumple` / `no_evaluable`
+  y razones explícitas (`regimen_no_rpm`, `regimen_desconocido`,
+  `semanas_desconocidas`, `semanas_invalidas`, `sexo_no_valido`), separación
+  entre semanas faltantes y excedentes (nunca negativos), propagación de la
+  certeza declarada por la persona (`certezaSemanas`), limitaciones
+  estructuradas que viajan con la evidencia, y validación propia del formato
+  de semanas (no depende de que la UI ya haya validado correctamente).
+- 29 pruebas nuevas (6 del resolver legal, 23 de la evidencia); 47/47 en
+  total en el proyecto.
+
+### Decisiones tomadas
+
+1. Deliberadamente no se construye un "Motor de Evidencias" genérico —un
+   solo archivo, una sola regla— hasta que exista un segundo caso real que
+   lo justifique (Principio 9).
+2. `estado` de la evidencia describe si la regla es aplicable al caso
+   (`cumple`/`no_cumple`), nunca si la persona "aprueba" algo — distinción
+   semántica revisada explícitamente durante el diseño.
+3. Ninguna cifra de semanas se presenta con signo negativo —
+   `semanasFaltantes`/`semanasExcedentes` siempre `≥ 0`— para que ninguna
+   interfaz futura tenga que interpretar el signo de un campo cuyo nombre ya
+   implica una dirección.
+4. Las limitaciones son estructurales, no responsabilidad de que una
+   pantalla las recuerde — viajan con la evidencia: la de régimen de
+   transición está siempre presente en resultados evaluables; la de fuente
+   legal no lista para producción aparece solo cuando los metadatos reales
+   del archivo lo ameritan, nunca como texto fijo.
+5. La función es autónoma: valida su propio formato de entrada (semanas) y
+   nunca descarta información válida (certeza declarada, fecha de
+   evaluación) solo porque otra parte de la evaluación no pudo completarse.
+6. **Límite de uso mientras la fuente legal siga en borrador:** mientras la
+   fuente legal utilizada (`vigente-2026.json`) conserve
+   `estado: 'borrador'` o `listoParaProduccion: false`, esta evidencia puede
+   utilizarse para desarrollo, pruebas y demostraciones controladas, pero no
+   debe presentarse públicamente como una orientación legal definitiva. La
+   interfaz que la consuma deberá mostrar esa limitación de forma visible —
+   no basta con que exista en el dato devuelto, tiene que llegar a la
+   persona.
+
+### Pendiente
+
+- Diseñar e implementar la pantalla que consume esta evidencia, reemplazando
+  `ContinuarHistoriaTemporal.jsx` — sin captura de datos nuevos, mostrando la
+  comparación de semanas, el nivel de certeza, la norma utilizada, las
+  limitaciones visibles, y una explicación honesta para el caso no
+  evaluable.
+- S3-010 (salario/IBC) permanece pausado; se retoma después de que esta
+  primera orientación esté visible para el usuario.
+
+---
+
 ## Slices pendientes de Sprint 3
 
 Por definir a medida que el sprint avance.

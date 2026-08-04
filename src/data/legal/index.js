@@ -31,13 +31,29 @@ function esFirme(entrada, permitirTransitorio) {
  * no sea 'firme' (ej. el SMLV 2026, bajo litigio) — pásese `{ permitirTransitorio: true }`
  * para incluirlas explícitamente, a sabiendas del riesgo.
  *
+ * Cada entrada devuelta incluye `metadataFuente` (`estado`, `listoParaProduccion`) tomada
+ * del archivo de versión (`LegalVersionFile`) del que proviene — esos campos viven a nivel
+ * de archivo, no de entrada individual (ver schema.js), así que se propagan aquí para que
+ * cualquier consumidor pueda saber si la norma que está usando proviene de una fuente
+ * todavía en borrador, sin tener que volver a leer el archivo JSON por su cuenta.
+ *
  * @param {string} fecha - Fecha ISO (ej. '2026-07-30')
  * @param {{permitirTransitorio?: boolean}} [opts]
- * @returns {import('./schema.js').LegalRuleEntry[]}
+ * @returns {Array<import('./schema.js').LegalRuleEntry & {
+ *   metadataFuente: { estado: string, listoParaProduccion: boolean }
+ * }>}
  */
 export function resolverReglasVigentes(fecha, { permitirTransitorio = false } = {}) {
   return LINEA_DE_TIEMPO_VIGENTE
-    .flatMap((archivo) => archivo?.entradas ?? [])
+    .flatMap((archivo) =>
+      (archivo?.entradas ?? []).map((entrada) => ({
+        ...entrada,
+        metadataFuente: {
+          estado: archivo?.estado ?? 'publicado',
+          listoParaProduccion: archivo?.listoParaProduccion ?? true,
+        },
+      }))
+    )
     .filter((entrada) => dentroDeVigencia(entrada, fecha))
     .filter((entrada) => esFirme(entrada, permitirTransitorio))
 }
@@ -64,10 +80,24 @@ function resolverCronograma(valorCronograma, fecha) {
  * domain/pensionEngine/calcularProyeccionRAIS.js) — se lanza un error explícito en vez
  * de asumir o reutilizar el valor de RPM.
  *
+ * Devuelve el valor junto con su trazabilidad completa (id, fuente, artículo, vigencia,
+ * y el estado del archivo del que proviene) en vez de un número suelto — sin esto, un
+ * consumidor podría saber CUÁNTO exige la norma sin poder citar CUÁL norma exactamente
+ * (Principio 3: todo resultado debe ser trazable hasta su origen).
+ *
  * @param {string} fecha - Fecha ISO en la que se evalúa el requisito (ej. fecha de cálculo)
  * @param {('M'|'F')} sexo
  * @param {('RPM'|'RAIS')} regimen
- * @returns {number} Semanas mínimas exigidas
+ * @returns {{
+ *   valor: number,
+ *   id: string,
+ *   fuente: string,
+ *   articulo: string,
+ *   estado: string,
+ *   listoParaProduccion: boolean,
+ *   vigenciaDesde: string | null,
+ *   vigenciaHasta: string | null,
+ * }}
  */
 export function obtenerSemanasMinimas(fecha, sexo, regimen) {
   if (regimen !== 'RPM') {
@@ -85,9 +115,19 @@ export function obtenerSemanasMinimas(fecha, sexo, regimen) {
     throw new Error(`obtenerSemanasMinimas: no se encontró '${campo}' vigente para la fecha ${fecha}`)
   }
 
-  if (typeof entrada.valor === 'object' && entrada.valor?.tipo === 'cronograma-lineal') {
-    return resolverCronograma(entrada.valor, fecha)
-  }
+  const valor =
+    typeof entrada.valor === 'object' && entrada.valor?.tipo === 'cronograma-lineal'
+      ? resolverCronograma(entrada.valor, fecha)
+      : entrada.valor
 
-  return entrada.valor
+  return {
+    valor,
+    id: entrada.id,
+    fuente: entrada.fuente,
+    articulo: entrada.articulo,
+    estado: entrada.metadataFuente.estado,
+    listoParaProduccion: entrada.metadataFuente.listoParaProduccion,
+    vigenciaDesde: entrada.vigencia?.desde ?? null,
+    vigenciaHasta: entrada.vigencia?.hasta ?? null,
+  }
 }

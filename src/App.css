@@ -230,6 +230,10 @@
   line-height: 1.15;
 }
 
+.screen__title--continuar-historia {
+  line-height: 1.15;
+}
+
 .screen__subtitle {
   font-size: 18px;
   line-height: 150%;
@@ -359,6 +363,32 @@
   border-radius: 8px;
   background: var(--accent-bg);
   text-align: left;
+}
+
+.insight {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent-bg);
+  text-align: left;
+}
+
+.insight__label {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--accent);
+}
+
+.insight__message {
+  margin: 0;
+  font-size: 16px;
 }
 
 .summary {

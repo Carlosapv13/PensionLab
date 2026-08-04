@@ -9,7 +9,8 @@ import HistorialLaboral from './pages/HistorialLaboral.jsx'
 import ExpedientePensional from './pages/ExpedientePensional.jsx'
 import CompletarExpediente from './pages/CompletarExpediente.jsx'
 import InformacionPensionalEsencial from './pages/InformacionPensionalEsencial.jsx'
-import HistoriaPensionalTemporal from './pages/HistoriaPensionalTemporal.jsx'
+import HistoriaPensional from './pages/HistoriaPensional.jsx'
+import ContinuarHistoriaTemporal from './pages/ContinuarHistoriaTemporal.jsx'
 
 function App() {
   const [vista, setVista] = useState('bienvenida')
@@ -27,6 +28,17 @@ function App() {
   const [infoEsencialCompletada, setInfoEsencialCompletada] = useState(false)
   const [anioConfirmadoEdadTemprana, setAnioConfirmadoEdadTemprana] = useState(null)
   const [semanasConfirmadasPara, setSemanasConfirmadasPara] = useState(null)
+  const [trasladoRegimen, setTrasladoRegimen] = useState(null)
+
+  function actualizarRegimenActual(valor) {
+    // trasladoRegimen depende semánticamente de regimenActual (S3-009): la
+    // opción "No" y su redacción están ancladas al régimen actual, así que
+    // un cambio real de régimen invalida cualquier respuesta ya dada.
+    if (valor !== regimenActual) {
+      setTrasladoRegimen(null)
+    }
+    setRegimenActual(valor)
+  }
 
   function actualizarAnioInicioCotizacion(valor) {
     setAnioInicioCotizacion(valor)
@@ -92,7 +104,7 @@ function App() {
       {vista === 'situacionPensional' && (
         <SituacionPensional
           regimenActual={regimenActual}
-          onCambiarRegimenActual={setRegimenActual}
+          onCambiarRegimenActual={actualizarRegimenActual}
           onContinuar={() => setVista('historialLaboral')}
           onVolver={() => setVista('datosIniciales')}
         />
@@ -156,8 +168,21 @@ function App() {
       )}
 
       {vista === 'historiaPensional' && (
-        <HistoriaPensionalTemporal
+        <HistoriaPensional
+          regimenActual={regimenActual}
+          tipoCotizante={tipoCotizante}
+          nivelConocimientoSemanas={nivelConocimientoSemanas}
+          anioInicioCotizacion={anioInicioCotizacion}
+          trasladoRegimen={trasladoRegimen}
+          onCambiarTrasladoRegimen={setTrasladoRegimen}
           onVolver={() => setVista('informacionPensional')}
+          onContinuar={() => setVista('continuarHistoria')}
+        />
+      )}
+
+      {vista === 'continuarHistoria' && (
+        <ContinuarHistoriaTemporal
+          onVolver={() => setVista('historiaPensional')}
         />
       )}
     </AppShell>

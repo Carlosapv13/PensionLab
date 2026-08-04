@@ -1141,6 +1141,141 @@ siguiendo el mismo método ya usado para PL-230:
 
 ---
 
+## Slice S3-009 — Pantalla "Esto es lo que ya sabemos de tu historia"
+
+**Estado:** ✅ Cerrado y aprobado (pendiente de commit hasta revisión funcional
+y visual) en `sprint-3-mvp-headless`.
+
+### Objetivo
+
+Reemplazar la vista temporal `HistoriaPensionalTemporal.jsx` por la primera
+pantalla que representa, según PL-240, "el primer momento en que PensionLab
+devuelve valor al usuario" — no una pantalla de resumen aislada ni un
+formulario más, sino una sola conversación continua de tres tiempos:
+comprender lo ya contado, devolver un valor personalizado derivado solo de
+esos datos, y abrir desde ese mismo contexto la siguiente pregunta real del
+expediente.
+
+### Alcance aprobado
+
+- **Tiempo 1 — Comprensión:** refleja, en lenguaje específico a la persona
+  (no genérico), el régimen actual, la forma de cotizar y el nivel de
+  conocimiento de sus semanas cotizadas — distinguiendo explícitamente los
+  tres niveles (`conocido` / `aproximado` / `desconocido`) sin agrupar
+  `conocido` y `aproximado` como si fueran la misma certeza.
+- **Tiempo 2 — Valor personalizado (destacado visualmente):** calcula
+  `añoActual - anioInicioCotizacion` y lo presenta como el tiempo
+  transcurrido desde que la persona empezó a cotizar —nunca como años
+  efectivamente cotizados, porque el dato no permite afirmar eso (pudo haber
+  interrupciones)—, con redacción distinta para 0, 1 y 2+ años. Si el año es
+  `'desconocido'`, reconoce la incertidumbre y explica cómo se reducirá más
+  adelante, sin frases genéricas de relleno.
+- **Tiempo 3 — Transición + pregunta:** desde ese mismo contexto, abre la
+  pregunta "¿Te has trasladado alguna vez entre Colpensiones y un fondo
+  privado, o viceversa?", con tres opciones (`'si'` / `'no'` /
+  `'no_estoy_seguro'`). La opción "No" se redacta dinámicamente según el
+  régimen actual ya conocido ("No, siempre he cotizado en Colpensiones." /
+  "...en un fondo privado." / "...en el mismo régimen." si el régimen es
+  desconocido).
+- `trasladoRegimen` como nuevo estado en `App.jsx`, con invalidación
+  semántica: cambiar `regimenActual` reinicia `trasladoRegimen` a `null`
+  (porque la opción "No" y su redacción dependen de él); navegar sin
+  modificar `regimenActual`, o cambiar `tipoCotizante`/
+  `nivelConocimientoSemanas`, conserva la respuesta ya dada.
+- `ContinuarHistoriaTemporal.jsx` reemplaza a `HistoriaPensionalTemporal.jsx`
+  como vista temporal, con título "Sigamos construyendo tu historia".
+- Sin captura de detalle de traslado (fechas, cuántas veces), sin
+  salario/IBC, sin semanas verificadas — explícitamente fuera de alcance.
+- Sin cambios en `domain/`, `models/`, `data/` ni `context/`. El cálculo de
+  años y la resolución de textos son funciones puras locales a
+  `HistoriaPensional.jsx`, sin persistirse como dato nuevo del expediente.
+
+### Archivos creados
+
+- `src/pages/HistoriaPensional.jsx`
+- `src/pages/ContinuarHistoriaTemporal.jsx`
+
+### Archivos modificados
+
+- `src/App.jsx` — nuevo estado `trasladoRegimen`; wrapper
+  `actualizarRegimenActual` que invalida `trasladoRegimen` solo ante un
+  cambio real de `regimenActual`; swap de import
+  (`HistoriaPensionalTemporal` → `HistoriaPensional`), nuevo import de
+  `ContinuarHistoriaTemporal`; nuevo valor de `vista` (`'continuarHistoria'`).
+- `src/App.css` — clase nueva `.insight` para el destacado visual del Tiempo
+  2, y clase exclusiva de título `screen__title--continuar-historia`
+  (corrección proactiva de superposición, mismo patrón ya usado en Slices
+  anteriores).
+
+### Archivos eliminados
+
+- `src/pages/HistoriaPensionalTemporal.jsx` — reemplazado por
+  `HistoriaPensional.jsx`.
+
+### Correcciones y ajustes realizados durante el Slice
+
+- **Ajuste de redacción del Tiempo 2**: de *"tu historia pensional comenzó
+  hace aproximadamente X años"* a *"llevas aproximadamente X años
+  construyendo tu historia pensional"* (y su equivalente para 0 y 1 año) —
+  un tono más natural y cercano, detectado en la revisión funcional. Se
+  verificó explícitamente que "construir tu historia pensional" sigue sin
+  implicar años efectivamente cotizados (no reabre el problema ya corregido
+  de falsa precisión).
+- **El bloque destacado del Tiempo 2 se prepara como componente reutilizable
+  futuro**: se le agrega el encabezado fijo "Lo que entendemos hasta ahora"
+  (clase `.insight__label`) sobre el mensaje (`.insight__message`) — mismo
+  comportamiento, sin nueva funcionalidad ni props nuevos, dejando la
+  estructura lista para que en el futuro el mismo bloque muestre
+  observaciones, riesgos u oportunidades sin rediseñarse (Principio 9: se
+  prepara la lectura, no se generaliza el componente todavía).
+
+### Decisiones tomadas en este Slice
+
+1. El dato que abre la siguiente pregunta del expediente es el traslado de
+   régimen, no salario/IBC — decisión revisada explícitamente durante la
+   propuesta: aunque salario/IBC ya tiene campo reservado en
+   `UserProfile.laboralInfo`, ese argumento de "listo arquitectónicamente"
+   no era real (ningún Slice ha instanciado todavía un `UserProfile`), y
+   narrativamente el traslado sigue siendo un hecho de trayectoria —igual
+   que régimen, tipo de cotizante y año de inicio—, mientras que salario es
+   la primera magnitud financiera orientada a un cálculo futuro.
+2. El valor del Tiempo 2 se interpreta estrictamente como *tiempo
+   transcurrido desde el inicio declarado*, no como *años efectivamente
+   cotizados* — el dato disponible no permite esa segunda afirmación, porque
+   pudo haber interrupciones entre el año de inicio y hoy.
+3. `trasladoRegimen` captura únicamente si la persona se trasladó alguna vez
+   entre Colpensiones y un fondo privado (`'si'` / `'no'` /
+   `'no_estoy_seguro'`), suficiente para el alcance de S3-009. Se deja
+   registrado, sin implementar, que el concepto que PensionLab necesitará
+   modelar más adelante no es el traslado como evento aislado, sino la
+   **trayectoria pensional completa** entre regímenes — con al menos las
+   siguientes categorías candidatas: siempre en Colpensiones; siempre en
+   fondo privado; fondo privado → Colpensiones; Colpensiones → fondo
+   privado; más de un traslado; trayectoria desconocida. No se implementa en
+   S3-009 (Principio 9: sin un segundo caso real que lo justifique) — queda
+   pendiente para cuando el detalle de traslados se aborde en un Slice
+   futuro.
+4. `trasladoRegimen` se invalida (`null`) únicamente cuando `regimenActual`
+   cambia de verdad, no en cualquier llamada a su setter — la opción "No" de
+   S3-009 depende semánticamente del régimen actual, así que un cambio real
+   de régimen vuelve obsoleta cualquier respuesta ya dada; navegar sin
+   editar, o cambiar otros datos no relacionados (`tipoCotizante`,
+   `nivelConocimientoSemanas`), no la afecta.
+5. Este Slice se evalúa contra el checklist de PL-240 §12 antes de su
+   aprobación, siguiendo la decisión ya tomada en la pausa de Sprint 3 previa
+   a este Slice.
+
+### Pendiente para el siguiente Slice
+
+- Definir el alcance funcional del Slice que reemplace
+  `ContinuarHistoriaTemporal.jsx` — candidatos identificados: detalle del
+  traslado (si `trasladoRegimen === 'si'`), salario/IBC, o semanas
+  verificadas mediante historia laboral oficial. Ninguno decidido todavía.
+- Diseñar formalmente la clasificación de "trayectoria pensional" (Decisión
+  3) cuando exista un segundo caso real que la justifique.
+
+---
+
 ## Slices pendientes de Sprint 3
 
 Por definir a medida que el sprint avance.

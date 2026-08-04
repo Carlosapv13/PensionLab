@@ -91,6 +91,29 @@ reemplazan la validación de dominio — cuando un dato llega por primera vez a
 un componente de `domain/`, ese componente valida de nuevo sus entradas y
 falla de forma explícita, sin asumir que la UI ya lo hizo.
 
+## Explicar todo bloqueo (vigente desde 2026-08-03)
+
+Adoptada tras detectar que `DatosIniciales.jsx` bloqueaba "Continuar" ante una
+edad fuera del rango funcional del MVP —y, se descubrió en la misma
+revisión, ante una fecha futura— sin mostrar ningún mensaje: la persona veía
+el botón deshabilitado sin ninguna pista de qué dato revisar.
+
+**Toda validación que impida continuar debe mostrar un mensaje visible,
+específico y accionable**: qué dato revisar y por qué. Nunca un mensaje
+genérico ("Dato inválido", "Error de validación"), y nunca dejar a la persona
+adivinar cuál fue el problema. Cuando sea posible, el mensaje repite el valor
+o la cifra derivada que causó el bloqueo (ej. la edad calculada), no solo la
+regla abstracta que se incumplió.
+
+Al proponer o revisar cualquier pantalla que capture datos, se audita
+explícitamente cada condición que pueda dejar "Continuar" deshabilitado, y se
+confirma que cada una tiene su propio mensaje visible — o se deja registrado,
+con su razón, por qué esa condición en particular no lo necesita (ej. un campo
+todavía vacío mientras la persona edita no es un error que explicar, es
+incompletitud normal). Esta regla se aplica junto con "Validación desde el
+origen" (arriba): una no sustituye a la otra — una decide *qué* se valida,
+esta decide *cómo se comunica* cuando la validación bloquea el avance.
+
 ## Operaciones sensibles (git, datos legales)
 
 Las acciones difíciles de revertir o visibles fuera del entorno local (commits,

@@ -7,7 +7,6 @@ import { useState, useRef, useEffect } from 'react'
 
 const HOY = new Date().toISOString().slice(0, 10)
 const ANIO_ACTUAL = Number(HOY.slice(0, 4))
-const ANIO_MINIMO = 1900
 
 const MESES = [
   { valor: '01', texto: 'Enero' },
@@ -56,6 +55,15 @@ function esFechaReal(fecha) {
 // corrección de un valor normativo.
 const EDAD_MINIMA_FUNCIONAL = 15
 
+// 100 años tampoco es un límite legal ni biológico — es la misma clase de
+// decisión funcional del MVP que EDAD_MINIMA_FUNCIONAL, y reemplaza al
+// antiguo límite fijo por año de nacimiento (ANIO_MINIMO = 1900): ese límite
+// dejaba pasar edades extremadamente improbables porque comparaba contra un
+// año fijo, no contra la edad real de la persona. Se revisa como decisión de
+// producto si el alcance de PensionLab cambia, no como corrección de un
+// valor normativo.
+const EDAD_MAXIMA_FUNCIONAL = 100
+
 // Calcula la edad cumplida a partir de la fecha completa (año, mes y día),
 // no por resta de años — evitar `añoActual - añoNacimiento` es necesario
 // porque esa resta da un valor incorrecto antes del cumpleaños del año.
@@ -77,12 +85,9 @@ function calcularEdadCumplida(fechaISO, fechaReferenciaISO) {
 // el mismo criterio que ya aplica `evaluarSemanasMinimas` para las semanas
 // cotizadas (Principio de Arquitectura 11: validación en capas).
 function esFechaNacimientoValida(fecha) {
-  return (
-    Boolean(fecha) &&
-    esFechaReal(fecha) &&
-    fecha <= HOY &&
-    calcularEdadCumplida(fecha, HOY) >= EDAD_MINIMA_FUNCIONAL
-  )
+  if (!fecha || !esFechaReal(fecha) || fecha > HOY) return false
+  const edad = calcularEdadCumplida(fecha, HOY)
+  return edad >= EDAD_MINIMA_FUNCIONAL && edad <= EDAD_MAXIMA_FUNCIONAL
 }
 
 function diasMaximosEnMes(mesStr, anioStr) {
@@ -109,16 +114,40 @@ function mensajeErrorDia(diaStr, mesStr, anioStr) {
   return nombreMes ? `${nombreMes} tiene máximo ${maximo} días.` : 'Ingresa un día entre 1 y 31.'
 }
 
-function mensajeErrorEdad(fecha) {
-  if (!fecha || !esFechaReal(fecha) || fecha > HOY) return null
-  return calcularEdadCumplida(fecha, HOY) < EDAD_MINIMA_FUNCIONAL
-    ? 'PensionLab está diseñado actualmente para personas de 15 años o más.'
-    : null
+// Cubre los dos casos en que una fecha completa y real todavía bloquea
+// "Continuar" sin que mensajeErrorDia diga nada al respecto (esa función solo
+// conoce el día frente al mes/año, no la fecha completa frente a hoy): fecha
+// futura, y edad fuera del rango funcional del MVP. Regla de UX: ningún
+// bloqueo se deja sin explicar — ver "Explicar todo bloqueo" en
+// metodologia-de-desarrollo-con-ia.md.
+function mensajeErrorFecha(fecha) {
+  if (!fecha || !esFechaReal(fecha)) return null
+
+  if (fecha > HOY) {
+    return 'La fecha de nacimiento que ingresaste está en el futuro. Por favor verifica ese dato antes de continuar.'
+  }
+
+  const edad = calcularEdadCumplida(fecha, HOY)
+  if (edad < EDAD_MINIMA_FUNCIONAL) {
+    return (
+      `La fecha de nacimiento que ingresaste indica una edad aproximada de ${edad} años. ` +
+      'PensionLab está diseñado para personas de 15 años o más — verifica ese dato antes de continuar.'
+    )
+  }
+  if (edad > EDAD_MAXIMA_FUNCIONAL) {
+    return (
+      `La fecha de nacimiento que ingresaste indica una edad aproximada de ${edad} años. ` +
+      'PensionLab está diseñado para personas de hasta 100 años — verifica ese dato antes de continuar.'
+    )
+  }
+  return null
 }
 
 function construirFecha(dia, mes, anio) {
   if (!dia || !mes || anio.length !== 4) return ''
-  if (Number(anio) < ANIO_MINIMO || Number(anio) > ANIO_ACTUAL) return ''
+  // El límite inferior ya no se basa en un año fijo (ver EDAD_MAXIMA_FUNCIONAL)
+  // — solo se descarta aquí lo estructuralmente imposible: un año futuro.
+  if (Number(anio) > ANIO_ACTUAL) return ''
   return `${anio}-${mes}-${pad2(dia)}`
 }
 
@@ -287,9 +316,9 @@ function DatosIniciales({
           </div>
         )}
 
-        {mensajeErrorEdad(fechaNacimiento) && (
+        {mensajeErrorFecha(fechaNacimiento) && (
           <div className="field__warning">
-            <p>{mensajeErrorEdad(fechaNacimiento)}</p>
+            <p>{mensajeErrorFecha(fechaNacimiento)}</p>
           </div>
         )}
       </fieldset>

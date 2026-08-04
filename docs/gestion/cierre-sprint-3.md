@@ -417,6 +417,67 @@ documentación ya referenciadas (`UserProfile.js`,
 `metodologia-de-desarrollo-con-ia.md`) y la nota pendiente en este cierre.
 Sin cambios en `domain/`, `data/`, `context/`, ni en ninguna otra pantalla.
 
+### Tercera mejora posterior al cierre — edad máxima funcional, reemplazando el año mínimo fijo
+
+Detectada aplicando la propia regla "Validación desde el origen" recién
+adoptada: `ANIO_MINIMO = 1900` permitía registrar personas con edades
+extremadamente improbables (ej. nacidas en 1900, ~126 años hoy), porque
+comparaba contra un año fijo en vez de contra la edad real de la persona.
+
+**Revierte, de forma explícita, una decisión anterior de esta misma sesión**:
+al diseñar la edad mínima funcional se decidió deliberadamente *no*
+establecer todavía una edad máxima bloqueante ("una edad avanzada puede ser
+poco habitual, pero no necesariamente imposible"). Esa decisión se revisa
+aquí, no se oculta: se reemplaza `ANIO_MINIMO` por `EDAD_MAXIMA_FUNCIONAL =
+100`, documentada en el código con el mismo criterio que
+`EDAD_MINIMA_FUNCIONAL` — decisión funcional de alcance del MVP, no un
+límite legal ni biológico.
+
+`construirFecha` deja de rechazar años "muy antiguos"; el límite inferior
+ahora vive exclusivamente en `esFechaNacimientoValida` (edad entre 15 y 100
+años, inclusive), con su propio mensaje visible ("PensionLab está diseñado
+actualmente para personas de hasta 100 años.") que nunca corrige el año ya
+escrito. Comportamiento verificado sin romper casos existentes: un año
+estructuralmente absurdo (ej. `0001`) sigue quedando bloqueado, ahora por
+edad excesiva en vez de por año mínimo — mismo resultado final, mecanismo
+más preciso.
+
+**Verificación**: `npm run lint`, `npm test` (47/47) y `npm run build`
+exitosos; `git diff --check` sin errores de contenido. Alcance limitado a
+`src/pages/DatosIniciales.jsx`.
+
+### Cuarta mejora posterior al cierre — explicar todo bloqueo (edad y fecha futura)
+
+Detectada al pedir explícitamente que la edad fuera del rango funcional
+mostrara un mensaje más específico: al revisar, se confirmó que el mensaje
+existente para edad ya era visible pero no citaba la edad calculada, y —
+hallazgo nuevo durante esa misma auditoría— una fecha de nacimiento futura
+deshabilitaba "Continuar" **sin ningún mensaje**, dejando a la persona sin
+ninguna pista de qué revisar.
+
+`mensajeErrorEdad` se reemplaza por `mensajeErrorFecha`, que cubre ambos
+casos con mensajes específicos y accionables: para edad fuera de rango, cita
+la edad aproximada calculada ("...indica una edad aproximada de {X} años.
+PensionLab está diseñado para personas de 15 años o más / de hasta 100 años
+— verifica ese dato antes de continuar."); para fecha futura, un mensaje
+propio ("La fecha de nacimiento que ingresaste está en el futuro..."). Se
+auditaron el resto de condiciones que pueden bloquear "Continuar" en esta
+pantalla (sexo y lugar de residencia sin seleccionar) y se decidió, con su
+razón, no agregarles mensaje: un radio sin marcar es incompletitud normal
+mientras la persona todavía no responde, no un dato inconsistente que
+explicar — mismo criterio que ya regía para día/mes/año vacíos.
+
+**Origen de una segunda regla permanente.** Se adoptó la regla **"Explicar
+todo bloqueo"** (`docs/ia/metodologia-de-desarrollo-con-ia.md`): toda
+validación que impida continuar debe mostrar un mensaje visible, específico
+y accionable — nunca genérico, nunca silencioso. Complementa, sin
+reemplazar, "Validación desde el origen": una decide qué se valida, esta
+decide cómo se comunica cuando la validación bloquea el avance.
+
+**Verificación**: `npm run lint`, `npm test` (47/47) y `npm run build`
+exitosos; `git diff --check` sin errores de contenido. Alcance limitado a
+`src/pages/DatosIniciales.jsx` y a la nueva sección de metodología.
+
 ---
 
 ## Slice S3-004 — Pantalla de Situación pensional

@@ -385,6 +385,14 @@
   text-align: left;
 }
 
+/* Cuando dos bloques .insight quedan uno junto al otro (ej. las dos
+   evidencias de Primera Lectura), el gap uniforme de .screen no basta para
+   distinguirlos visualmente entre sí, al compartir el mismo estilo. No
+   afecta a pantallas con un solo bloque .insight (ej. HistoriaPensional). */
+.insight + .insight {
+  margin-top: 12px;
+}
+
 .insight__label {
   margin: 0;
   font-size: 13px;

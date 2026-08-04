@@ -187,6 +187,7 @@ function App() {
           regimenActual={regimenActual}
           nivelConocimientoSemanas={nivelConocimientoSemanas}
           semanasCotizadas={semanasCotizadas}
+          fechaNacimiento={fechaNacimiento}
           onVolver={() => setVista('historiaPensional')}
           onContinuar={() => setVista('siguientePaso')}
         />

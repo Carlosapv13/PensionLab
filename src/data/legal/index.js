@@ -131,3 +131,49 @@ export function obtenerSemanasMinimas(fecha, sexo, regimen) {
     vigenciaHasta: entrada.vigencia?.hasta ?? null,
   }
 }
+
+/**
+ * Resuelve la edad legal general de pensión de vejez, según sexo (Art. 33 Ley
+ * 100/Art. 9 Ley 797 de 2003) — un valor fijo, sin el cronograma que sí tiene
+ * obtenerSemanasMinimas.
+ *
+ * Responsabilidad estrictamente acotada a resolver qué dice la norma para esa
+ * fecha y ese sexo, con su trazabilidad completa. NO decide si esa norma es
+ * aplicable a un caso concreto (ej. si el régimen del caso tiene un requisito
+ * de edad equivalente) — esa decisión pertenece a quien consume este valor
+ * (hoy, evidenciaEdadPension.js), nunca al resolver. Deliberado: este resolver
+ * puede tener consumidores futuros distintos de esa evidencia.
+ *
+ * @param {string} fecha - Fecha ISO en la que se evalúa el requisito
+ * @param {('M'|'F')} sexo
+ * @returns {{
+ *   valor: number,
+ *   id: string,
+ *   fuente: string,
+ *   articulo: string,
+ *   estado: string,
+ *   listoParaProduccion: boolean,
+ *   vigenciaDesde: string | null,
+ *   vigenciaHasta: string | null,
+ * }}
+ */
+export function obtenerEdadPension(fecha, sexo) {
+  const campo = sexo === 'F' ? 'edadPensionMujer' : 'edadPensionHombre'
+  const reglas = resolverReglasVigentes(fecha)
+  const entrada = buscarPorCampo(reglas, campo)
+
+  if (!entrada) {
+    throw new Error(`obtenerEdadPension: no se encontró '${campo}' vigente para la fecha ${fecha}`)
+  }
+
+  return {
+    valor: entrada.valor,
+    id: entrada.id,
+    fuente: entrada.fuente,
+    articulo: entrada.articulo,
+    estado: entrada.metadataFuente.estado,
+    listoParaProduccion: entrada.metadataFuente.listoParaProduccion,
+    vigenciaDesde: entrada.vigencia?.desde ?? null,
+    vigenciaHasta: entrada.vigencia?.hasta ?? null,
+  }
+}

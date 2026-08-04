@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { obtenerSemanasMinimas } from './index.js'
+import { obtenerSemanasMinimas, obtenerEdadPension } from './index.js'
 
 // obtenerSemanasMinimas no tenía pruebas propias pese a estar implementado — estos casos
 // cubren la diferencia por sexo, el cronograma progresivo de mujeres (Sentencia C-197 de
@@ -49,5 +49,34 @@ describe('obtenerSemanasMinimas', () => {
     expect(() => obtenerSemanasMinimas('2026-06-15', 'M', 'RAIS')).toThrow(
       /no implementado para regimen 'RAIS'/
     )
+  })
+})
+
+// obtenerEdadPension no recibe régimen: solo resuelve qué dice la norma para
+// un sexo y una fecha, con su trazabilidad completa. Si esa norma aplica a un
+// caso concreto es responsabilidad de quien la consume, no de este resolver.
+describe('obtenerEdadPension', () => {
+  it('hombre: 62 años, trazable a la entrada por sexo', () => {
+    const resultado = obtenerEdadPension('2026-06-15', 'M')
+
+    expect(resultado.valor).toBe(62)
+    expect(resultado.id).toBe('edad-pension-hombre')
+    expect(resultado.fuente).toBe('Ley 100 de 1993')
+  })
+
+  it('mujer: 57 años, trazable a la entrada por sexo', () => {
+    const resultado = obtenerEdadPension('2026-06-15', 'F')
+
+    expect(resultado.valor).toBe(57)
+    expect(resultado.id).toBe('edad-pension-mujer')
+  })
+
+  it('devuelve la trazabilidad completa: estado y listoParaProduccion del archivo de origen', () => {
+    const resultado = obtenerEdadPension('2026-06-15', 'M')
+
+    expect(resultado.estado).toBe('borrador')
+    expect(resultado.listoParaProduccion).toBe(false)
+    expect(resultado.vigenciaDesde).toBe('2003-01-29')
+    expect(resultado.vigenciaHasta).toBeNull()
   })
 })

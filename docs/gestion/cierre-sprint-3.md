@@ -1521,6 +1521,117 @@ evidencia real y ejecutable del sistema.
 
 ---
 
+## Pausa de Sprint 3 — Segunda evidencia ejecutable: edad de pensión en RPM
+
+**Estado:** ✅ Implementado y probado — commit local en `sprint-3-mvp-headless`,
+sin push.
+
+### Objetivo
+
+Resuelve el pendiente dejado por la primera evidencia: `fechaNacimiento`
+tiene ahora su primer consumidor real en `domain/`. Antes de proponer una
+tercera pantalla de captura, se analizó si el siguiente momento de valor
+requería un dato nuevo — no lo requería: `edadPensionMujer`/
+`edadPensionHombre` ya estaban citadas en `data/legal`, y `fechaNacimiento` y
+`sexo` ya estaban capturados desde S3-003. Se extendió `PrimeraLectura.jsx`
+con una segunda evidencia (edad legal general de pensión en RPM) en vez de
+crear una pantalla nueva o pedir un dato adicional.
+
+### Qué se construyó
+
+- `obtenerEdadPension(fecha, sexo)` (`src/data/legal/index.js`) — **sin
+  parámetro `regimen`**, a diferencia de `obtenerSemanasMinimas`: su
+  responsabilidad se limita a resolver qué dice la norma para un sexo y una
+  fecha, con trazabilidad completa. La decisión de si esa norma aplica a un
+  caso concreto (régimen RPM vs. RAIS) vive en `evidenciaEdadPension.js`, no
+  en el resolver — separación de responsabilidades explícitamente más
+  estricta que la ya existente en `obtenerSemanasMinimas` (ver "Decisiones
+  arquitectónicas" más abajo).
+- `evaluarEdadPension` (`src/domain/evidenciaEdadPension.js`) — segundo
+  archivo de evidencia independiente, mismo criterio que la primera: sin
+  Motor de Evidencias genérico. Valida de forma autónoma su propia
+  `fechaNacimiento` (formato ISO, fecha real, no futura), con una
+  implementación propia de la validación de fecha —no importada de
+  `DatosIniciales.jsx`—, consistente con que un componente de `domain/`
+  nunca depende de `pages/`. Sin dimensión de certeza (a diferencia de
+  `certezaSemanas`): la fecha de nacimiento no es un dato aproximado.
+- `PrimeraLectura.jsx` reestructurada con dos bloques de evidencia
+  ("Lo que esto nos dice sobre tus semanas" / "...sobre tu edad"),
+  limitaciones deduplicadas por `codigo` en un bloque compartido con
+  encabezado propio ("Lo que todavía no hemos podido revisar"), y un cierre
+  explícito que previene que cumplir ambos requisitos generales a la vez se
+  lea como una determinación de derecho pensional.
+- 22 pruebas nuevas (3 del resolver, 19 de la evidencia); 69/69 en total en
+  el proyecto.
+
+### Refinamientos posteriores a la primera implementación
+
+- Corrección de una frase que afirmaba "la legislación... aplicable a este
+  caso" cuando precisamente una de las limitaciones declara que eso todavía
+  no se evaluó — reemplazada por "la regla general que hoy podemos evaluar".
+- Bloque combinado: cuando ambas evidencias son `no_evaluable` por la misma
+  causa compartida (régimen o sexo, nunca por una razón específica de una
+  sola evidencia), la interfaz consolida un único mensaje en vez de repetir
+  casi la misma explicación dos veces.
+- Eliminada la línea "Basado en la regla general que hoy podemos evaluar"
+  del bloque de edad, donde era redundante con su propia oración de
+  evidencia; conservada en el bloque de semanas, donde es la única vez que
+  aparece.
+- Encabezado propio para el bloque de limitaciones compartidas, sin cambiar
+  colores, para que no se lea como una tercera evidencia.
+- Separación visual adicional (`margin-top: 12px`) entre bloques `.insight`
+  consecutivos, acotada con el selector `.insight + .insight` para no
+  afectar pantallas con un solo bloque.
+
+### Decisiones arquitectónicas registradas en esta revisión
+
+1. **Límite de alcance de `PrimeraLectura.jsx`.** Queda limitada a
+   comparaciones estructurales generales (semanas y edad) en RPM, sin
+   cálculos de monto ni captura de información adicional. Se verificó
+   contra los campos reales de `data/legal/versions/vigente-2026.json`: no
+   existe hoy una tercera comparación de umbral simple disponible sin
+   captura nueva o sin construir `formulaRPM`/`pensionEngine` — el resto de
+   campos (`tasaCotizacion`, `topeMaximoIBC`, `tasaReemplazo*`, etc.) son
+   parámetros de cálculo de monto, no de elegibilidad. No se agregará una
+   tercera evidencia a esta pantalla; la siguiente capacidad de valor
+   pertenece a un momento posterior del recorrido.
+2. **Consolidación visual sin fusión de dominio.** Cuando varias evidencias
+   resultan `no_evaluable` por exactamente la misma causa compartida, la
+   interfaz puede consolidar el mensaje — la consolidación ocurre
+   únicamente a partir de los resultados ya producidos por el dominio,
+   nunca modificando ni fusionando las evidencias mismas.
+3. **El dominio sigue produciendo evidencias independientes.** Cualquier
+   combinación, agrupación o jerarquía visual pertenece exclusivamente a la
+   interfaz — `evaluarSemanasMinimas` y `evaluarEdadPension` no se conocen
+   entre sí ni comparten estado.
+4. **El Motor de Evidencias sigue diferido.** Con dos evidencias reales ya
+   comparadas en código, se identificó un candidato pequeño y probado para
+   compartir (`construirLimitaciones` y la forma de `normaUsada`, casi
+   idénticos entre los dos archivos) — pero no una base suficiente para un
+   contrato genérico u orquestador: la dimensión de certeza, las razones de
+   no evaluación, y la asimetría de firma entre `obtenerSemanasMinimas`
+   (recibe `regimen`) y `obtenerEdadPension` (no lo recibe) siguen siendo
+   reales. Esa asimetría queda pendiente de un análisis de impacto propio
+   antes de tocar `obtenerSemanasMinimas`, que pertenece a un bloque ya
+   cerrado.
+
+### Verificación
+
+`npm run lint`, `npm test` (69/69) y `npm run build` exitosos en cada ronda;
+`git diff --check` sin errores de contenido. Verificación visual manual del
+bloque combinado (régimen `RAIS`), los dos bloques separados (régimen
+`RPM`), el encabezado de limitaciones, ambos "Ver fundamento legal", y
+navegación Volver/Continuar sin pérdida de datos.
+
+### Pendiente
+
+- Análisis de impacto específico para alinear la firma de
+  `obtenerSemanasMinimas` con la de `obtenerEdadPension` (quitarle
+  `regimen`), antes de considerar cualquier extracción de lógica común.
+- S3-010 (salario/IBC) permanece pausado.
+
+---
+
 ## Slices pendientes de Sprint 3
 
 Por definir a medida que el sprint avance.

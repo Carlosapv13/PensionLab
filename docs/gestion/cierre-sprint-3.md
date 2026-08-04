@@ -1078,6 +1078,69 @@ Sin push realizado — el commit permanece local en `sprint-3-mvp-headless`.
 
 ---
 
+## Pausa de Sprint 3 — PL-240 (Filosofía de Experiencia de PensionLab)
+
+**Estado:** ✅ Cerrada — PL-240 v1.0 aprobado. Documento fuente en
+`docs/producto/PL-240 - Filosofía de Experiencia de PensionLab.md`, entregable
+Word en `docs/producto/PL-240 - Filosofía de Experiencia de PensionLab - v1.0.docx`.
+
+### Objetivo de la pausa
+
+Antes de iniciar el Slice S3-009, se detuvo deliberadamente el desarrollo de
+nuevas pantallas para construir un documento fundacional de producto —PL-240—
+que definiera los principios que guían toda interacción entre PensionLab y sus
+usuarios: cómo habla, cómo pregunta, cómo genera confianza, y cómo comunica
+incertidumbre, riesgos y oportunidades. A diferencia de PL-230, PL-240 no
+describe arquitectura técnica ni implementación — describe comportamiento de
+producto.
+
+### Contenido aprobado
+
+PL-240 se construyó y aprobó por partes (propuesta → revisión → aprobación),
+siguiendo el mismo método ya usado para PL-230:
+
+- **§0** La Promesa de PensionLab — por qué existe el producto.
+- **§1-§3** Filosofía, Propósito del documento, y siete Principios
+  fundamentales con nombre memorable (Conversar no interrogar; Brújula no
+  piloto automático; Sin certezas fingidas; Progreso sin maquillaje; Ninguna
+  puerta sin salida; El idioma de la persona; Cuidar la coherencia).
+- **§4-§9** Cómo habla, cómo hace preguntas, cómo genera confianza, cómo
+  comunica incertidumbre, riesgos y oportunidades.
+- **§10** Principios de diseño conversacional.
+- **§11-§13** Ejemplos prácticos de buenas y malas interacciones (anclados en
+  pantallas reales de S3-001 a S3-008, no en casos hipotéticos), checklist de
+  evaluación para cualquier pantalla nueva, y relación explícita con PL-230,
+  con los Principios de Arquitectura y con `docs/ia/principios-y-limites.md`.
+- Cierre con Riesgos, Decisiones (tomadas y pendientes), y un epílogo breve.
+
+### Decisiones tomadas en esta pausa
+
+1. PL-240 queda establecido como documento fundacional de Filosofía de
+   Experiencia, con rango equivalente —dentro de su propio dominio— al de
+   PL-230 dentro del suyo.
+2. El checklist de PL-240 §12 se adopta como criterio obligatorio de revisión
+   para cualquier pantalla nueva de Sprint 3, empezando por S3-009.
+3. Ningún Slice ya cerrado (S3-001 a S3-008) se modifica como parte de esta
+   pausa — se usan como fuente de ejemplos ya aprobados, no como objeto de
+   rediseño retroactivo.
+4. El `.docx` de PL-240 sigue el mismo estándar de encabezado y pie de página
+   (código, título y versión del documento; numeración de página) ya usado en
+   el entregable Word de PL-230, para mantener consistencia visual dentro de
+   la Biblioteca de Conocimiento. El `.docx`, igual que el de PL-230, no se
+   versiona en el repositorio — solo el `.md` fuente.
+
+### Pendiente para cuando se retome Sprint 3
+
+- Reanudar S3-009 aplicando el checklist de PL-240 §12 antes de aprobar
+  cualquier redacción o flujo nuevo.
+- Las decisiones explícitamente pendientes de PL-240 (§15) —en particular el
+  mecanismo concreto para que la interfaz "reconozca sus propios cambios" y la
+  eventual migración de la lógica de coherencia de S3-008 a un Motor de
+  Coherencia del Expediente— quedan abiertas y no bloquean la reanudación de
+  Sprint 3.
+
+---
+
 ## Slices pendientes de Sprint 3
 
 Por definir a medida que el sprint avance.

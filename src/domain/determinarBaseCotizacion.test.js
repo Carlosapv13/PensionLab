@@ -57,6 +57,25 @@ describe('determinarBaseCotizacion — valor declarado (conocido/aproximado)', (
     expect(r.ajustesAplicados[0].valorDespues).toBe(TOPE_PESOS)
   })
 
+  it('ajustesAplicados es puramente estructural: sin descripcion, redacción exclusiva de la pantalla', () => {
+    const r = determinarBaseCotizacion({
+      certeza: 'conocido',
+      valorDeclarado: '50000000',
+      tipoCotizante: 'independiente',
+      lugarCotizacion: 'colombia',
+      salarioParaEstimar: '',
+      fecha: FECHA,
+    })
+
+    expect(r.ajustesAplicados[0]).not.toHaveProperty('descripcion')
+    expect(Object.keys(r.ajustesAplicados[0]).sort()).toEqual(
+      ['codigo', 'normaUsada', 'valorAntes', 'valorDespues'].sort()
+    )
+    // El valor original declarado nunca se pierde ni se sobrescribe, incluso
+    // cuando ibcAplicableSimulacion ya quedó ajustado por el tope.
+    expect(r.ibcActualDeclarado).toBe(50000000)
+  })
+
   it('valor por debajo del piso doméstico: se advierte, nunca se corrige', () => {
     const r = determinarBaseCotizacion({
       certeza: 'conocido',

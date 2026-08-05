@@ -92,6 +92,34 @@ function App() {
     )
   }
 
+  function invalidarBaseCotizacion() {
+    setCertezaBaseCotizacion(null)
+    setValorBaseCotizacionDeclarado('')
+    setSalarioParaEstimarBase('')
+  }
+
+  function actualizarTipoCotizante(valor) {
+    // certezaBaseCotizacion (Base actual de cotización) depende semánticamente
+    // de tipoCotizante: decide qué ayuda contextual aplica y si existe la ruta
+    // de estimación desde salario (solo empleado). Un cambio real invalida
+    // cualquier respuesta ya dada — mismo criterio ya usado en
+    // actualizarRegimenActual.
+    if (valor !== tipoCotizante) {
+      invalidarBaseCotizacion()
+    }
+    setTipoCotizante(valor)
+  }
+
+  function actualizarLugarCotizacion(valor) {
+    // Mismo criterio que actualizarTipoCotizante: lugarCotizacion decide la
+    // ayuda contextual (exterior tiene la suya propia) y si el piso legal se
+    // valida o se declara como limitación no evaluada.
+    if (valor !== lugarCotizacion) {
+      invalidarBaseCotizacion()
+    }
+    setLugarCotizacion(valor)
+  }
+
   function actualizarCertezaBaseCotizacion(valor) {
     // valorBaseCotizacionDeclarado y salarioParaEstimarBase dependen
     // semánticamente de certezaBaseCotizacion: el primero solo tiene sentido
@@ -147,9 +175,9 @@ function App() {
       {vista === 'historialLaboral' && (
         <HistorialLaboral
           tipoCotizante={tipoCotizante}
-          onCambiarTipoCotizante={setTipoCotizante}
+          onCambiarTipoCotizante={actualizarTipoCotizante}
           lugarCotizacion={lugarCotizacion}
-          onCambiarLugarCotizacion={setLugarCotizacion}
+          onCambiarLugarCotizacion={actualizarLugarCotizacion}
           cotizaActualmente={cotizaActualmente}
           onCambiarCotizaActualmente={setCotizaActualmente}
           onContinuar={() => setVista('expedientePensional')}

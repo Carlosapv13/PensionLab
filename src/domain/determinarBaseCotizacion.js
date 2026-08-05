@@ -71,6 +71,34 @@ function construirNormaUsada(entrada) {
   }
 }
 
+/**
+ * Aplica el tope de 25 SMLMV a `valor`, si lo supera. Devuelve el valor final
+ * (topado o intacto) y, solo cuando hubo ajuste, la entrada trazable
+ * correspondiente — puramente estructural (codigo/valorAntes/valorDespues/
+ * normaUsada), sin redacción narrativa: esa responsabilidad es exclusiva de
+ * la pantalla que consume este resultado (BaseCotizacion.jsx), no del
+ * dominio (ambigüedad detectada y corregida durante la revisión del Slice).
+ *
+ * @param {number} valor
+ * @param {number} topeEnPesos
+ * @param {Object} normaTope
+ * @returns {{ valorFinal: number, ajuste: Object | null }}
+ */
+function aplicarTopeMaximoIBC(valor, topeEnPesos, normaTope) {
+  if (valor <= topeEnPesos) {
+    return { valorFinal: valor, ajuste: null }
+  }
+  return {
+    valorFinal: topeEnPesos,
+    ajuste: {
+      codigo: 'TOPE_MAXIMO_IBC',
+      valorAntes: valor,
+      valorDespues: topeEnPesos,
+      normaUsada: normaTope,
+    },
+  }
+}
+
 function limitacionesFuenteLegal(tope, smlv) {
   const limitaciones = []
 
@@ -122,7 +150,7 @@ function resultadoBase() {
  *   origenDatoIbc: 'declarado_por_usuario' | 'calculado_desde_dato_declarado' | null,
  *   certezaValorDeclarado: 'conocido' | 'aproximado' | 'desconocido' | null,
  *   confianzaReglaAplicada: 'validada_directamente_aplicable' | 'aplicable_con_supuestos' | null,
- *   ajustesAplicados: Array<{ codigo: string, descripcion: string, valorAntes: number, valorDespues: number, normaUsada: Object }>,
+ *   ajustesAplicados: Array<{ codigo: string, valorAntes: number, valorDespues: number, normaUsada: Object }>,
  *   limitaciones: Array<{ codigo: string, mensaje: string }>,
  *   normaUsada: { id: string, fuente: string, articulo: string, estado: string, listoParaProduccion: boolean, vigenciaDesde: string | null, vigenciaHasta: string | null } | null,
  * }}
@@ -151,19 +179,8 @@ export function determinarBaseCotizacion({
       return { ...resultadoBase(), certezaValorDeclarado: certeza }
     }
 
-    const ajustesAplicados = []
-    let valorFinal = valorNumerico
-
-    if (valorNumerico > topeEnPesos) {
-      valorFinal = topeEnPesos
-      ajustesAplicados.push({
-        codigo: 'TOPE_MAXIMO_IBC',
-        descripcion: `El valor declarado supera el tope legal de ${tope.valor} SMLMV — se usará el tope para las simulaciones.`,
-        valorAntes: valorNumerico,
-        valorDespues: valorFinal,
-        normaUsada: normaTope,
-      })
-    }
+    const { valorFinal, ajuste } = aplicarTopeMaximoIBC(valorNumerico, topeEnPesos, normaTope)
+    const ajustesAplicados = ajuste ? [ajuste] : []
 
     const limitaciones = limitacionesFuenteLegal(tope, smlv)
 
@@ -202,19 +219,8 @@ export function determinarBaseCotizacion({
     const salarioNumerico = validarMonto(salarioParaEstimar)
 
     if (salarioNumerico !== null) {
-      const ajustesAplicados = []
-      let valorFinal = salarioNumerico
-
-      if (salarioNumerico > topeEnPesos) {
-        valorFinal = topeEnPesos
-        ajustesAplicados.push({
-          codigo: 'TOPE_MAXIMO_IBC',
-          descripcion: `El salario indicado supera el tope legal de ${tope.valor} SMLMV — se usará el tope para las simulaciones.`,
-          valorAntes: salarioNumerico,
-          valorDespues: valorFinal,
-          normaUsada: normaTope,
-        })
-      }
+      const { valorFinal, ajuste } = aplicarTopeMaximoIBC(salarioNumerico, topeEnPesos, normaTope)
+      const ajustesAplicados = ajuste ? [ajuste] : []
 
       const limitaciones = [
         ...limitacionesFuenteLegal(tope, smlv),

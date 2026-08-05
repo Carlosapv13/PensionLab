@@ -127,6 +127,78 @@ materializa hoy parcialmente en `UserProfile.laboralInfo`
 etapa— para incorporar `traslados` (cambios de régimen RPM↔RAIS) y `bonos`
 (bonos pensionales), ambos ausentes hoy del contrato.
 
+#### Niveles de madurez de la información pensional
+
+Registrado tras el análisis de brecha hacia el primer resultado económico de
+PensionLab (Sprint 3, agosto 2026), a partir de una tensión que ya había aparecido
+sin resolverse en tres lugares del código: la ayuda de la pregunta de semanas en
+`InformacionPensionalEsencial.jsx` y el Tiempo 2 de `HistoriaPensional.jsx`
+prometen ambas, en distintas palabras, que *"más adelante podremos
+verificar/validar esto con tu historia laboral oficial"* — sin que nada definiera
+qué significa ese "más adelante"; y `Explanation.gradoEstimacion`
+(`domain/contracts/Explanation.js`, Sprint 2, nunca instanciado) ya reserva un
+campo para expresar exactamente este tipo de confianza, citando en su propio
+JSDoc "falta de historial de IBC completo" como ejemplo, sin que ningún código lo
+haya llenado de contenido todavía.
+
+Este marco extiende, a nivel de todo el Bloque 2, el mismo patrón que Sprint 3 ya
+usa a nivel de un solo campo (`certezaSemanas`: conocido/aproximado/desconocido,
+en `evaluarSemanasMinimas`) — no introduce un concepto ajeno al proyecto, nombra
+uno que ya existía disperso.
+
+- **Nivel 1 — Información autodeclarada.** Datos ya capturados hoy por Sprint 3:
+  fecha de nacimiento, sexo, régimen, semanas cotizadas (con su propia
+  certeza). Datos autodeclarados **todavía sin capturar, previstos para los
+  próximos Slices de la secuencia económica**: salario/IBC y edad de
+  jubilación deseada. Lo ya capturado habilita las evidencias de elegibilidad
+  ya construidas (semanas mínimas, edad de pensión, indicios de régimen de
+  transición); una primera estimación de monto con IBL simplificado (proxy =
+  salario actual) queda habilitada recién cuando se complete la captura
+  prevista. En ningún caso, dentro de este nivel, hay datos verificados
+  contra una fuente oficial.
+- **Nivel 2 — Historia laboral oficial (verificada, no solo resumida).** El
+  usuario aporta o el sistema consulta su historial real de cotizaciones —
+  fechas exactas por período, no un número autorreportado. Mejora: la certeza
+  de `semanasCotizadas` deja de depender de "aproximado"; permite validar si
+  realmente hubo traslado de régimen (hoy `evaluarIndiciosTransicion` no puede
+  evaluar ese efecto — es justo la pieza que lo desbloquearía). No resuelve IBL
+  con precisión por sí solo si no incluye los IBC históricos, solo fechas y
+  semanas.
+- **Nivel 3 — Evolución histórica de salario/IBC.** El sistema conoce el IBC
+  mes a mes (o año a año) de la ventana relevante. Es la única pieza que
+  habilita el cálculo real de IBL, reemplazando el proxy del Nivel 1. RAIS
+  mejora, pero su techo de confianza permanece en "media": depende de
+  rentabilidad futura proyectada, algo inherente a cualquier proyección, no
+  resoluble con más historia.
+- **Nivel 4 — Saldo actual de la cuenta individual (solo aplica a RAIS).**
+  Resuelve la limitación ya documentada como "la más importante de todo el
+  documento" en `trazabilidad-formula-RAIS.md` (RAIS hoy no incluye capital ya
+  acumulado). Fuente de dato distinta (consulta a la AFP), no una extensión de
+  los niveles 1-3.
+
+**Uso previsto:** `Explanation.gradoEstimacion.nivel`/`.motivo`, cuando se
+implemente, debe poblarse a partir de este marco — no como un juicio ad-hoc por
+cálculo. Sirve además como respuesta explícita a las dos promesas de "más
+adelante" ya hechas al usuario en pantallas de Sprint 3: ese "más adelante" es
+el Nivel 2.
+
+**Pregunta de producto registrada, deliberadamente sin resolver:** "Nivel
+1/2/3/4" es lenguaje útil para la arquitectura, pero no se ha decidido si debe
+llegar así de literal a la interfaz. Antes de diseñar cómo PensionLab comunica
+el grado de confianza de un resultado, debe revisarse si conviene traducirlo a
+un concepto orientado a la experiencia (ej. "calidad del análisis", "precisión
+del análisis", o una idea equivalente) en vez de exponer la numeración interna
+directamente al usuario. No decidido — queda para cuando se diseñe esa
+comunicación.
+
+Distinción explícita para cuando se implemente el primer resultado de la
+secuencia económica: su **clasificación interna** (`gradoEstimacion`, trazas,
+documentación) sí corresponde inequívocamente al Nivel 1, y el resultado debe
+explicar de forma concreta que se basa en información declarada y no
+verificada — eso no está en discusión. Lo que permanece abierto es únicamente
+el **texto literal que verá el usuario** en pantalla, que se decide al diseñar
+esa pantalla, no en este documento.
+
 ### Bloque 3: Perfil de Decisión
 
 Objetivos, restricciones, preferencias, prioridades y horizonte temporal definidos por

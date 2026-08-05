@@ -606,6 +606,8 @@ A diferencia de los cinco componentes anteriores, Explicabilidad no ocupa una po
 
 Traduce lo que cada uno de los cinco componentes en secuencia ya produjo —evidencia, estrategias, comparación, orientación— a lenguaje legible para una persona sin formación técnica ni jurídica, sin volver a resolver, calcular o inferir nada por su cuenta. Es la extensión directa, a los cinco componentes de esta arquitectura, del patrón ya validado en Sprint 1 y reforzado en Sprint 2: `Explanation` se construye a partir de `CalculationTrace` y de `contextoEvaluacionUtilizado`, "sin volver a resolver nada directamente contra `data/legal` ni `data/assumptions`" (`Explanation.js`, comentario de responsabilidad). Explicabilidad, en este documento, generaliza ese mismo compromiso a evidencia, estrategias, comparación y orientación.
 
+`Explanation.gradoEstimacion` (reservado desde Sprint 2, todavía sin poblar por ningún código) es el campo concreto donde Explicabilidad debe expresar esta confianza. Su contenido, cuando se implemente, debe poblarse a partir de los **Niveles de madurez de la información pensional** registrados en `expediente-pensional.md` (Bloque 2) — no como un juicio ad-hoc por cálculo. Ese mismo registro deja abierta, sin resolver todavía, si esa numeración interna (Nivel 1-4) debe traducirse a un concepto orientado a la experiencia antes de llegar a la interfaz — decisión que pertenece al diseño de Explicabilidad hacia el usuario, no a este documento.
+
 #### Diagrama de la capa transversal
 
 ```

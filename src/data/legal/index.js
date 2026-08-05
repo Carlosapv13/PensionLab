@@ -179,6 +179,88 @@ export function obtenerEdadPension(fecha, sexo) {
 }
 
 /**
+ * Resuelve el tope máximo del Ingreso Base de Cotización (Art. 18 Ley 100 de
+ * 1993, modificado por Art. 5 Ley 797 de 2003) — 25 SMLMV, sin condición de
+ * ampliación activa (ver trazabilidad-normativa.md). El valor se devuelve en
+ * SMLMV, no en pesos — quien lo consuma debe multiplicarlo por `obtenerSmlv`
+ * para obtener el tope en pesos, nunca fusionar ambos aquí.
+ *
+ * @param {string} fecha - Fecha ISO en la que se evalúa el requisito
+ * @returns {{
+ *   valor: number,
+ *   id: string,
+ *   fuente: string,
+ *   articulo: string,
+ *   estado: string,
+ *   listoParaProduccion: boolean,
+ *   vigenciaDesde: string | null,
+ *   vigenciaHasta: string | null,
+ * }}
+ */
+export function obtenerTopeMaximoIBC(fecha) {
+  const reglas = resolverReglasVigentes(fecha)
+  const entrada = buscarPorCampo(reglas, 'topeMaximoIBC')
+
+  if (!entrada) {
+    throw new Error(`obtenerTopeMaximoIBC: no se encontró una entrada vigente para la fecha ${fecha}`)
+  }
+
+  return {
+    valor: entrada.valor,
+    id: entrada.id,
+    fuente: entrada.fuente,
+    articulo: entrada.articulo,
+    estado: entrada.metadataFuente.estado,
+    listoParaProduccion: entrada.metadataFuente.listoParaProduccion,
+    vigenciaDesde: entrada.vigencia?.desde ?? null,
+    vigenciaHasta: entrada.vigencia?.hasta ?? null,
+  }
+}
+
+/**
+ * Resuelve el Salario Mínimo Legal Mensual Vigente. A diferencia de los demás
+ * resolvers de este archivo, `smlv` tiene hoy `estadoJuridico: 'transitorio'`
+ * (litigio activo ante el Consejo de Estado, ver trazabilidad-normativa.md) —
+ * este resolver activa conscientemente `permitirTransitorio: true` para poder
+ * resolverlo, y expone `estadoJuridico` en su retorno para que ningún
+ * consumidor use este valor sin saber que no está firme. No decide si es
+ * aceptable usarlo — esa decisión pertenece a quien lo consume (Principio 11).
+ *
+ * @param {string} fecha - Fecha ISO en la que se evalúa el requisito
+ * @returns {{
+ *   valor: number,
+ *   id: string,
+ *   fuente: string,
+ *   articulo: string,
+ *   estado: string,
+ *   listoParaProduccion: boolean,
+ *   vigenciaDesde: string | null,
+ *   vigenciaHasta: string | null,
+ *   estadoJuridico: string,
+ * }}
+ */
+export function obtenerSmlv(fecha) {
+  const reglas = resolverReglasVigentes(fecha, { permitirTransitorio: true })
+  const entrada = buscarPorCampo(reglas, 'smlv')
+
+  if (!entrada) {
+    throw new Error(`obtenerSmlv: no se encontró una entrada vigente para la fecha ${fecha}`)
+  }
+
+  return {
+    valor: entrada.valor,
+    id: entrada.id,
+    fuente: entrada.fuente,
+    articulo: entrada.articulo,
+    estado: entrada.metadataFuente.estado,
+    listoParaProduccion: entrada.metadataFuente.listoParaProduccion,
+    vigenciaDesde: entrada.vigencia?.desde ?? null,
+    vigenciaHasta: entrada.vigencia?.hasta ?? null,
+    estadoJuridico: entrada.estadoJuridico ?? 'firme',
+  }
+}
+
+/**
  * Resuelve la fecha de entrada en vigencia del Sistema General de Pensiones
  * (Art. 151 Ley 100 de 1993) — la fecha histórica fija contra la que se evalúa el
  * screening de indicios de régimen de transición (ver evaluarIndiciosTransicion,

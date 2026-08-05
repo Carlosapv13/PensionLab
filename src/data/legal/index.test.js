@@ -4,6 +4,9 @@ import {
   obtenerEdadPension,
   obtenerFechaEntradaVigenciaSistema,
   obtenerEdadTransicion,
+  obtenerTopeMaximoIBC,
+  obtenerSmlv,
+  resolverReglasVigentes,
 } from './index.js'
 
 // obtenerSemanasMinimas no tenía pruebas propias pese a estar implementado — estos casos
@@ -134,5 +137,51 @@ describe('obtenerEdadTransicion', () => {
     expect(resultado.listoParaProduccion).toBe(false)
     expect(resultado.vigenciaDesde).toBe('1994-04-01')
     expect(resultado.vigenciaHasta).toBeNull()
+  })
+})
+
+// obtenerTopeMaximoIBC y obtenerSmlv viven en vigente-2026.json — usados por
+// determinarBaseCotizacion.js (Slice "Base actual de cotización") para aplicar
+// el techo del IBC. Ver trazabilidad-normativa.md.
+
+describe('obtenerTopeMaximoIBC', () => {
+  it('resuelve 25 SMLMV, trazable a su entrada', () => {
+    const resultado = obtenerTopeMaximoIBC('2026-06-15')
+
+    expect(resultado.valor).toBe(25)
+    expect(resultado.id).toBe('tope-maximo-ibc')
+    expect(resultado.fuente).toMatch(/^Ley 100 de 1993/)
+  })
+
+  it('devuelve la trazabilidad completa: estado y listoParaProduccion del archivo de origen', () => {
+    const resultado = obtenerTopeMaximoIBC('2026-06-15')
+
+    expect(resultado.estado).toBe('borrador')
+    expect(resultado.listoParaProduccion).toBe(false)
+    expect(resultado.vigenciaDesde).toBe('2003-01-29')
+    expect(resultado.vigenciaHasta).toBeNull()
+  })
+})
+
+describe('obtenerSmlv', () => {
+  it('resuelve el valor vigente, activando conscientemente el estado transitorio', () => {
+    const resultado = obtenerSmlv('2026-06-15')
+
+    expect(resultado.valor).toBe(1750905)
+    expect(resultado.id).toBe('smlv-2026')
+  })
+
+  it('expone estadoJuridico transitorio, sin ocultarlo', () => {
+    const resultado = obtenerSmlv('2026-06-15')
+
+    expect(resultado.estadoJuridico).toBe('transitorio')
+  })
+
+  it('sin activar permitirTransitorio, resolverReglasVigentes excluye smlv por defecto', () => {
+    // Confirma la premisa que justifica la activación consciente en el JSDoc
+    // de obtenerSmlv: sin ese permiso explícito, la entrada ni siquiera
+    // aparece entre las reglas vigentes.
+    const reglasPorDefecto = resolverReglasVigentes('2026-06-15')
+    expect(reglasPorDefecto.find((r) => r.campo === 'smlv')).toBeUndefined()
   })
 })

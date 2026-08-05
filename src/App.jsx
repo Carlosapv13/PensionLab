@@ -12,7 +12,8 @@ import InformacionPensionalEsencial from './pages/InformacionPensionalEsencial.j
 import HistoriaPensional from './pages/HistoriaPensional.jsx'
 import PrimeraLectura from './pages/PrimeraLectura.jsx'
 import IndiciosRegimenTransicion from './pages/IndiciosRegimenTransicion.jsx'
-import SiguienteEtapaTemporal from './pages/SiguienteEtapaTemporal.jsx'
+import BaseCotizacion from './pages/BaseCotizacion.jsx'
+import SiguientePasoEconomicoTemporal from './pages/SiguientePasoEconomicoTemporal.jsx'
 
 function App() {
   const [vista, setVista] = useState('bienvenida')
@@ -32,6 +33,9 @@ function App() {
   const [semanasConfirmadasPara, setSemanasConfirmadasPara] = useState(null)
   const [trasladoRegimen, setTrasladoRegimen] = useState(null)
   const [detalleTraslado, setDetalleTraslado] = useState(null)
+  const [certezaBaseCotizacion, setCertezaBaseCotizacion] = useState(null)
+  const [valorBaseCotizacionDeclarado, setValorBaseCotizacionDeclarado] = useState('')
+  const [salarioParaEstimarBase, setSalarioParaEstimarBase] = useState('')
 
   function actualizarRegimenActual(valor) {
     // trasladoRegimen depende semánticamente de regimenActual (S3-009): la
@@ -86,6 +90,21 @@ function App() {
         ? `${nivelConocimientoSemanas}||${semanasCotizadas}||${anioInicioCotizacion}`
         : null
     )
+  }
+
+  function actualizarCertezaBaseCotizacion(valor) {
+    // valorBaseCotizacionDeclarado y salarioParaEstimarBase dependen
+    // semánticamente de certezaBaseCotizacion: el primero solo tiene sentido
+    // con 'conocido'/'aproximado', el segundo solo con 'desconocido'. Cambiar
+    // la certeza invalida el campo que ya no aplica — mismo criterio ya usado
+    // en actualizarTrasladoRegimen.
+    if (valor !== 'conocido' && valor !== 'aproximado') {
+      setValorBaseCotizacionDeclarado('')
+    }
+    if (valor !== 'desconocido') {
+      setSalarioParaEstimarBase('')
+    }
+    setCertezaBaseCotizacion(valor)
   }
 
   return (
@@ -215,13 +234,28 @@ function App() {
           detalleTraslado={detalleTraslado}
           onCambiarDetalleTraslado={setDetalleTraslado}
           onVolver={() => setVista('primeraLectura')}
-          onContinuar={() => setVista('siguienteEtapa')}
+          onContinuar={() => setVista('baseCotizacion')}
         />
       )}
 
-      {vista === 'siguienteEtapa' && (
-        <SiguienteEtapaTemporal
+      {vista === 'baseCotizacion' && (
+        <BaseCotizacion
+          tipoCotizante={tipoCotizante}
+          lugarCotizacion={lugarCotizacion}
+          certezaBaseCotizacion={certezaBaseCotizacion}
+          onCambiarCertezaBaseCotizacion={actualizarCertezaBaseCotizacion}
+          valorBaseCotizacionDeclarado={valorBaseCotizacionDeclarado}
+          onCambiarValorBaseCotizacionDeclarado={setValorBaseCotizacionDeclarado}
+          salarioParaEstimarBase={salarioParaEstimarBase}
+          onCambiarSalarioParaEstimarBase={setSalarioParaEstimarBase}
           onVolver={() => setVista('indiciosTransicion')}
+          onContinuar={() => setVista('siguientePasoEconomico')}
+        />
+      )}
+
+      {vista === 'siguientePasoEconomico' && (
+        <SiguientePasoEconomicoTemporal
+          onVolver={() => setVista('baseCotizacion')}
         />
       )}
     </AppShell>

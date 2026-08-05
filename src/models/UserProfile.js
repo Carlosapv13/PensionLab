@@ -20,7 +20,15 @@
  * @property {('RPM'|'RAIS'|'desconocido')} laboralInfo.regimenActual
  * @property {number} laboralInfo.semanasCotizadas
  * @property {string} laboralInfo.fechaInicioCotizacion
- * @property {number} laboralInfo.salarioActual
+ * @property {number} laboralInfo.salarioActual - Nota (Sprint 3, Slice "Base actual de
+ *   cotización"): un único número no representa con precisión este dato para los cinco casos
+ *   jurídicos reales (dependiente, independiente en sus dos modalidades, mixto, cotización
+ *   desde el exterior) — ver domain/determinarBaseCotizacion.js, que produce en su lugar
+ *   ibcActualDeclarado/ibcActualCalculado/ibcAplicableSimulacion junto con origenDatoIbc y
+ *   certezaValorDeclarado. Ese modelo vive hoy fuera de UserProfile (como estado plano en
+ *   App.jsx, igual que el resto de Sprint 3) — este campo queda documentado como candidato a
+ *   reemplazarse por ese modelo más rico cuando UserProfile se instancie realmente, no como
+ *   una simplificación todavía válida.
  * @property {string} laboralInfo.fechaCorte - Fecha a la que corresponden semanasCotizadas y
  *   salarioActual: son autorreportados, no derivables matemáticamente como la edad.
  * @property {Array<{anio: number, ibcPromedio: number}>} laboralInfo.historialIBC

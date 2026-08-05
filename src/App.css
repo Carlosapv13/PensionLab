@@ -246,6 +246,10 @@
   line-height: 1.15;
 }
 
+.screen__title--base-cotizacion {
+  line-height: 1.15;
+}
+
 .screen__subtitle {
   font-size: 18px;
   line-height: 150%;

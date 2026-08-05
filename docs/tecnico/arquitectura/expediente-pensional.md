@@ -148,14 +148,20 @@ uno que ya existía disperso.
 
 - **Nivel 1 — Información autodeclarada.** Datos ya capturados hoy por Sprint 3:
   fecha de nacimiento, sexo, régimen, semanas cotizadas (con su propia
-  certeza). Datos autodeclarados **todavía sin capturar, previstos para los
-  próximos Slices de la secuencia económica**: salario/IBC y edad de
-  jubilación deseada. Lo ya capturado habilita las evidencias de elegibilidad
-  ya construidas (semanas mínimas, edad de pensión, indicios de régimen de
-  transición); una primera estimación de monto con IBL simplificado (proxy =
-  salario actual) queda habilitada recién cuando se complete la captura
-  prevista. En ningún caso, dentro de este nivel, hay datos verificados
-  contra una fuente oficial.
+  certeza), y —desde el Slice "Base actual de cotización"— la base sobre la
+  que la persona cotiza hoy. Este último dato no se guarda como un número
+  suelto: `determinarBaseCotizacion.js` conserva por separado
+  `ibcActualDeclarado`/`ibcActualCalculado` (el valor original, nunca
+  sobrescrito) e `ibcAplicableSimulacion` (después de ajustes trazados en
+  `ajustesAplicados`), junto con `origenDatoIbc` y `certezaValorDeclarado` —
+  el mismo tipo de separación entre dato y certeza que ya motivó este marco de
+  niveles. Datos autodeclarados **todavía sin capturar, previstos para el
+  siguiente Slice de la secuencia económica**: edad de jubilación deseada. Lo
+  ya capturado habilita las evidencias de elegibilidad ya construidas
+  (semanas mínimas, edad de pensión, indicios de régimen de transición); una
+  primera estimación de monto (RAIS/RPM mínimos) queda habilitada recién
+  cuando se complete también la meta de jubilación. En ningún caso, dentro de
+  este nivel, hay datos verificados contra una fuente oficial.
 - **Nivel 2 — Historia laboral oficial (verificada, no solo resumida).** El
   usuario aporta o el sistema consulta su historial real de cotizaciones —
   fechas exactas por período, no un número autorreportado. Mejora: la certeza
@@ -191,13 +197,21 @@ del análisis", o una idea equivalente) en vez de exponer la numeración interna
 directamente al usuario. No decidido — queda para cuando se diseñe esa
 comunicación.
 
-Distinción explícita para cuando se implemente el primer resultado de la
-secuencia económica: su **clasificación interna** (`gradoEstimacion`, trazas,
-documentación) sí corresponde inequívocamente al Nivel 1, y el resultado debe
-explicar de forma concreta que se basa en información declarada y no
-verificada — eso no está en discusión. Lo que permanece abierto es únicamente
-el **texto literal que verá el usuario** en pantalla, que se decide al diseñar
-esa pantalla, no en este documento.
+Distinción confirmada durante la implementación de "Base actual de
+cotización" (corrige la formulación anterior de este párrafo, que hablaba de
+`gradoEstimacion` a nivel de un dato individual): la **calidad de un dato
+capturado** (`origenDatoIbc`, `certezaValorDeclarado`, `confianzaReglaAplicada`)
+vive junto a ese dato, en el Slice que lo captura — nunca deriva ni produce
+`gradoEstimacionResultado` por sí sola. `Explanation.gradoEstimacion` sigue
+siendo, sin excepción, una síntesis de **toda una `Simulation`** (todos los
+insumos combinados, no un dato aislado), que solo el futuro Motor de
+Explicabilidad puede construir — ver `determinarBaseCotizacion.js` para el
+razonamiento completo de esta separación. Lo que sí corresponde
+inequívocamente al Nivel 1 es la información que alimentará esa síntesis
+cuando exista: ninguno de los datos capturados hasta ahora está verificado
+contra una fuente oficial. El **texto literal que verá el usuario** para
+comunicar esta calidad permanece abierto, tal como ya registraba este
+documento — se decide al diseñar esa comunicación, no aquí.
 
 ### Bloque 3: Perfil de Decisión
 

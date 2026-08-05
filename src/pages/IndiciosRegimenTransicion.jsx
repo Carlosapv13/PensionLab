@@ -37,7 +37,7 @@ const OPCIONES_DETALLE_TRASLADO = [
   {
     valor: 'no_estoy_seguro',
     texto: 'No estoy seguro de la dirección exacta.',
-    ayuda: 'No te preocupes, este dato no es indispensable para continuar.',
+    ayuda: "No pasa nada si no recuerdas la dirección exacta: elegir 'No estoy seguro' es suficiente para continuar.",
   },
 ]
 
@@ -58,8 +58,14 @@ function textoIndicios(resultado) {
     `Según tu fecha de nacimiento, tenías ${edadA1994} años el 1 de abril de 1994 ` +
     `—la fecha en que entró en vigencia el sistema de pensiones actual—. Con este ` +
     `dato, por la vía de edad, no encontramos indicios de que el régimen de ` +
-    `transición te haya cubierto.`
+    `transición pueda aplicar a tu caso. Esto no permite descartarlo por completo, ` +
+    `porque esta lectura todavía no evalúa la otra vía prevista por la ley.`
   )
+}
+
+function textoVigencia({ vigenciaDesde, vigenciaHasta }) {
+  if (!vigenciaDesde) return null
+  return vigenciaHasta ? `Vigente desde ${vigenciaDesde} hasta ${vigenciaHasta}.` : `Vigente desde ${vigenciaDesde}.`
 }
 
 function limitacionTraslado(trasladoRegimen) {
@@ -118,12 +124,14 @@ function IndiciosRegimenTransicion({
       </h1>
 
       <p className="screen__subtitle">
-        Vamos a revisar un dato que a veces cambia los requisitos de pensión. Lo
-        que sigue es un primer indicio, no una respuesta definitiva.
+        El régimen de transición permite que algunas personas se pensionen con
+        reglas anteriores, que en ciertos casos pueden ser más favorables. Esta
+        lectura busca únicamente un primer indicio de si podría ser relevante
+        para ti; no es una conclusión definitiva.
       </p>
 
       {trasladoRegimen === 'si' && (
-        <fieldset className="options">
+        <fieldset className="options options--secundario">
           <legend>
             Nos contaste que te has trasladado alguna vez entre Colpensiones y un
             fondo privado. ¿En qué dirección fue?
@@ -160,6 +168,7 @@ function IndiciosRegimenTransicion({
               <p>
                 {resultado.normaUsada.fuente} — {resultado.normaUsada.articulo}
               </p>
+              {textoVigencia(resultado.normaUsada) && <p>{textoVigencia(resultado.normaUsada)}</p>}
               {limitacionFuente && <p>{limitacionFuente.mensaje}</p>}
             </details>
           </>

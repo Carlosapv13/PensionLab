@@ -314,6 +314,21 @@
   margin: 0 0 4px;
 }
 
+/* Variante acotada a bloques de captura secundarios dentro de una pantalla cuyo
+   protagonista es un hallazgo, no la captura (ej. detalle de traslado en
+   IndiciosRegimenTransicion) — mismas tarjetas .option, sin cambios en su estilo
+   compartido, solo un legend más liviano y un poco menos de espacio interno. */
+.options--secundario {
+  gap: 8px;
+}
+
+.options--secundario legend {
+  font-weight: 400;
+  font-size: 15px;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+
 .field {
   display: flex;
   flex-direction: column;

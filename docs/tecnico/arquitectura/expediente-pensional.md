@@ -191,6 +191,22 @@ todavía — mismo tratamiento que recibió el cálculo de IBL en Sprint 1 ("ubi
 diseñado"): se nombra su lugar, no se diseña su forma, a la espera de evidencia
 suficiente (Principio 9).
 
+**Panel de Hallazgos del Expediente Pensional** — hipótesis arquitectónica registrada
+durante Sprint 3, a partir de la pantalla "Posibles indicios de régimen de transición"
+(`src/pages/IndiciosRegimenTransicion.jsx`, tercera evidencia de `domain/`). Esa
+pantalla se mantuvo dentro del recorrido lineal principal por decisión explícita —
+Principio 9: un único caso real no basta para diseñar un componente nuevo—, pero dejó
+visible una tensión: a medida que crezca el número de evidencias reales (`domain/
+evidencia*.js`), presentarlas cada una como su propia pantalla de parada dentro del
+recorrido lineal podría dejar de escalar, y algunas evidencias de baja probabilidad de
+aplicar (ej. `sin_indicios` para la mayoría de casos) podrían encajar mejor en un lugar
+consultable después, no en un punto obligatorio del recorrido. Mismo tratamiento que
+Brújula Pensional: se nombra el lugar, no se diseña su forma. **Condición explícita de
+activación**: se diseñará formalmente solo cuando exista una **segunda evidencia real**
+que produzca la misma tensión de ubicación en el recorrido lineal — no antes, y no por
+anticipación. Hasta entonces, cada evidencia nueva sigue evaluándose individualmente
+dentro del flujo principal, caso por caso.
+
 ## Mapa de relación con contratos existentes
 
 | Bloque / capacidad | Objeto o contrato que lo materializa | Tipo de cambio | Ubicación propuesta |
@@ -310,6 +326,12 @@ queda diferida a una versión posterior.
     intención de extensión, sin implementarla.
 13. La persistencia del Expediente queda explícitamente fuera de este documento, como
     decisión independiente y posterior.
+14. **Panel de Hallazgos del Expediente Pensional** queda registrado como hipótesis
+    arquitectónica dentro de Resultados (Bloque 5), mismo tratamiento que Brújula
+    Pensional — sin contrato ni diseño todavía. Se activa su diseño formal únicamente
+    cuando exista una segunda evidencia real (`domain/evidencia*.js`) que produzca la
+    misma tensión de ubicación en el recorrido lineal ya observada con
+    `IndiciosRegimenTransicion.jsx` (Sprint 3) — no antes.
 
 ## Próximos pasos
 
@@ -322,6 +344,10 @@ queda diferida a una versión posterior.
 3. Diseñar el módulo de IBL — sigue siendo prerrequisito de `pensionEngine`,
    independiente de este documento pero bloqueante para materializar Resultados de
    forma real.
+4. Vigilar la aparición de una segunda evidencia (`domain/evidencia*.js`) que produzca
+   la misma tensión de ubicación en el recorrido lineal que motivó el Panel de
+   Hallazgos (Decisión 14) — cuando ocurra, diseñarlo formalmente; hasta entonces,
+   permanece como hipótesis nombrada, no como trabajo pendiente de diseño activo.
 4. Decidir la estrategia de persistencia del Expediente — explícitamente fuera de
    alcance aquí, pendiente como decisión propia.
 5. Decidir cómo se relaciona este diseño con el plan de 10 pasos de

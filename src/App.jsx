@@ -11,7 +11,8 @@ import CompletarExpediente from './pages/CompletarExpediente.jsx'
 import InformacionPensionalEsencial from './pages/InformacionPensionalEsencial.jsx'
 import HistoriaPensional from './pages/HistoriaPensional.jsx'
 import PrimeraLectura from './pages/PrimeraLectura.jsx'
-import SiguientePasoTemporal from './pages/SiguientePasoTemporal.jsx'
+import IndiciosRegimenTransicion from './pages/IndiciosRegimenTransicion.jsx'
+import SiguienteEtapaTemporal from './pages/SiguienteEtapaTemporal.jsx'
 
 function App() {
   const [vista, setVista] = useState('bienvenida')
@@ -30,6 +31,7 @@ function App() {
   const [anioConfirmadoEdadTemprana, setAnioConfirmadoEdadTemprana] = useState(null)
   const [semanasConfirmadasPara, setSemanasConfirmadasPara] = useState(null)
   const [trasladoRegimen, setTrasladoRegimen] = useState(null)
+  const [detalleTraslado, setDetalleTraslado] = useState(null)
 
   function actualizarRegimenActual(valor) {
     // trasladoRegimen depende semánticamente de regimenActual (S3-009): la
@@ -37,8 +39,20 @@ function App() {
     // un cambio real de régimen invalida cualquier respuesta ya dada.
     if (valor !== regimenActual) {
       setTrasladoRegimen(null)
+      setDetalleTraslado(null)
     }
     setRegimenActual(valor)
+  }
+
+  function actualizarTrasladoRegimen(valor) {
+    // detalleTraslado (IndiciosRegimenTransicion) depende semánticamente de trasladoRegimen:
+    // solo tiene sentido cuando la respuesta es 'si'. Cualquier cambio que la
+    // aleje de 'si' invalida un detalle ya dado — mismo criterio ya aplicado a
+    // trasladoRegimen respecto de regimenActual.
+    if (valor !== 'si') {
+      setDetalleTraslado(null)
+    }
+    setTrasladoRegimen(valor)
   }
 
   function actualizarAnioInicioCotizacion(valor) {
@@ -175,7 +189,7 @@ function App() {
           nivelConocimientoSemanas={nivelConocimientoSemanas}
           anioInicioCotizacion={anioInicioCotizacion}
           trasladoRegimen={trasladoRegimen}
-          onCambiarTrasladoRegimen={setTrasladoRegimen}
+          onCambiarTrasladoRegimen={actualizarTrasladoRegimen}
           onVolver={() => setVista('informacionPensional')}
           onContinuar={() => setVista('primeraLectura')}
         />
@@ -189,13 +203,25 @@ function App() {
           semanasCotizadas={semanasCotizadas}
           fechaNacimiento={fechaNacimiento}
           onVolver={() => setVista('historiaPensional')}
-          onContinuar={() => setVista('siguientePaso')}
+          onContinuar={() => setVista('indiciosTransicion')}
         />
       )}
 
-      {vista === 'siguientePaso' && (
-        <SiguientePasoTemporal
+      {vista === 'indiciosTransicion' && (
+        <IndiciosRegimenTransicion
+          sexo={sexo}
+          fechaNacimiento={fechaNacimiento}
+          trasladoRegimen={trasladoRegimen}
+          detalleTraslado={detalleTraslado}
+          onCambiarDetalleTraslado={setDetalleTraslado}
           onVolver={() => setVista('primeraLectura')}
+          onContinuar={() => setVista('siguienteEtapa')}
+        />
+      )}
+
+      {vista === 'siguienteEtapa' && (
+        <SiguienteEtapaTemporal
+          onVolver={() => setVista('indiciosTransicion')}
         />
       )}
     </AppShell>

@@ -1632,6 +1632,158 @@ navegación Volver/Continuar sin pérdida de datos.
 
 ---
 
+## Pausa de Sprint 3 — Tercera evidencia ejecutable: indicios de régimen de transición
+
+**Estado:** ✅ Implementado, verificado visualmente y aprobado — commit local en
+`sprint-3-mvp-headless`, sin push.
+
+### Objetivo
+
+Tras la primera y segunda evidencia (semanas mínimas, edad de pensión en RPM), se
+analizó críticamente cuál era el siguiente candidato de valor. De los tres
+identificados en el pendiente de S3-009 (detalle de traslado, salario/IBC, semanas
+verificadas), se eligió el detalle de traslado porque resuelve —parcialmente y de
+forma honesta— una limitación que `PrimeraLectura.jsx` ya le mostraba a la persona
+en cada lectura (`REGIMEN_TRANSICION_NO_EVALUADO`), en vez de añadir una capacidad
+aislada. El análisis crítico previo a la implementación (candidatos de salario/IBC
+bloqueado por el módulo de IBL sin diseñar, y detalle de traslado bloqueado por
+`ley100-1993.json` vacío) siguió el mismo patrón ya establecido en las dos pausas
+anteriores.
+
+### Alcance aprobado
+
+- **Evidencia limitada exclusivamente a la vía de edad** al 1994-04-01 (Art. 36,
+  inciso 2, Ley 100 de 1993) — la vía de 15 años de tiempo de servicio se descartó
+  explícitamente para no inferirla desde `anioInicioCotizacion` (autorreportado,
+  sensible a interrupciones laborales sin evidencia real que lo respalde).
+- **Ningún resultado concluye** "tienes" o "no tienes" régimen de transición:
+  estados `con_indicios` / `sin_indicios` / `no_evaluable`, terminología revisada
+  explícitamente para evitar lenguaje de determinación en dominio, UI y nombres de
+  archivo.
+- Vigencia posterior del régimen (Acto Legislativo 01 de 2005, expiración
+  2010/2014) y efecto del traslado a RAIS: declarados como limitaciones
+  permanentes, nunca calculados.
+- `detalleTraslado` (dirección del traslado, con opción "No estoy seguro") se
+  captura solo si `trasladoRegimen === 'si'`, en la pantalla nueva —
+  `HistoriaPensional.jsx` (S3-009) permanece cerrado y sin modificar.
+- Sin tercera evidencia agregada a `PrimeraLectura.jsx` — decisión ya registrada en
+  su propio cierre; esta evidencia requiere pantalla propia.
+
+### Investigación normativa
+
+Cotejo directo contra fuentes oficiales primarias (Función Pública/Gestor
+Normativo para Art. 36 y Acto Legislativo 01/2005; relatoría oficial de la Corte
+Constitucional para la Sentencia de unificación SU-023 de 2018), documentado en
+`src/data/legal/trazabilidad-normativa.md`. Estados de validación usan
+**"Verificado en una fuente oficial"**, reservando "Validado" para cuando se
+complete el cotejo cruzado contra SUIN-Juriscol (intentado sin éxito por error de
+certificado en esta sesión).
+
+**Hallazgo relevante no anticipado**: la fecha de entrada en vigencia del Sistema
+General de Pensiones no es universal — 1994-04-01 para sector privado y
+servidores públicos nacionales, pero 1995-06-30 para servidores públicos
+territoriales (Art. 151 Ley 100/1993 + Decreto 1296 de 1994). Se aplica hoy
+1994-04-01 a todos los casos por igual, y se registró como observación
+arquitectónica: `fechaEntradaVigenciaSistemaPensional` deberá tratarse, en una
+versión futura, como un dato normativo trazable potencialmente resoluble según
+tipo de afiliado — diferido a Sprint 4, sin enriquecer la interfaz del resolver
+legal en esta versión.
+
+### Qué se construyó
+
+- `src/data/legal/versions/ley100-1993.json` — 3 entradas
+  (`fechaEntradaVigenciaSistemaPensional`, `edadTransicionMujer`,
+  `edadTransicionHombre`), `estado: 'borrador'`, `listoParaProduccion: false`.
+- `src/data/legal/index.js` — `obtenerFechaEntradaVigenciaSistema` y
+  `obtenerEdadTransicion`, aditivos, mismo shape que los resolvers existentes.
+- `src/domain/evidenciaIndiciosTransicion.js` — tercera evidencia real y
+  ejecutable, mismo patrón autónomo que `evidenciaSemanasMinimas.js` y
+  `evidenciaEdadPension.js`; sin Motor de Evidencias genérico todavía.
+- `src/pages/IndiciosRegimenTransicion.jsx` — pantalla nueva, reemplaza
+  `SiguientePasoTemporal.jsx` (eliminado).
+- `src/pages/SiguienteEtapaTemporal.jsx` — nuevo placeholder temporal siguiente.
+- `src/App.jsx` — estado `detalleTraslado`, wrapper `actualizarTrasladoRegimen`
+  (invalida el detalle si `trasladoRegimen` deja de ser `'si'`), nuevo valor de
+  `vista` (`'indiciosTransicion'`).
+- `src/App.css` — clase de título exclusiva y `.field__warning summary` para la
+  divulgación progresiva de limitaciones.
+- 22 pruebas nuevas (6 de los resolvers en `index.test.js`, 16 de la evidencia en
+  `evidenciaIndiciosTransicion.test.js`); 91/91 en total en el proyecto.
+
+### Decisiones de producto y arquitectura tomadas en este ciclo
+
+1. **Ubicación en el recorrido principal, no en un futuro resumen de hallazgos.**
+   Evaluada explícitamente como decisión de UX, no solo técnica: se mantiene
+   dentro del flujo lineal (Principio 9 — un único caso real no basta para
+   diseñar un componente nuevo), preservando la coherencia conversacional de la
+   pregunta de traslado abierta en S3-009.
+2. **Panel de Hallazgos del Expediente Pensional** queda registrado como
+   **hipótesis arquitectónica formal** (no un pendiente suelto) en
+   `docs/tecnico/arquitectura/expediente-pensional.md` (Bloque 5 — Resultados,
+   Decisión 14), mismo tratamiento que ya recibe Brújula Pensional: se nombra el
+   lugar, no se diseña su forma. Se activará su diseño solo ante una **segunda
+   evidencia real** que produzca la misma tensión de ubicación — no antes.
+3. **Divulgación progresiva de limitaciones**: el bloque "Lo que todavía no
+   hemos podido revisar" pasó de `<div>` siempre visible a `<details>` colapsado
+   por defecto, reutilizando el mismo patrón nativo ya usado en "Ver fundamento
+   legal" — sin generalizarlo ni tocar `PrimeraLectura.jsx`.
+4. **Separación entre limitaciones funcionales y estado de la fuente
+   normativa**: el contador del `<summary>` solo cuenta aspectos que el análisis
+   no evalúa (tiempo de servicio, vigencia, traslado); el estado de la fuente
+   (borrador/no lista para producción) se reubicó dentro de "Ver fundamento
+   legal", donde pertenece semánticamente.
+5. **Nomenclatura revisada en tres rondas** para evitar cualquier lenguaje de
+   determinación: la evidencia se llama `evidenciaIndiciosTransicion.js`
+   (`evaluarIndiciosTransicion`, estados `con_indicios`/`sin_indicios`), y la
+   pantalla se renombró de "Una segunda lectura de tu situación" (demasiado
+   genérica) a **"Posibles indicios de régimen de transición"** — nombra el
+   tema sin afirmar un resultado.
+
+### Observaciones registradas para antes del MVP (sin implementar)
+
+1. **Botón "Volver" sin contexto explícito.** Detectado durante la revisión
+   visual de esta pantalla, pero es un patrón transversal a las ~10 pantallas
+   del recorrido (`Objetivo`, `DatosIniciales`, `SituacionPensional`,
+   `HistorialLaboral`, `ExpedientePensional`, `CompletarExpediente`,
+   `InformacionPensionalEsencial`, `HistoriaPensional`, `PrimeraLectura`,
+   `IndiciosRegimenTransicion`), no específico de este Slice. Antes del MVP,
+   revisar si el texto necesita mayor especificidad (ej. "Volver a Historia
+   pensional") para evitar ambigüedad.
+2. **`SiguienteEtapaTemporal.jsx` se percibe como transición, no como
+   progreso.** Cumple su función de placeholder, pero antes del MVP se debe
+   revisar si debe transmitir una sensación más clara de avance y continuidad.
+   Nota dejada también en el propio archivo.
+
+### Verificación
+
+`npm run lint`, `npm test` (91/91) y `npm run build` exitosos en cada ronda;
+`git diff --check` sin errores de contenido. Revisión visual manual en servidor
+de desarrollo, cubriendo `con_indicios`, `sin_indicios`, traslado sin detalle,
+traslado con detalle concreto, "No estoy seguro", ventana de escritorio y ventana
+estrecha (quiebre `max-width: 600px`). El estado `no_evaluable` no es alcanzable
+desde la interfaz actual —`DatosIniciales.jsx` ya garantiza `sexo` válido y
+`fechaNacimiento` real y no futura antes de permitir avanzar— por lo que queda
+cubierto únicamente por las pruebas automatizadas de dominio, no por revisión
+manual en navegador.
+
+### Pendiente para el siguiente Slice
+
+- Definir el alcance funcional del Slice que reemplace
+  `SiguienteEtapaTemporal.jsx` — candidatos sin decidir: salario/IBC, semanas
+  verificadas mediante historia laboral oficial, u otro bloque del Expediente
+  Pensional.
+- Vigilar la aparición de una segunda evidencia real que produzca la misma
+  tensión de ubicación en el recorrido lineal (Decisión 2 arriba) — cuando
+  ocurra, diseñar formalmente el Panel de Hallazgos del Expediente Pensional.
+- Revisar antes del MVP las dos observaciones de UX registradas arriba (botón
+  "Volver" sin contexto; sensación de progreso de las pantallas de transición).
+- Análisis de impacto pendiente para alinear la firma de `obtenerSemanasMinimas`
+  con la de `obtenerEdadPension`/`obtenerEdadTransicion` (heredado de la segunda
+  evidencia, sigue sin abordarse).
+- S3-010 (salario/IBC) permanece pausado.
+
+---
+
 ## Slices pendientes de Sprint 3
 
 Por definir a medida que el sprint avance.

@@ -242,6 +242,10 @@
   line-height: 1.15;
 }
 
+.screen__title--indicios-transicion {
+  line-height: 1.15;
+}
+
 .screen__subtitle {
   font-size: 18px;
   line-height: 150%;
@@ -371,6 +375,23 @@
   border-radius: 8px;
   background: var(--accent-bg);
   text-align: left;
+}
+
+.field__warning summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--accent);
+}
+
+.field__warning summary::marker {
+  color: var(--accent);
+}
+
+.field__warning[open] summary {
+  margin-bottom: 2px;
 }
 
 .insight {

@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { obtenerSemanasMinimas, obtenerEdadPension } from './index.js'
+import {
+  obtenerSemanasMinimas,
+  obtenerEdadPension,
+  obtenerFechaEntradaVigenciaSistema,
+  obtenerEdadTransicion,
+} from './index.js'
 
 // obtenerSemanasMinimas no tenía pruebas propias pese a estar implementado — estos casos
 // cubren la diferencia por sexo, el cronograma progresivo de mujeres (Sentencia C-197 de
@@ -77,6 +82,57 @@ describe('obtenerEdadPension', () => {
     expect(resultado.estado).toBe('borrador')
     expect(resultado.listoParaProduccion).toBe(false)
     expect(resultado.vigenciaDesde).toBe('2003-01-29')
+    expect(resultado.vigenciaHasta).toBeNull()
+  })
+})
+
+// obtenerFechaEntradaVigenciaSistema y obtenerEdadTransicion viven en
+// ley100-1993.json, no en vigente-2026.json — cubren el screening de indicios de
+// régimen de transición (Art. 36 y Art. 151, Ley 100 de 1993). Ver
+// trazabilidad-normativa.md para la investigación normativa completa.
+
+describe('obtenerFechaEntradaVigenciaSistema', () => {
+  it('resuelve la fecha fija de entrada en vigencia del Sistema', () => {
+    const resultado = obtenerFechaEntradaVigenciaSistema('2026-06-15')
+
+    expect(resultado.valor).toBe('1994-04-01')
+    expect(resultado.id).toBe('fecha-entrada-vigencia-sistema-pensional')
+    expect(resultado.fuente).toBe('Ley 100 de 1993')
+    expect(resultado.articulo).toBe('Art. 151 Ley 100 de 1993')
+  })
+
+  it('devuelve la trazabilidad completa: estado y listoParaProduccion del archivo de origen', () => {
+    const resultado = obtenerFechaEntradaVigenciaSistema('2026-06-15')
+
+    expect(resultado.estado).toBe('borrador')
+    expect(resultado.listoParaProduccion).toBe(false)
+    expect(resultado.vigenciaDesde).toBe('1994-04-01')
+    expect(resultado.vigenciaHasta).toBeNull()
+  })
+})
+
+describe('obtenerEdadTransicion', () => {
+  it('mujer: 35 años, trazable a la entrada por sexo', () => {
+    const resultado = obtenerEdadTransicion('2026-06-15', 'F')
+
+    expect(resultado.valor).toBe(35)
+    expect(resultado.id).toBe('edad-transicion-mujer')
+    expect(resultado.fuente).toBe('Ley 100 de 1993')
+  })
+
+  it('hombre: 40 años, trazable a la entrada por sexo', () => {
+    const resultado = obtenerEdadTransicion('2026-06-15', 'M')
+
+    expect(resultado.valor).toBe(40)
+    expect(resultado.id).toBe('edad-transicion-hombre')
+  })
+
+  it('devuelve la trazabilidad completa: estado y listoParaProduccion del archivo de origen', () => {
+    const resultado = obtenerEdadTransicion('2026-06-15', 'F')
+
+    expect(resultado.estado).toBe('borrador')
+    expect(resultado.listoParaProduccion).toBe(false)
+    expect(resultado.vigenciaDesde).toBe('1994-04-01')
     expect(resultado.vigenciaHasta).toBeNull()
   })
 })

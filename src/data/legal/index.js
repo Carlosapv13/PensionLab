@@ -177,3 +177,95 @@ export function obtenerEdadPension(fecha, sexo) {
     vigenciaHasta: entrada.vigencia?.hasta ?? null,
   }
 }
+
+/**
+ * Resuelve la fecha de entrada en vigencia del Sistema General de Pensiones
+ * (Art. 151 Ley 100 de 1993) — la fecha histórica fija contra la que se evalúa el
+ * screening de indicios de régimen de transición (ver evaluarIndiciosTransicion,
+ * domain/evidenciaIndiciosTransicion.js). Existe como entrada propia de data/legal,
+ * no como literal embebido en ningún consumidor — mismo criterio de trazabilidad
+ * que cualquier otro campo legal.
+ *
+ * Nota: la investigación normativa encontró que esta fecha no es universal (los
+ * servidores públicos territoriales tienen 1995-06-30, no 1994-04-01) — ver la
+ * observación arquitectónica en trazabilidad-normativa.md. Esta versión aplica la
+ * fecha general a todos los casos; resolverla según tipo de afiliado queda diferido.
+ *
+ * @param {string} fecha - Fecha ISO en la que se evalúa el requisito (ej. fecha de cálculo)
+ * @returns {{
+ *   valor: string,
+ *   id: string,
+ *   fuente: string,
+ *   articulo: string,
+ *   estado: string,
+ *   listoParaProduccion: boolean,
+ *   vigenciaDesde: string | null,
+ *   vigenciaHasta: string | null,
+ * }}
+ */
+export function obtenerFechaEntradaVigenciaSistema(fecha) {
+  const reglas = resolverReglasVigentes(fecha)
+  const entrada = buscarPorCampo(reglas, 'fechaEntradaVigenciaSistemaPensional')
+
+  if (!entrada) {
+    throw new Error(`obtenerFechaEntradaVigenciaSistema: no se encontró una entrada vigente para la fecha ${fecha}`)
+  }
+
+  return {
+    valor: entrada.valor,
+    id: entrada.id,
+    fuente: entrada.fuente,
+    articulo: entrada.articulo,
+    estado: entrada.metadataFuente.estado,
+    listoParaProduccion: entrada.metadataFuente.listoParaProduccion,
+    vigenciaDesde: entrada.vigencia?.desde ?? null,
+    vigenciaHasta: entrada.vigencia?.hasta ?? null,
+  }
+}
+
+/**
+ * Resuelve el umbral de edad del régimen de transición (Art. 36, inciso 2, Ley 100
+ * de 1993), según sexo — 35 años o más (mujeres) / 40 años o más (hombres) al
+ * momento de entrar en vigencia el Sistema (ver obtenerFechaEntradaVigenciaSistema).
+ *
+ * Responsabilidad estrictamente acotada a resolver qué dice la norma, con su
+ * trazabilidad completa — igual que obtenerEdadPension, NO decide si el umbral
+ * implica que la persona tuvo o no régimen de transición (esa interpretación, con
+ * su lenguaje deliberadamente no concluyente, vive en evaluarIndiciosTransicion).
+ * Cubre únicamente la vía de edad: la vía de 15 años de tiempo de servicio queda
+ * fuera de este resolver por decisión de alcance ya registrada en
+ * trazabilidad-normativa.md — no hay campo `añosServicioTransicion` cargado.
+ *
+ * @param {string} fecha - Fecha ISO en la que se evalúa el requisito
+ * @param {('M'|'F')} sexo
+ * @returns {{
+ *   valor: number,
+ *   id: string,
+ *   fuente: string,
+ *   articulo: string,
+ *   estado: string,
+ *   listoParaProduccion: boolean,
+ *   vigenciaDesde: string | null,
+ *   vigenciaHasta: string | null,
+ * }}
+ */
+export function obtenerEdadTransicion(fecha, sexo) {
+  const campo = sexo === 'F' ? 'edadTransicionMujer' : 'edadTransicionHombre'
+  const reglas = resolverReglasVigentes(fecha)
+  const entrada = buscarPorCampo(reglas, campo)
+
+  if (!entrada) {
+    throw new Error(`obtenerEdadTransicion: no se encontró '${campo}' vigente para la fecha ${fecha}`)
+  }
+
+  return {
+    valor: entrada.valor,
+    id: entrada.id,
+    fuente: entrada.fuente,
+    articulo: entrada.articulo,
+    estado: entrada.metadataFuente.estado,
+    listoParaProduccion: entrada.metadataFuente.listoParaProduccion,
+    vigenciaDesde: entrada.vigencia?.desde ?? null,
+    vigenciaHasta: entrada.vigencia?.hasta ?? null,
+  }
+}

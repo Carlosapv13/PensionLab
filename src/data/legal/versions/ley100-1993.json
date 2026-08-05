@@ -1,1 +1,36 @@
-{}
+{
+  "id": "ley100-1993",
+  "descripcion": "Régimen de transición (Art. 36 Ley 100 de 1993) y su fecha de referencia (Art. 151 Ley 100 de 1993). Cubre únicamente el screening preliminar por edad usado por evaluarIndiciosTransicion — no incluye la vía de tiempo de servicio (Art. 36, 15 años) ni la vigencia posterior del régimen (Acto Legislativo 01 de 2005), ambas deliberadamente fuera de cálculo en esta versión. Ver src/data/legal/trazabilidad-normativa.md para la matriz completa y las fuentes.",
+  "estado": "borrador",
+  "listoParaProduccion": false,
+  "notas": "Borrador bloqueado: los 3 campos están 'Verificado en una fuente oficial' (Función Pública, Gestor Normativo), pero ninguno tiene todavía verificación cruzada contra una segunda fuente primaria independiente (SUIN-Juriscol, intentado sin éxito por error de certificado en esta sesión). No marcar 'publicado' hasta completar ese cotejo cruzado. fechaEntradaVigenciaSistemaPensional se aplica hoy de forma uniforme a todos los casos, aunque la investigación encontró que varía para servidores públicos territoriales (1995-06-30) — ver la observación arquitectónica en trazabilidad-normativa.md.",
+  "entradas": [
+    {
+      "id": "fecha-entrada-vigencia-sistema-pensional",
+      "campo": "fechaEntradaVigenciaSistemaPensional",
+      "valor": "1994-04-01",
+      "unidad": "fecha",
+      "fuente": "Ley 100 de 1993",
+      "articulo": "Art. 151 Ley 100 de 1993",
+      "vigencia": { "desde": "1994-04-01", "hasta": null }
+    },
+    {
+      "id": "edad-transicion-mujer",
+      "campo": "edadTransicionMujer",
+      "valor": 35,
+      "unidad": "años",
+      "fuente": "Ley 100 de 1993",
+      "articulo": "Art. 36, inciso 2, Ley 100 de 1993",
+      "vigencia": { "desde": "1994-04-01", "hasta": null }
+    },
+    {
+      "id": "edad-transicion-hombre",
+      "campo": "edadTransicionHombre",
+      "valor": 40,
+      "unidad": "años",
+      "fuente": "Ley 100 de 1993",
+      "articulo": "Art. 36, inciso 2, Ley 100 de 1993",
+      "vigencia": { "desde": "1994-04-01", "hasta": null }
+    }
+  ]
+}

@@ -109,9 +109,59 @@ trazabilidad.
 - **Requiere revisión** — fuente localizada y con evidencia razonable, pero con una
   ambigüedad, litigio activo, o implicación de diseño sin resolver antes de poder
   cargarse en `vigente-2026.json`.
+- **Verificado en una fuente oficial** — texto literal cotejado contra una fuente
+  oficial primaria (ej. Función Pública/Gestor Normativo, relatoría oficial de la
+  Corte Constitucional), pero **sin verificación cruzada todavía contra una segunda
+  fuente primaria independiente** (ej. SUIN-Juriscol, Diario Oficial). No equivale a
+  "Validado" — el campo puede cargarse como borrador, nunca como `publicado`.
 - **Validado** — confirmado contra fuente con evidencia consistente, listo para
   cargarse en `vigente-2026.json` (sujeto a verificación final contra el texto
   oficial en Diario Oficial / SUIN-Juriscol antes de publicar).
+
+---
+
+# Régimen de transición — Screening por edad (ley100-1993.json)
+
+Investigación realizada por búsqueda web y cotejo directo de fuentes oficiales
+primarias (fecha de consulta: 2026-08-04), en el marco del análisis de un Slice de
+Sprint 3 (indicios de régimen de transición). Alcance explícitamente acotado a un
+**screening preliminar por edad**, aprobado con ese límite — no cubre la vía de
+tiempo de servicio ni la vigencia posterior del régimen (ver "Alcance usado" y
+"Aspectos no evaluados" de cada fila).
+
+## Matriz
+
+| Campo | Regla | Texto normativo (resumen) | Fuente oficial | Artículo/parágrafo | Fecha histórica de evaluación | Vigencia | Alcance usado por este Slice | Aspectos expresamente NO evaluados | Estado de validación |
+|---|---|---|---|---|---|---|---|---|---|
+| `fechaEntradaVigenciaSistemaPensional` | Fecha de referencia fija para el screening | El Sistema General de Pensiones entra en vigencia el 1994-04-01 para sector privado y servidores públicos nacionales | Función Pública — Gestor Normativo (hallazgo por búsqueda, texto de Art. 151 no cotejado literalmente en esta sesión) | Art. 151, Ley 100 de 1993 | — (es la fecha misma) | Desde 1994-04-01, sin cambio conocido | Constante normativa trazable, cargada como entrada propia — nunca un literal embebido en código | Excepción territorial: servidores públicos departamentales/municipales/distritales tienen fecha distinta (1995-06-30, Art. 151 + Decreto 1296 de 1994) — **no evaluada; esta versión aplica 1994-04-01 a todos los casos por igual** | Requiere revisión (hallazgo de búsqueda; falta cotejo literal directo del Art. 151 y del Decreto 1296/1994) |
+| `edadTransicionMujer` | Umbral de edad, vía mujer | 35 años o más al momento de entrar en vigencia el Sistema | Función Pública — Gestor Normativo (texto literal cotejado) | Art. 36, inciso 2, Ley 100 de 1993 | `fechaEntradaVigenciaSistemaPensional` | Desde 1994-04-01, sin cambio (Ley 797/2003 y Sentencia C-197/2023 solo modificaron edad/semanas de pensión, no este umbral) | Único criterio evaluado por la evidencia `evaluarIndiciosTransicion` | Vía de 15 años de servicio (limitación permanente); efecto del traslado a RAIS (Art. 36 inciso 4, misma fuente); vigencia posterior 2010/2014 (Parágrafo Transitorio 4, Acto Legislativo 01/2005) | Verificado en una fuente oficial (falta cotejo cruzado en SUIN-Juriscol, no accesible por error de certificado en esta sesión) |
+| `edadTransicionHombre` | Umbral de edad, vía hombre | 40 años o más al momento de entrar en vigencia el Sistema | Función Pública — Gestor Normativo (texto literal cotejado) | Art. 36, inciso 2, Ley 100 de 1993 | `fechaEntradaVigenciaSistemaPensional` | Igual que arriba | Igual que arriba | Igual que arriba | Verificado en una fuente oficial (mismas condiciones) |
+| *(no se carga — solo referencia documentada para etapa futura)* `añosServicioTransicion` | Umbral de tiempo de servicio, ambos sexos | 15 años o más de servicios cotizados al momento de entrar en vigencia el Sistema | Función Pública — Gestor Normativo (texto literal cotejado) | Art. 36, inciso 2, Ley 100 de 1993 | `fechaEntradaVigenciaSistemaPensional` | Igual que arriba | **Ninguno — vía excluida del cálculo en esta versión**, por decisión de producto: evitar inferir años de servicio a partir de `anioInicioCotizacion` (dato autorreportado y sensible a interrupciones laborales) sin evidencia real que lo respalde | Toda la vía queda fuera del cálculo; se declara como limitación permanente (`REGIMEN_TRANSICION_TIEMPO_SERVICIO_NO_EVALUADO`) en cada resultado evaluable | Verificado en una fuente oficial (registrado para una etapa futura, no para esta implementación) |
+| *(no se carga — solo texto de limitación)* | Vigencia posterior del régimen | No podrá extenderse más allá de 2010-07-31, salvo 750 semanas (o su equivalente en tiempo de servicio) al 2005-07-25 → hasta 2014-12-31 | Función Pública — Gestor Normativo (texto literal) + Sentencia SU-023 de 2018, Corte Constitucional (relatoría oficial, sentencia de unificación) | Parágrafo Transitorio 4, Art. 1, Acto Legislativo 01 de 2005 | No aplica (límite temporal posterior a 1994, no un umbral de esa fecha) | Desde 2005-07-25 | **Ninguno — no se calcula**; se declara como limitación permanente (`REGIMEN_TRANSICION_VIGENCIA_NO_EVALUADA`), con lenguaje de "expectativa legítima" (término usado explícitamente por SU-023/2018), nunca "derecho adquirido" | Cálculo de si la persona alcanzó a consolidar los requisitos del régimen anterior antes de la fecha límite que le aplicaba | Verificado en una fuente oficial (norma y sentencia de unificación cotejadas directamente; falta cotejo cruzado en SUIN-Juriscol) |
+| *(no se carga — solo texto de limitación)* | Efecto del traslado a RAIS | Los umbrales de edad de este artículo no aplican a quien se acoja voluntariamente al régimen de ahorro individual (RAIS) | Función Pública — Gestor Normativo (texto literal, mismo artículo) | Art. 36, inciso 4, Ley 100 de 1993 | No aplica | Desde 1994-04-01, sin cambio | **Ninguno — no se calcula**; se declara como limitación (`REGIMEN_TRANSICION_TRASLADO_NO_EVALUADO` o equivalente) solo cuando la pantalla sabe que hubo traslado | Excepciones de retorno a RPM y jurisprudencia sobre validez del traslado ("doble asesoría") — no investigadas, este alcance no las necesita | Verificado en una fuente oficial (texto literal confirmado; jurisprudencia de excepciones no investigada) |
+
+## Observación arquitectónica (diferida a Sprint 4, no implementada ahora)
+
+`fechaEntradaVigenciaSistemaPensional` se carga en esta versión como una fecha
+única (1994-04-01) aplicada a todos los casos, aunque la investigación confirmó que
+la fecha real varía según el tipo de afiliado (servidores públicos territoriales
+tienen 1995-06-30). Este dato **deberá tratarse, en una versión futura, como un dato
+normativo trazable potencialmente resoluble según el tipo de afiliado** — de forma
+análoga a como `semanasMinimasPensionMujer` ya resuelve por sexo mediante un `valor`
+estructurado. No se implementa esa capacidad en Sprint 3: ni el resolver legal ni el
+esquema de `LegalRuleEntry` se modifican para soportarla todavía, por decisión
+explícita de mantener el Vertical Slice de Sprint 3 enfocado en su objetivo
+funcional (screening por edad) sin sobre-diseñar una generalización sin un segundo
+caso real que la justifique (Principio 9). Queda registrado aquí como intención de
+diseño para Sprint 4, no como trabajo pendiente de esta implementación.
+
+## Fuentes consultadas (régimen de transición)
+
+- [Artículo 36, Ley 100 de 1993 — Función Pública, Gestor Normativo](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=5248)
+- [Acto Legislativo 01 de 2005, Art. 1 y parágrafos transitorios — Función Pública, Gestor Normativo](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=17236)
+- [Sentencia SU-023 de 2018 — Corte Constitucional, relatoría oficial](https://www.corteconstitucional.gov.co/relatoria/2018/su023-18.htm)
+- [Régimen de Transición — Colpensiones, preguntas frecuentes](https://www.colpensiones.gov.co/preguntas-frecuentes/280/regimen-de-transicion/) (fuente secundaria, usada solo para orientación inicial, no como sustento de ningún campo)
+- Ley 100 de 1993 en SUIN-Juriscol: intentado, error de certificado en esta sesión — pendiente de reintento antes de marcar cualquier campo como "Validado".
 
 ## Fuentes consultadas
 

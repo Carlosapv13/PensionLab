@@ -1843,6 +1843,222 @@ pruebas automatizadas de dominio, no por revisión manual en navegador.
 
 ---
 
+## Pausa de Sprint 3 — Primer Slice de la secuencia económica: Base actual de cotización
+
+**Estado:** ✅ Cerrado y aprobado — commit `6f5373f` (dominio, resolvers,
+pantalla, documentación de arquitectura) en `sprint-3-mvp-headless`, sin
+push. Este cierre documental se comitea por separado, mismo criterio ya
+usado en Slices anteriores.
+
+### Contexto: de la brecha económica a este Slice
+
+Antes de este Slice se hizo un análisis de brecha hacia el primer resultado
+económico de PensionLab (motivado porque, tras nueve Slices y tres evidencias
+de elegibilidad, el sistema nunca había producido un número). Ese análisis
+concluyó: (1) `formulaRPM.js`/`formulaRAIS.js` ya existen y están probadas
+desde Sprint 1, pero sus orquestadores están vacíos; (2) el Camino B —una
+cuarta función de dominio con la misma forma liviana que las tres evidencias
+ya construidas, en vez de instanciar `UserProfile`/`Simulation` por primera
+vez— es la vía más consistente con lo que Sprint 3 ya demostró tres veces;
+(3) la secuencia recomendada es salario/IBC → meta de jubilación → RAIS
+mínimo → RPM mínimo → viabilidad. Antes de iniciar esa secuencia, se hizo una
+segunda pausa para registrar los **Niveles de madurez de la información
+pensional** (commit `99bf900`) — el marco que hoy da contenido a
+`origenDatoIbc`/`certezaValorDeclarado` de este Slice.
+
+### Objetivo, revisado durante el propio análisis
+
+La propuesta inicial encuadraba el Slice como "capturar salario/IBC". Un
+análisis posterior ("¿cuál es el dato que realmente necesita el motor
+pensional?") encontró que `formulaRAIS.js` ya asumía, desde Sprint 1 y sin
+decirlo, que alguien resolvería un IBC antes de llegar a ella
+(`Math.min(salarioActual, topeMaximoIBC * smlv)`). El objetivo final quedó
+reencuadrado: obtener el IBC aplicable, trazable, para alimentar las
+simulaciones — no conocer el ingreso general de la persona.
+
+### Investigación normativa
+
+Se investigaron cinco casos jurídicos reales (dependiente, independiente por
+contrato de prestación de servicios, independiente por cuenta propia, mixto,
+colombiano residente en el exterior con afiliación voluntaria) contra fuentes
+oficiales primarias (Función Pública/Gestor Normativo, UGPP, Ministerio de
+Trabajo, Colpensiones). Hallazgos clave:
+
+- El **Decreto 682 de 2014** (Art. 2) es el fundamento confirmado de la
+  afiliación voluntaria de colombianos en el exterior — el IBC debe
+  corresponder a ingresos reales (no es una elección arbitraria), con un
+  techo de 25 SMLMV confirmado y un piso con **discrepancia sin resolver**
+  (el texto de 2014 dice 2 SMLMV; fuentes recientes de Colpensiones dicen 1).
+- La cita legal que se había asumido para el 40% del contrato de prestación
+  de servicios (Art. 244, Ley 1955 de 2019) **está anulada** — la Corte
+  Constitucional la declaró inexequible (Sentencia C-068 de 2020), y las
+  resoluciones que la desarrollaban carecen de efectos legales. El
+  fundamento vigente exacto de esa regla no quedó identificado con certeza.
+- El **Decreto 379 de 2026** (vigente desde 2026-04-07) regula el IBC de
+  independientes por cuenta propia, con un esquema de presunción de costos
+  por actividad económica que la UGPP ahora define por resolución — más
+  volátil que un decreto.
+
+Esta investigación, junto con un análisis posterior de UX ("¿un colombiano
+promedio realmente conoce su IBC?"), llevó a **descartar el cálculo de IBC
+para cualquier caso distinto de empleado** — la inestabilidad normativa
+confirmada reforzó, no solo simplificó, esa decisión.
+
+### Modelo de datos final
+
+```
+ibcActualDeclarado        // lo que la persona afirma usar hoy — nunca sobrescrito
+ibcActualCalculado         // derivado de otro dato declarado, solo cuando hay regla confiable
+ibcAplicableSimulacion     // valor final, después de ajustes — el único que ve el motor
+origenDatoIbc               // declarado_por_usuario | calculado_desde_dato_declarado | verificado_en_fuente
+certezaValorDeclarado       // conocido | aproximado | desconocido
+confianzaReglaAplicada      // validada_directamente_aplicable | aplicable_con_supuestos | pendiente_de_revision
+ajustesAplicados             // ej. tope de 25 SMLMV — trazado, nunca aplicado en silencio
+limitaciones
+```
+
+Decisión de separación explícita (corrigiendo un intento inicial de
+mezclarlos): **calidad del dato** (`origenDatoIbc`/`certezaValorDeclarado`) y
+**solidez de la regla aplicada** (`confianzaReglaAplicada`) son ejes
+independientes — un salario autodeclarado puede alimentar una regla legal
+sólida, y viceversa. `gradoEstimacionResultado` se evaluó explícitamente
+como candidato y se **descartó de este Slice**: pertenece a una síntesis de
+toda una `Simulation` (todos los insumos combinados), no a un dato aislado —
+producirlo aquí habría adelantado una responsabilidad del futuro Motor de
+Explicabilidad (PL-230 §6.6).
+
+### Alcance aprobado — captura universal simplificada
+
+- Mismo patrón de tres niveles ya validado en semanas cotizadas ("Lo
+  conozco" / "Tengo una idea aproximada" / "No lo conozco"), para los cinco
+  casos por igual — sin bifurcar la mecánica de captura por tipo de
+  cotizante.
+- **Solo empleado** tiene una ruta de ayuda opcional (estimar desde salario),
+  siempre etiquetada como reconstrucción aproximada, nunca como cálculo
+  exacto, con sus excepciones (salario integral, pagos no salariales,
+  múltiples empleos) declaradas.
+- Independiente, mixto y exterior: **nunca se calcula** — solo se captura el
+  valor que la persona ya declara usar hoy.
+- Caso mixto: una sola captura del IBC total declarado, sin desglose por
+  fuente (diferido explícitamente — evita construir complejidad sin un caso
+  real que la use).
+- Techo de 25 SMLMV: se aplica siempre, trazado en `ajustesAplicados`, sin
+  sobrescribir el valor original.
+- Piso doméstico (1 SMLMV): advertencia si el valor está por debajo, nunca
+  corrección silenciosa.
+- Piso para exterior: **no se aplica** mientras la discrepancia normativa
+  siga sin resolver — se declara como limitación explícita.
+- `smlv` se resuelve activando conscientemente `permitirTransitorio: true`,
+  con su estado jurídico expuesto en el resultado, nunca oculto.
+- Cambio de fase (de elegibilidad a estimación económica) reconocido dentro
+  del propio subtítulo de la pantalla, sin pantalla de pausa aparte — el
+  riesgo de fatiga ya registrado pesó más que la ganancia narrativa de una
+  vista sin captura ni resultado propio.
+
+### Qué se construyó
+
+- `src/domain/determinarBaseCotizacion.js` + `determinarBaseCotizacion.test.js`
+  (16 pruebas) — cuarta función de dominio, primera de una nueva familia
+  (`determinar*`).
+- `src/data/legal/index.js` — `obtenerTopeMaximoIBC` y `obtenerSmlv`
+  (aditivos), con 6 pruebas nuevas en `index.test.js`.
+- `src/pages/BaseCotizacion.jsx` — pantalla "El valor sobre el que cotizas
+  hoy", reemplaza a `SiguientePasoEconomicoTemporal.jsx` (antes
+  `SiguienteEtapaTemporal.jsx`, eliminado).
+- `src/pages/SiguientePasoEconomicoTemporal.jsx` — nuevo placeholder
+  temporal siguiente.
+- `src/App.jsx` — tres estados nuevos, wrapper de invalidación, nueva vista
+  `baseCotizacion`.
+- `src/App.css` — clase de título exclusiva.
+- `src/models/UserProfile.js` — nota registrando que `salarioActual` (campo
+  documentado desde Sprint 1, nunca instanciado) queda superado por el
+  modelo real construido aquí.
+- `docs/tecnico/arquitectura/expediente-pensional.md` — Niveles de madurez
+  actualizados: Nivel 1 pasa de "previsto" a "capturado" para la base de
+  cotización, y se corrige la formulación anterior sobre `gradoEstimacion`
+  para reflejar que nunca se deriva a nivel de un dato aislado.
+- 22 pruebas nuevas; **112/112** en el proyecto.
+
+### Decisiones arquitectónicas consolidadas
+
+1. **Nomenclatura de dominio fijada con este primer caso real**: `evaluar*`
+   (juicio de elegibilidad) / `obtener*` (consulta normativa pura) /
+   `resolverReglasVigentes` (motor de selección de normas) / `determinar*`
+   (dato aplicable del expediente, a partir de información declarada + reglas
+   trazadas) — cuatro categorías distintas, sin generalizar todavía una
+   infraestructura común (Principio 9).
+2. **Separación entre el contrato del Expediente y el contrato del motor**:
+   los datos de origen (`salarioMensual`, futuro `valorMensualContrato`)
+   permanecen en el Expediente para explicar, recalcular y detectar
+   inconsistencias; el motor solo consume `ibcAplicableSimulacion` +
+   `origenDatoIbc` + `certezaValorDeclarado`.
+3. **Responsabilidad de la fórmula acotada**: el tope se aplica en el Slice
+   (donde vive la complejidad jurídica), se entrega ya resuelto al
+   orquestador bajo un nombre de parámetro corregido (`ibcMensual`, no
+   `salarioActual`), y la fórmula conserva el tope solo como defensa
+   adicional, nunca como el lugar donde se decide el significado jurídico
+   del dato — pendiente de aplicar en código cuando se construya el
+   orquestador de RAIS/RPM.
+4. **`gradoEstimacionResultado` diferido en firme** al Motor de
+   Explicabilidad — ningún Slice de captura debe producirlo, sin importar
+   cuántos datos combine.
+5. **Nombre final**: "Base actual de cotización" — evolucionó desde
+   "Salario/IBC" (S3-009) → "Capacidad económica actual" (podía sugerir
+   patrimonio o gastos) → "Ingreso e IBC actual" (sobreprometía que siempre
+   se captura ingreso) → nombre final, el único que describe con precisión
+   lo que el Slice captura en los cinco casos.
+
+### Limitaciones explícitamente diferidas
+
+- Cálculo de IBC para independiente (ambas modalidades), mixto y exterior —
+  solo captura, nunca cálculo, mientras la normativa siga inestable.
+- Desglose de fuentes para el caso mixto.
+- Resolución de la discrepancia normativa del piso para exterior (1 vs. 2
+  SMLMV).
+- Identificación del fundamento legal vigente y preciso del 40% para
+  contrato de prestación de servicios (la cita anterior quedó anulada).
+- Esquema de presunción de costos por actividad económica para cuenta
+  propia.
+- Verificación cruzada del IBC declarado contra PILA/UGPP (Nivel 2 del marco
+  de madurez).
+- Renombrar `salarioActual` a `ibcMensual` dentro de `formulaRAIS.js` — se
+  hará junto con la construcción del orquestador, no en este Slice.
+
+### Qué cambia en la secuencia completa del MVP
+
+Slice 1 de 5 de la secuencia económica, completado. Resuelve explícitamente
+el pendiente que quedó abierto como "S3-010 (salario/IBC) permanece
+pausado" en cierres anteriores de este documento. Próximo: meta de
+jubilación deseada (Slice 2), seguido de RAIS mínimo, RPM mínimo, y una
+lectura de viabilidad de la meta declarada.
+
+### Verificación
+
+`npm run lint`, `npm test` (112/112) y `npm run build` exitosos en cada
+ronda; `git diff --check` sin errores de contenido; sin referencias
+residuales a nombres descartados (`resolverBaseCotizacion`,
+`SiguienteEtapaTemporal.jsx`) tras el cierre. Revisión visual manual
+cubriendo los cinco casos jurídicos, ajuste de techo, advertencia de piso
+doméstico, limitación de piso no evaluado para exterior, ruta de ayuda para
+empleado con y sin uso, casos sin ruta de ayuda, validación de "Continuar",
+fundamento legal simplificado, y eliminación de mensajes duplicados.
+
+### Pendiente para el siguiente Slice
+
+- Meta de jubilación deseada (`edadJubilacionDeseada`) — Slice 2 de la
+  secuencia económica.
+- Los asuntos normativos diferidos arriba siguen bloqueando, específicamente,
+  cualquier intento futuro de **calcular** (no solo capturar) el IBC de
+  independientes o exterior.
+- Análisis de impacto pendiente para alinear la firma de
+  `obtenerSemanasMinimas` con `obtenerEdadPension`/`obtenerEdadTransicion`
+  (heredado de Slices anteriores, sigue sin abordarse).
+- Observaciones de UX ya registradas (botón "Volver" sin contexto,
+  desactualización del checklist de `CompletarExpediente.jsx`) siguen
+  vigentes, sin resolver.
+
+---
+
 ## Slices pendientes de Sprint 3
 
 Por definir a medida que el sprint avance.

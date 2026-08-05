@@ -1634,8 +1634,9 @@ navegación Volver/Continuar sin pérdida de datos.
 
 ## Pausa de Sprint 3 — Tercera evidencia ejecutable: indicios de régimen de transición
 
-**Estado:** ✅ Implementado, verificado visualmente y aprobado — commit local en
-`sprint-3-mvp-headless`, sin push.
+**Estado:** ✅ Cerrado y aprobado — commits `20d0be4` (evidencia, pantalla y
+resolvers) y `1b8e8a5` (refinamiento de redacción y jerarquía visual, posterior a
+la revisión de producto) en `sprint-3-mvp-headless`, sin push.
 
 ### Objetivo
 
@@ -1739,32 +1740,82 @@ legal en esta versión.
    genérica) a **"Posibles indicios de régimen de transición"** — nombra el
    tema sin afirmar un resultado.
 
-### Observaciones registradas para antes del MVP (sin implementar)
+### Ronda de refinamiento tras revisión visual y de producto
 
-1. **Botón "Volver" sin contexto explícito.** Detectado durante la revisión
-   visual de esta pantalla, pero es un patrón transversal a las ~10 pantallas
-   del recorrido (`Objetivo`, `DatosIniciales`, `SituacionPensional`,
-   `HistorialLaboral`, `ExpedientePensional`, `CompletarExpediente`,
-   `InformacionPensionalEsencial`, `HistoriaPensional`, `PrimeraLectura`,
-   `IndiciosRegimenTransicion`), no específico de este Slice. Antes del MVP,
-   revisar si el texto necesita mayor especificidad (ej. "Volver a Historia
-   pensional") para evitar ambigüedad.
+Tras la implementación inicial (commit `20d0be4`), se hizo una revisión visual
+manual completa y, después, una revisión crítica del Slice desde una perspectiva
+de Product Designer/Arquitecto ajena a la implementación — explícitamente
+buscando problemas de narrativa, jerarquía visual y percepción de valor, no
+mejoras cosméticas. De esa revisión salieron cinco ajustes aprobados e
+implementados (commit `1b8e8a5`):
+
+1. Redacción de `sin_indicios` reescrita para no sonar a descarte definitivo —
+   deja explícito que la ausencia de indicios por la vía de edad no descarta la
+   otra vía que la ley contempla.
+2. Subtítulo reescrito para explicar en una frase qué es el régimen de
+   transición y por qué puede importarle a la persona (antes asumía que el
+   término ya se entendía), sin agregar detalle jurídico adicional.
+3. Texto de ayuda de "No estoy seguro" corregido — antes podía leerse como "esta
+   pregunta es opcional" cuando lo opcional es solo conocer la dirección exacta.
+4. Línea de vigencia agregada a "Ver fundamento legal", igualando el criterio ya
+   usado en `PrimeraLectura.jsx`.
+5. Nueva clase `.options--secundario`: reduce el protagonismo visual del bloque
+   de detalle de traslado (legend más liviano, menos espacio interno) sin
+   cambiar el orden de la conversación (se decidió explícitamente mantener la
+   pregunta de traslado antes del hallazgo, por sentirse más natural
+   conversacionalmente aunque el cálculo no dependa de ella), las opciones
+   disponibles, ni el componente/estilo compartido `.option`.
+
+### Observaciones registradas para el futuro (sin implementar)
+
+De la revisión visual:
+
+1. **Botón "Volver" sin contexto explícito.** Patrón transversal a las ~10
+   pantallas del recorrido, no específico de este Slice. Antes del MVP, revisar
+   si el texto necesita mayor especificidad (ej. "Volver a Historia pensional").
 2. **`SiguienteEtapaTemporal.jsx` se percibe como transición, no como
    progreso.** Cumple su función de placeholder, pero antes del MVP se debe
-   revisar si debe transmitir una sensación más clara de avance y continuidad.
-   Nota dejada también en el propio archivo.
+   revisar si debe transmitir una sensación más clara de avance. Nota dejada
+   también en el propio archivo.
+
+De la revisión crítica de producto (perspectiva Product Designer/Arquitecto):
+
+3. **El checklist de `CompletarExpediente.jsx` queda desactualizado.** Solo
+   conoce los cuatro bloques base y `infoEsencialCompletada` — no refleja
+   Historia pensional, Primera lectura ni Posibles indicios. Un usuario que
+   retrocede varias pantallas puede ver *"Siguiente paso: Historia pensional"*
+   habiendo ya completado las tres. **Decisión explícita: no se resuelve con
+   otro booleano puntual** — es la misma señal que ya motivó, en varios cierres
+   anteriores, evaluar si se justifica `context/` o una gestión de estado real;
+   arreglarlo bien depende de resolver esa deuda de fondo, no de repetir el
+   parche.
+4. **Sin puente narrativo entre Primera Lectura e Indicios.** Primera Lectura
+   cierra sin reconocer que la siguiente pantalla es otra lectura relacionada.
+   Evaluado y **decidido explícitamente no implementar ahora** — tras revisar
+   el flujo de nuevo, se consideró que la continuidad ya es suficiente para
+   cerrar el Slice; queda registrada solo como posible mejora futura, sin
+   reabrir la pantalla otra vez.
+5. **`objetivoSeleccionado` (capturado en S3-002) nunca vuelve a aparecer** en
+   ninguna lectura ni evidencia — las lecturas se sienten genéricas, no
+   ancladas al objetivo que la persona declaró al empezar. Alcance mayor al de
+   cualquier Slice individual; probablemente pertenece al mismo momento en que
+   se diseñe el Motor de Decisión (PL-230).
+6. **Riesgo de fatiga a vigilar**: van 11 pantallas desde Bienvenida sin que el
+   sistema entregue todavía un resultado accionable (solo lecturas parciales).
+   Coherente con la filosofía de no fingir certezas, pero es una tensión a
+   observar según crezca el número de evidencias — no accionable hoy.
 
 ### Verificación
 
-`npm run lint`, `npm test` (91/91) y `npm run build` exitosos en cada ronda;
-`git diff --check` sin errores de contenido. Revisión visual manual en servidor
-de desarrollo, cubriendo `con_indicios`, `sin_indicios`, traslado sin detalle,
-traslado con detalle concreto, "No estoy seguro", ventana de escritorio y ventana
-estrecha (quiebre `max-width: 600px`). El estado `no_evaluable` no es alcanzable
-desde la interfaz actual —`DatosIniciales.jsx` ya garantiza `sexo` válido y
-`fechaNacimiento` real y no futura antes de permitir avanzar— por lo que queda
-cubierto únicamente por las pruebas automatizadas de dominio, no por revisión
-manual en navegador.
+`npm run lint`, `npm test` (91/91) y `npm run build` exitosos en cada ronda,
+incluida la ronda de refinamiento; `git diff --check` sin errores de contenido.
+Revisión visual manual en servidor de desarrollo, cubriendo `con_indicios`,
+`sin_indicios`, traslado sin detalle, traslado con detalle concreto, "No estoy
+seguro", ventana de escritorio y ventana estrecha (quiebre `max-width: 600px`).
+El estado `no_evaluable` no es alcanzable desde la interfaz actual —
+`DatosIniciales.jsx` ya garantiza `sexo` válido y `fechaNacimiento` real y no
+futura antes de permitir avanzar— por lo que queda cubierto únicamente por las
+pruebas automatizadas de dominio, no por revisión manual en navegador.
 
 ### Pendiente para el siguiente Slice
 
@@ -1773,10 +1824,18 @@ manual en navegador.
   verificadas mediante historia laboral oficial, u otro bloque del Expediente
   Pensional.
 - Vigilar la aparición de una segunda evidencia real que produzca la misma
-  tensión de ubicación en el recorrido lineal (Decisión 2 arriba) — cuando
-  ocurra, diseñar formalmente el Panel de Hallazgos del Expediente Pensional.
-- Revisar antes del MVP las dos observaciones de UX registradas arriba (botón
-  "Volver" sin contexto; sensación de progreso de las pantallas de transición).
+  tensión de ubicación en el recorrido lineal (Decisión 2 de este Slice) —
+  cuando ocurra, diseñar formalmente el Panel de Hallazgos del Expediente
+  Pensional.
+- Resolver, cuando se justifique una solución de gestión de estado real (no
+  antes), la desactualización del checklist de `CompletarExpediente.jsx`
+  (Observación 3 arriba) — explícitamente no como otro parche puntual.
+- Revisar antes del MVP: botón "Volver" sin contexto (Observación 1), sensación
+  de progreso de las pantallas de transición (Observación 2), y el puente
+  narrativo entre Primera Lectura e Indicios (Observación 4).
+- Registrado para una etapa de diseño mayor (Motor de Decisión / PL-230): que
+  las lecturas y evidencias se anclen al objetivo declarado por el usuario
+  (Observación 5).
 - Análisis de impacto pendiente para alinear la firma de `obtenerSemanasMinimas`
   con la de `obtenerEdadPension`/`obtenerEdadTransicion` (heredado de la segunda
   evidencia, sigue sin abordarse).

@@ -1845,10 +1845,11 @@ pruebas automatizadas de dominio, no por revisión manual en navegador.
 
 ## Pausa de Sprint 3 — Primer Slice de la secuencia económica: Base actual de cotización
 
-**Estado:** ✅ Cerrado y aprobado — commit `6f5373f` (dominio, resolvers,
-pantalla, documentación de arquitectura) en `sprint-3-mvp-headless`, sin
-push. Este cierre documental se comitea por separado, mismo criterio ya
-usado en Slices anteriores.
+**Estado:** ✅ Cerrado y aprobado — commits `6f5373f` (dominio, resolvers,
+pantalla, documentación de arquitectura) y `13fe732` (correcciones de la
+ronda final de revisión crítica) en `sprint-3-mvp-headless`, sin push. Este
+cierre documental se comitea por separado, mismo criterio ya usado en
+Slices anteriores.
 
 ### Contexto: de la brecha económica a este Slice
 
@@ -2024,6 +2025,39 @@ Explicabilidad (PL-230 §6.6).
 - Renombrar `salarioActual` a `ibcMensual` dentro de `formulaRAIS.js` — se
   hará junto con la construcción del orquestador, no en este Slice.
 
+### Ronda final — revisión crítica como arquitecto principal
+
+Antes del cierre formal, se hizo una última revisión buscando exclusivamente
+problemas que impidieran considerar el Slice un referente de calidad —no
+redacción ni preferencias— releyendo `determinarBaseCotizacion.js`,
+`BaseCotizacion.jsx` y el cableado de `App.jsx` línea por línea. Encontró dos
+problemas reales, corregidos antes de cerrar:
+
+1. **Duplicidad de responsabilidades**: `ajustesAplicados` producía una
+   `descripcion` narrativa en el dominio que ningún consumidor leía —
+   `BaseCotizacion.jsx` reconstruía su propio mensaje desde los números
+   crudos, ignorándola. Se eliminó `descripcion` del dominio;
+   `ajustesAplicados` queda puramente estructural (`codigo`, `valorAntes`,
+   `valorDespues`, `normaUsada`), igual que un `CalculationTrace` — toda la
+   redacción narrativa vive exclusivamente en la pantalla, mismo patrón ya
+   usado en `IndiciosRegimenTransicion.jsx`/`PrimeraLectura.jsx`. Se
+   aprovechó para extraer `aplicarTopeMaximoIBC`, que reemplaza dos bloques
+   casi idénticos de aplicación del tope.
+2. **Inconsistencia arquitectónica real**: `tipoCotizante` y
+   `lugarCotizacion` (Historial laboral, S3-005) no invalidaban el estado de
+   Base actual de cotización al cambiar, a diferencia de cada otro caso
+   semánticamente dependiente ya cubierto en el proyecto
+   (`regimenActual`→`trasladoRegimen`, `trasladoRegimen`→`detalleTraslado`,
+   `certezaBaseCotizacion`→sus propios dependientes). Se agregaron
+   `actualizarTipoCotizante`/`actualizarLugarCotizacion` en `App.jsx`, que
+   invalidan `certezaBaseCotizacion`/`valorBaseCotizacionDeclarado`/
+   `salarioParaEstimarBase` únicamente cuando el valor cambia realmente —
+   mismo criterio exacto ya establecido, sin introducir una solución global
+   de gestión de estado.
+
+1 prueba nueva verificando el shape sin `descripcion` y la preservación del
+valor original; **113/113** pruebas en el proyecto tras esta ronda.
+
 ### Qué cambia en la secuencia completa del MVP
 
 Slice 1 de 5 de la secuencia económica, completado. Resuelve explícitamente
@@ -2034,14 +2068,18 @@ lectura de viabilidad de la meta declarada.
 
 ### Verificación
 
-`npm run lint`, `npm test` (112/112) y `npm run build` exitosos en cada
-ronda; `git diff --check` sin errores de contenido; sin referencias
-residuales a nombres descartados (`resolverBaseCotizacion`,
-`SiguienteEtapaTemporal.jsx`) tras el cierre. Revisión visual manual
+`npm run lint`, `npm test` (112/112, luego 113/113 tras la ronda final) y
+`npm run build` exitosos en cada ronda; `git diff --check` sin errores de
+contenido; sin referencias residuales a nombres descartados
+(`resolverBaseCotizacion`, `SiguienteEtapaTemporal.jsx`) ni a `descripcion`
+en `ajustesAplicados`; sin setters directos para `tipoCotizante`/
+`lugarCotizacion` en el cableado de `App.jsx`. Revisión visual manual
 cubriendo los cinco casos jurídicos, ajuste de techo, advertencia de piso
 doméstico, limitación de piso no evaluado para exterior, ruta de ayuda para
 empleado con y sin uso, casos sin ruta de ayuda, validación de "Continuar",
-fundamento legal simplificado, y eliminación de mensajes duplicados.
+fundamento legal simplificado, eliminación de mensajes duplicados, y los
+recorridos de invalidación al cambiar tipo/lugar de cotización (incluido el
+caso de responder con el mismo valor, que no debe invalidar nada).
 
 ### Pendiente para el siguiente Slice
 

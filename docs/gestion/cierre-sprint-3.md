@@ -2510,6 +2510,193 @@ categorías o comparaciones en el texto.
 
 ---
 
+## Pausa de Sprint 3 — Redefinición de la Capacidad C y frontera de PerfilDecision
+
+**Estado:** ✅ Cerrado y aprobado — análisis conceptual puro (2026-08-06), sin ningún
+cambio de código.
+
+### Contexto
+
+Tras cerrar la Capacidad B ("Declaración libre"), el siguiente trabajo previsto era
+"Capacidad C": interpretar esa declaración. Antes de diseñarla, una revisión
+arquitectónica en profundidad —con el mismo rigor que la pausa que produjo los
+Principios 12 y 13— cuestionó si "Capacidad C" tenía, en realidad, una
+responsabilidad propia que justificara su existencia como capacidad independiente.
+No la tenía, en su formulación original.
+
+**Resultado de este documento**: "Capacidad C" deja de usarse como nombre. El
+trabajo que se le atribuía queda redistribuido entre una **capacidad de
+reconocimiento** (también referida abajo como "zona de mediación" — los dos
+términos designan la misma pieza) y un flujo de formulación y confirmación que
+pertenece al Bloque 3 (`PerfilDecision`). Ambos se definen en detalle en
+"Frontera aprobada", más abajo.
+
+### Recorrido del análisis — tres intentos de justificación, los tres rechazados
+
+1. **Capacidad C como clasificador de texto** (¿decisión procesable? ¿pregunta
+   informativa? ¿varios asuntos? ¿motivación mezclada? ¿fuera de alcance?).
+   Rechazado: reduce la capacidad a taxonomía de datos, sin fundamentar por qué el
+   negocio necesita esa taxonomía en sí misma.
+2. **Capacidad C como gestor de flujo** (¿qué debe reconocer o decir PensionLab
+   antes de continuar el recorrido, dado lo declarado?). Rechazado: convierte la
+   capacidad en un gestor de mensajes de experiencia, no en una responsabilidad de
+   negocio.
+3. **Prueba de conocimiento de negocio concreto**: "¿qué sabe PensionLab después de
+   esta capacidad que no sabía antes, en términos de negocio (hechos o
+   decisiones)?" No se pudo responder con precisión sin caer en uno de dos lugares:
+   territorio de `PerfilDecision` (fuera de alcance por decisión explícita de
+   diseñar esta capacidad por completo antes de decidir cualquier cambio al
+   contrato de `PerfilDecision`) o en una de las dos abstracciones ya rechazadas.
+
+### Ejercicio contrario — asumir que la Capacidad C no existe
+
+Se analizó qué pasaría si, tras B, el siguiente paso fuera directamente el diseño
+del Bloque 3 (`PerfilDecision`). Conclusión: **eliminar el nombre no elimina las
+responsabilidades reales.** Sin un lugar explícito que las asuma, quedan sin dueño
+—qué hacer con ambigüedad, con varios asuntos entrelazados, con contenido fuera de
+dominio, cómo preservar la declaración cruda— y terminan filtrándose, sin ser
+reconocidas, dentro del propio contrato de `PerfilDecision`, contaminándolo con
+preocupaciones de interpretación de lenguaje que no le corresponden. La
+arquitectura no se simplifica al quitar el nombre: la complejidad solo se mueve a
+un lugar sin dueño, lo cual es peor que tenerla en una capacidad explícita.
+
+### Frontera aprobada (hipótesis de trabajo, no verdad definitiva)
+
+- **B sigue siendo una captura completamente fiel** — nunca interpreta, nunca se
+  modifica después de capturada.
+- **`PerfilDecision` sigue siendo un contrato puro de decisiones ya confirmadas** —
+  nunca representa ambigüedad, nunca se llena a medias, nunca admite estados
+  intermedios.
+- Entre ambos existe una **zona de mediación**, con dos etapas internas:
+  - **(a) Reconocimiento de aptitud** — ¿hay materia pensional operable? Tres
+    estados posibles (apto / no_apto / indeterminado), autoridad exclusiva del
+    sistema, de naturaleza cercana a una validación (Principio 11) aplicada a
+    pertinencia de dominio en vez de a formato.
+  - **(b) Resolución de estructura** — ¿cuántos asuntos contiene la declaración y
+    tienen precisión suficiente para formularse? Autoridad compartida: el sistema
+    constata la forma, pero nunca decide cuál asunto es prioritario ni rellena lo
+    que falta (Principio 12).
+- Se evaluaron tres alternativas de agrupación —una capacidad fusionada, dos
+  capacidades separadas, una capacidad con dos etapas internas— contra ocho
+  criterios (cohesión, autoridad, interacción, pruebas, trazabilidad, riesgo de
+  sobrearquitectura, evolución con evidencia real, impacto en el recorrido).
+  **Ganó la tercera**: una sola capacidad de reconocimiento con dos etapas
+  internas, coherente con un patrón que el proyecto ya usa (`determinarBaseCotizacion`,
+  `determinarMecanismoYFaltantes`: una función de dominio, varios casos internos
+  diferenciados) y que evita tanto la pérdida de precisión de fusionar como la
+  sobrearquitectura de separar un flujo que nunca ocurre de forma independiente.
+- **(c) Formulación propuesta + (d) Confirmación de la persona NO son parte de
+  esta capacidad** — son el mecanismo mismo por el que nace un `PerfilDecision`, y
+  pertenecen conceptualmente al Bloque 3. La confirmación explícita de la persona
+  es el único acto legítimo que puede crear `objetivoPrincipal` sin violar el
+  Principio 12; el sistema puede proponer una traducción a vocabulario de dominio,
+  nunca imponerla.
+
+### Matriz de escenarios — resumen
+
+Se analizaron diez escenarios, cada uno evaluado contra: entrada de ejemplo,
+resultado de aptitud, resultado de estructura, autoridad del sistema vs. de la
+persona, si avanza al Bloque 3, qué queda pendiente, qué no debe hacer PensionLab,
+y un criterio de aceptación verificable. El detalle campo por campo de cada
+escenario no se transcribe en este documento — lo que sigue es el resultado ya
+consolidado, suficiente para las decisiones registradas aquí:
+
+1. Ausencia explícita — estado terminal, no entra al ciclo aptitud/estructura.
+2. Contenido pensional preciso — apto, un asunto, listo para el Bloque 3.
+3. Contenido pensional ambiguo — apto, estructura incompleta.
+4. Contenido pensional con información faltante — apto, estructura incompleta.
+5. Varios asuntos entrelazados — apto, múltiples asuntos sin jerarquizar por el
+   sistema; **sin destino posterior definido** (vacío, ver abajo).
+6. Mezcla de contenido pensional y no pensional — aptitud mixta; exige operar
+   sobre fragmentos, no sobre la declaración completa (vacío, ver abajo).
+7. Contenido fuera de alcance — no apto, explícito, nunca en silencio.
+8. Aptitud indeterminada — tercer estado honesto, distinto de apto/no_apto.
+9. Texto muy corto o de baja información — tratamiento equivalente a 8.
+10. Declaración que coincide con evidencia ya conocida por el sistema (ej. "cuántas
+    semanas me faltan") — apto y preciso, pero **sin destino claro** en el modelo:
+    ni es candidato al Bloque 3 ni es fuera de alcance (vacío, ver abajo).
+
+**Agrupables**: 3+4 (mismo tratamiento: apto/estructura incompleta); 8+9 (mismo
+tratamiento: información insuficiente para juzgar).
+**Exigen tratamiento independiente**: 5, 6, 7, 10.
+
+**Alcance mínimo recomendado para Sprint 3**: cubrir 1, 2, 3+4 (agrupados), 7, 8+9
+(agrupados). **Diferir explícitamente** 5, 6 y 10 hasta resolver los vacíos que
+exponen — no implementarlos por presión de completitud.
+
+### Vacíos identificados en la definición aprobada
+
+1. El escenario 10 no tiene destino en el modelo: la definición asume que todo lo
+   "apto y preciso" es candidato al Bloque 3, pero una pregunta ya respondible con
+   evidencia existente no es una decisión pendiente.
+2. El escenario 6 exige que la capacidad opere sobre fragmentos de una
+   declaración, no sobre ella como unidad — no contemplado en la definición
+   original de "entrada" (ver "Frontera aprobada", que sigue hablando de "la
+   declaración" como una sola unidad de entrada).
+3. El escenario 5 se reconoce pero no se resuelve: no está definido qué ocurre
+   después de detectar varios asuntos sin jerarquía.
+
+(El tercer estado de aptitud, "indeterminado", que en una versión anterior de este
+análisis figuraba como vacío, ya quedó incorporado como parte de la definición en
+"Frontera aprobada" — no es, a esta altura, un vacío pendiente.)
+
+### Revisión crítica — hallazgos que sobreviven y no deben olvidarse
+
+- **El mecanismo real para juzgar "aptitud" sobre texto libre nunca se validó.**
+  Todo el análisis es conceptual, construido sobre diez escenarios hipotéticos, sin
+  una sola declaración real observada — riesgo directo de que la propia
+  arquitectura de esta capacidad viole el Principio 9 ("generalizar solo con
+  evidencia real").
+- **"Resolución de estructura" ya roza interpretación semántica**: distinguir "un
+  asunto compuesto" de "varios asuntos distintos" no es una operación puramente
+  formal. La tensión con el Principio 12 está mitigada por el diseño, no eliminada
+  por completo.
+- **Riesgo de experiencia real**: si "indeterminado" termina siendo, en la
+  práctica, el resultado dominante, la invitación de B ("cuéntanoslo con tus
+  propias palabras") quedaría desmentida por una respuesta frecuente de "no
+  pudimos determinar esto" — peor que no tener la capacidad.
+- **Señal de sobreingeniería reconocida explícitamente**: varias rondas sucesivas
+  de diseño puramente conceptual, sin código, sin declaraciones reales, sin
+  validar si el mecanismo es siquiera viable con las herramientas actuales del
+  proyecto (JS determinista, sin NLP en el stack).
+
+### Decisión de método para lo que sigue
+
+Se declara **agotado el límite útil del análisis conceptual con escenarios
+hipotéticos**. El siguiente paso no es más generalización: es diseñar un
+**mecanismo mínimo viable** y contrastarlo con **declaraciones reales** capturadas
+vía la Capacidad B durante el desarrollo del producto — la aplicación ya permite
+generar esa evidencia. La siguiente sesión debe comenzar directamente en la etapa
+de **arquitectura técnica** de esta capacidad mínima, respetando todo lo aprobado
+en este documento, sin repetir el análisis de negocio ya cerrado.
+
+### Verificación
+
+No aplica a código — ninguna línea de `src/` se modificó durante este análisis. Se
+confirmó al inicio que el estado previo del repositorio seguía vigente: `npm run
+lint`, `npm test` (129/129) y `npm run build` en verde, working tree limpio salvo
+dos `.docx` sin trackear (PL-230, PL-240), ajenos a este análisis.
+
+### Commit
+
+Pendiente de crear.
+
+### Pendiente para la etapa de arquitectura técnica
+
+- Diseñar el mecanismo concreto de juicio de aptitud/estructura (reglas,
+  heurísticas u otra aproximación — sin comprometerse todavía a ninguna).
+- Recolectar u observar declaraciones reales de la Capacidad B antes de cerrar el
+  mecanismo, en vez de seguir razonando sobre ejemplos hipotéticos.
+- Resolver, o decidir conscientemente diferir con su propia justificación, los
+  tres vacíos señalados arriba.
+- Actualizar `src/pages/RevisionDeclaracionTemporal.jsx` solo cuando exista diseño
+  técnico aprobado — no antes.
+- El vacío en `PerfilDecision.js` (ninguna forma de representar una decisión
+  declarada pero no comprometida) sigue sin resolver — se resuelve al diseñar el
+  Bloque 3, coordinado con esta capacidad, no antes de eso.
+
+---
+
 ## Slices pendientes de Sprint 3
 
 Por definir a medida que el sprint avance.

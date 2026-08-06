@@ -33,6 +33,51 @@ código. El ciclo repetido durante todo el proyecto fue:
   silencio, y verificar resultados con ejecución real antes de presentarlos como
   válidos.
 
+## Revisión cruzada entre asistentes de IA
+
+En muchas decisiones importantes del proyecto —particularmente las de arquitectura y de
+consolidación conceptual— el patrón de trabajo no fue "un asistente propone, el humano aprueba" de
+forma directa, sino un ciclo adicional de contraste entre dos asistentes de IA distintos:
+
+1. Un asistente desarrollaba una propuesta concreta.
+2. Esa propuesta se sometía a revisión crítica por parte de otro asistente, con instrucción
+   explícita de intentar refutarla, no de confirmarla.
+3. Ambas posiciones —la propuesta original y la crítica— se contrastaban entre sí.
+4. Carlos Peraza, responsable del proyecto, analizaba la evidencia resultante de ese contraste y
+   tomaba la decisión final.
+5. Solo el conocimiento que sobrevivía a ese proceso completo se documentaba como parte del
+   proyecto.
+
+Durante Sprint 3, los dos asistentes involucrados en este patrón fueron ChatGPT (OpenAI) y Claude
+(Anthropic).
+
+### Qué es, y qué nunca fue, esta práctica
+
+- **Fue** una práctica metodológica para aumentar el rigor del análisis — una forma deliberada de
+  someter cada propuesta a un intento genuino de refutación antes de aceptarla, en vez de confiar en
+  una sola fuente de razonamiento.
+- **Nunca sustituyó** la validación normativa, jurídica o técnica. Que dos asistentes de IA
+  coincidieran sobre una interpretación no la convertía en correcta frente a la ley, los datos o el
+  comportamiento real del sistema — esa verificación siguió dependiendo siempre de fuentes primarias
+  y de ejecución real (ver "Validación desde el origen", más abajo en este mismo documento).
+- **Nunca reemplazó** la decisión humana. Ningún acuerdo entre asistentes se tradujo en una decisión
+  de arquitectura, de producto o de alcance sin pasar antes por la aprobación explícita de Carlos
+  Peraza, bajo el mismo criterio ya descrito en "Roles".
+- **Nunca convirtió el consenso entre modelos en un criterio de verdad.** Si ambos asistentes
+  coincidían, eso no bastaba por sí solo para considerar algo correcto; si discrepaban, la
+  discrepancia era información para el responsable del proyecto, no un empate a resolver por
+  votación.
+
+### Lo que tiene valor permanente
+
+Los nombres concretos de las herramientas usadas —ChatGPT, Claude— forman parte de la historia del
+proyecto y se registran aquí con esa honestidad. Pero lo que tiene valor permanente, más allá de qué
+herramientas existan o se sigan usando en el futuro, es la **metodología de revisión cruzada en sí
+misma**: proponer, someter a refutación independiente, contrastar, decidir con evidencia, y
+documentar solo lo que sobrevive. Esa disciplina es reproducible con cualquier combinación de
+herramientas —incluida ninguna— y es ella, no las marcas involucradas, lo que este documento existe
+para preservar.
+
 ## Cómo se manejan los hallazgos inesperados
 
 Varias veces durante el proyecto, investigar antes de codificar sacó a la luz

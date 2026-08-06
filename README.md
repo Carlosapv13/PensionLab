@@ -130,4 +130,7 @@ respuestas son parte del producto.
 
 ## Autoría
 
-Carlos Peraza — proyecto personal en desarrollo.
+Carlos Peraza — proyecto personal en desarrollo, construido mediante un proceso de revisión
+cruzada entre asistentes de IA, bajo su dirección y decisión final en cada resultado. Ver
+[Metodología de desarrollo con IA](docs/ia/metodologia-de-desarrollo-con-ia.md) para el detalle
+completo de cómo se trabaja.

@@ -2307,6 +2307,65 @@ Sin push realizado — el commit permanece local en `sprint-3-mvp-headless`.
 
 ---
 
+## Pausa de Sprint 3 — Nace PL-050, Fundamentos Conceptuales de PensionLab
+
+**Estado:** ✅ Cerrado — commit pendiente de registrar (ver "Commit" más abajo).
+
+### Qué se creó
+
+`docs/PL-050 - Fundamentos Conceptuales de PensionLab.md` — nuevo documento fundacional, permanente
+y transversal a los Sprints, sin pertenecer a ninguno de ellos. Vive en la raíz de `docs/`, no bajo
+`tecnico/arquitectura/` ni `producto/`, porque no es arquitectura técnica ni experiencia de
+usuario — es el sustrato conceptual sobre el que ambas se apoyan.
+
+### Por qué se creó
+
+Antes de PL-050, el razonamiento detrás de decisiones como los Principios 12 y 13 vivía disperso
+entre la conversación de diseño y los documentos de Principios ya existentes — sin un lugar
+permanente que conservara, además de la regla final, la incertidumbre original, las alternativas
+descartadas y los intentos de refutación que esa regla tuvo que superar. PL-050 existe para cerrar
+exactamente esa brecha: preserva el razonamiento, no solo la conclusión.
+
+### Arquitectura documental
+
+Unidad de conocimiento: el **Descubrimiento Conceptual (DC)** — un episodio cerrado de
+razonamiento, no un concepto individual (un solo DC puede producir varios conceptos, varios
+principios y varias preguntas abiertas a la vez, sin fragmentar su historia entre ellos). Cada DC
+sigue una plantilla obligatoria de 16 campos, con tres ejes independientes de clasificación (Estado,
+Nivel de Evidencia, Vigencia Conceptual), una regla oficial de citación (`PL-050 DC-NNN`), y una
+política de evolución explícita: ningún DC se reescribe ni se elimina — evoluciona exclusivamente
+mediante nuevos DC relacionados que lo citan.
+
+### Validación
+
+La arquitectura se validó escribiendo dos Descubrimientos Conceptuales reales, ambos ya cerrados y
+consolidados:
+
+- **DC-001** — origen del Principio 12 ("PensionLab asesora decisiones pensionales, no decisiones
+  personales").
+- **DC-002** — origen del Principio 13 ("El sistema no pide una decisión antes de agotar lo que ya
+  sabe").
+
+Ninguno de los dos exigió modificar la plantilla original más allá de dos rondas de ajuste editorial
+(Fecha de registro y Relación con otros documentos, en la primera revisión; Resumen Ejecutivo y
+Vigencia Conceptual, en el cierre). Tras esa validación, la arquitectura documental de PL-050 queda
+**declarada congelada**: los próximos cambios al documento deben consistir exclusivamente en agregar
+nuevos DC cuando el proyecto produzca conocimiento real que los justifique, no en modificar su
+estructura, salvo evidencia objetiva de que ya no funciona.
+
+### Pendiente
+
+- Redacción del tercer Descubrimiento Conceptual real (la reflexión sobre "estrategia" y el
+  nacimiento del concepto de "Camino"), cuando el proyecto retome ese frente.
+- Decidir si el contenido conceptual ya existente en `expediente-pensional.md` (los 5 Bloques, los
+  Niveles de madurez de la información pensional) se migra a PL-050 de forma retroactiva.
+
+### Commit
+
+Propuesto, pendiente de confirmación — ver cierre de esta pausa en la conversación de diseño.
+
+---
+
 ## Slices pendientes de Sprint 3
 
 Por definir a medida que el sprint avance.

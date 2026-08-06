@@ -62,6 +62,44 @@ registrados aquí como referencia permanente.
     imposibles, valores negativos sin sentido, casos límite, y validaciones que
     deben repetirse en `domain/` — no se espera a que esos casos se descubran en
     pruebas manuales.
+12. **PensionLab asesora decisiones pensionales, no decisiones personales.** El
+    sistema explica la situación actual, reduce la asimetría de información,
+    descubre oportunidades, compara estrategias, estima resultados y evidencia
+    costos/beneficios/riesgos/limitaciones — pero no interpreta la vida del
+    usuario, no deduce qué debería querer realmente, no reemplaza sus
+    prioridades personales ni actúa como consejero financiero, psicológico o
+    familiar. Prueba de consistencia: ante dos usuarios con el mismo objetivo
+    pensional pero motivaciones distintas, el sistema debe ofrecer las mismas
+    estrategias — la motivación pertenece a la vida personal del usuario, no al
+    dominio del producto. El único caso en que el sistema invita a reconsiderar
+    una estrategia es cuando existe una alternativa objetivamente mejor desde
+    el punto de vista pensional, y en ese caso solo explica por qué existe, sus
+    ventajas, costos y riesgos — nunca asume saber mejor que el usuario cuál
+    debería ser su objetivo. La decisión final siempre es del usuario. Adoptado
+    el 2026-08-05, durante el análisis de arquitectura del Slice "Meta de
+    jubilación deseada" (secuencia económica), al descartar deliberadamente que
+    el sistema debiera descubrir la prioridad o motivación subyacente del
+    usuario para recomendar mejores estrategias.
+13. **El sistema no pide una decisión antes de agotar lo que ya sabe.** Antes de
+    solicitar al usuario información destinada a orientar estrategias o
+    decisiones futuras (Bloque 3 del Expediente Pensional — objetivos,
+    restricciones, preferencias, prioridades), PensionLab debe mostrar todo el
+    valor que todavía pueda entregar utilizando únicamente los hechos que ya
+    conoce (Bloques 1-2). No rige la captura de hechos entre sí — solo el
+    momento en que el sistema empieza a orientar decisiones. Toda referencia
+    por defecto usada en una lectura derivada bajo este principio (ej. una edad
+    legal de referencia, a falta de una meta declarada) se declara
+    explícitamente como referencia, nunca como la meta del usuario (Principio
+    4). Adoptado el 2026-08-05, en la misma sesión que el Principio 12, tras
+    concluir que la secuencia económica original pedía una meta antes de
+    mostrar cualquier lectura construida solo con hechos ya conocidos.
+
+Sobre la relación entre 12 y 13: no son la misma regla vista dos veces, aunque
+nacieron de la misma discusión — el 12 rige qué hacer con una meta ya
+declarada (nunca interpretar el porqué); el 13 rige qué hacer antes de que
+exista una meta declarada (mostrar antes de preguntar). Uno gobierna el
+"después", el otro el "antes" — mismo criterio de distinción ya usado en PL-240
+§3 entre sus Principios C y G.
 
 ## Diagrama general — todas las capas del sistema
 

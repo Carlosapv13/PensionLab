@@ -250,6 +250,14 @@
   line-height: 1.15;
 }
 
+.screen__title--que-determina-resultado {
+  line-height: 1.15;
+}
+
+.screen__title--explorar-direccion {
+  line-height: 1.15;
+}
+
 .screen__subtitle {
   font-size: 18px;
   line-height: 150%;

@@ -13,7 +13,8 @@ import HistoriaPensional from './pages/HistoriaPensional.jsx'
 import PrimeraLectura from './pages/PrimeraLectura.jsx'
 import IndiciosRegimenTransicion from './pages/IndiciosRegimenTransicion.jsx'
 import BaseCotizacion from './pages/BaseCotizacion.jsx'
-import SiguientePasoEconomicoTemporal from './pages/SiguientePasoEconomicoTemporal.jsx'
+import QueDeterminaTuResultado from './pages/QueDeterminaTuResultado.jsx'
+import ExplorarDireccionTemporal from './pages/ExplorarDireccionTemporal.jsx'
 
 function App() {
   const [vista, setVista] = useState('bienvenida')
@@ -277,14 +278,20 @@ function App() {
           salarioParaEstimarBase={salarioParaEstimarBase}
           onCambiarSalarioParaEstimarBase={setSalarioParaEstimarBase}
           onVolver={() => setVista('indiciosTransicion')}
-          onContinuar={() => setVista('siguientePasoEconomico')}
+          onContinuar={() => setVista('queDeterminaResultado')}
         />
       )}
 
-      {vista === 'siguientePasoEconomico' && (
-        <SiguientePasoEconomicoTemporal
+      {vista === 'queDeterminaResultado' && (
+        <QueDeterminaTuResultado
+          regimenActual={regimenActual}
           onVolver={() => setVista('baseCotizacion')}
+          onContinuar={() => setVista('explorarDireccion')}
         />
+      )}
+
+      {vista === 'explorarDireccion' && (
+        <ExplorarDireccionTemporal onVolver={() => setVista('queDeterminaResultado')} />
       )}
     </AppShell>
   )

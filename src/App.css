@@ -258,6 +258,14 @@
   line-height: 1.15;
 }
 
+.screen__title--declaracion-libre {
+  line-height: 1.15;
+}
+
+.screen__title--revision-declaracion {
+  line-height: 1.15;
+}
+
 .screen__subtitle {
   font-size: 18px;
   line-height: 150%;
@@ -365,6 +373,19 @@
   background: var(--bg);
   color: var(--text-h);
   box-sizing: border-box;
+}
+
+.field__textarea {
+  resize: vertical;
+  min-height: 96px;
+  font-family: inherit;
+  line-height: 1.4;
+}
+
+.btn-secondary--activo {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  color: var(--text-h);
 }
 
 .field__input:focus-visible {

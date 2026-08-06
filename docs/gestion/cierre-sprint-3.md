@@ -2362,7 +2362,151 @@ estructura, salvo evidencia objetiva de que ya no funciona.
 
 ### Commit
 
-Propuesto, pendiente de confirmación — ver cierre de esta pausa en la conversación de diseño.
+```
+ee6b81b docs: crear PL-050 y formalizar metodologia de revision cruzada con IA
+```
+
+Sin push realizado — el commit permanece local en `sprint-3-mvp-headless`.
+
+---
+
+## Slice — Fase 2 (Base Económica), Capacidad B: Declaración libre
+
+**Estado:** ✅ Cerrado y aprobado.
+
+### Objetivo y responsabilidad aprobada
+
+Permitir que la persona exprese, en sus propias palabras, algo que le gustaría resolver
+sobre su futuro pensional —una "decisión pensional pendiente", tratada en todo momento
+como hipótesis de dominio, no como concepto consolidado— o declarar explícitamente que
+no tiene nada puntual por ahora. La capacidad no interpreta, no clasifica, ni reacciona a
+lo declarado; esa responsabilidad pertenece a la Capacidad C.
+
+### Alcance final
+
+- Produce una **declaración sin clasificar** (contenido libre, conservado verbatim) o una
+  **ausencia explícitamente declarada** — nunca ambas, nunca inferida de un campo vacío.
+- No consume ningún dato del Expediente, ni siquiera `regimenActual`.
+- No valida contenido por relevancia, pertenencia al dominio, especificidad, ni presencia
+  de motivación personal mezclada — todo se conserva sin examinar.
+- Captura exactamente una declaración por paso; puede contener uno o varios asuntos
+  entrelazados, sin que la capacidad los cuente ni los separe.
+- Sin ejemplos en esta primera versión.
+- No gestiona vigencia, historial, caminos, objetivos, restricciones ni preferencias.
+
+### Archivos creados
+
+- `src/pages/DeclaracionLibre.jsx`
+- `src/pages/RevisionDeclaracionTemporal.jsx` — nuevo placeholder temporal para la
+  Capacidad C, redactado desde cero.
+
+### Archivos modificados
+
+- `src/App.jsx` — nuevo estado `declaracionLibre` (única variable con tres valores
+  mutuamente excluyentes: `null` | `{ tipo: 'contenido', texto }` | `{ tipo: 'ausencia' }`);
+  nuevas vistas; `onContinuar` de `QueDeterminaTuResultado` (Capacidad A) ahora apunta a
+  esta capacidad.
+- `src/App.css` — clases de título, `.field__textarea`, `.btn-secondary--activo`.
+
+### Archivos eliminados
+
+- `src/pages/ExplorarDireccionTemporal.jsx` — retirado solo después de confirmar el nuevo
+  recorrido conectado y verificado.
+
+### Decisiones de arquitectura
+
+1. La capacidad no consume `regimenActual` ni ningún otro dato del Expediente —
+   corregido durante la revisión de arquitectura al no encontrar ninguna razón objetiva
+   que lo justificara (el régimen no cambia ni la responsabilidad ni la forma de lo
+   capturado).
+2. No se creó ninguna función de dominio: toda la lógica es una comparación estructural
+   trivial (¿hay contenido? ¿hay ausencia declarada?), sin ninguna regla de negocio que
+   aislar, probar o reutilizar por separado.
+3. No se modificó ni se creó ningún contrato. Se reconoce explícitamente un vacío:
+   ningún campo de `PerfilDecision.js` representa hoy "una decisión sin resolver,
+   declarada pero no comprometida" — el vacío queda registrado, no resuelto, hasta que
+   `PerfilDecision` tenga su primera instanciación real.
+4. La gestión de vigencia e historial (qué ocurre si la declaración se actualiza
+   después) se reconoció como responsabilidad del futuro modelo que almacene el dato,
+   no de esta capacidad de captura.
+
+### Las tres contradicciones resueltas durante el diseño funcional
+
+1. **La capacidad no puede llamar "decisión pensional pendiente" a cualquier texto.**
+   Se corrigió nombrando el resultado como una **declaración sin clasificar** — nunca
+   como una decisión ya confirmada — dejando que la Capacidad C determine qué contiene
+   realmente.
+2. **Vacío no equivale a ausencia explícita.** Se distinguieron tres estados: contenido
+   declarado, ausencia explícitamente declarada (un acto deliberado de la persona), y
+   falta de respuesta (que no es un resultado, sino que la capacidad simplemente no ha
+   concluido).
+3. **Una sola decisión pendiente no estaba demostrada por la existencia de un único
+   `PerfilDecision` vigente.** Se encontró la razón funcional propia: exigir que el
+   contenido se limite a una sola decisión, o permitir varias independientes, requeriría
+   que la capacidad interprete el contenido — exactamente lo que su responsabilidad
+   prohíbe. Se captura exactamente una declaración por paso, que puede contener uno o
+   varios asuntos sin que la capacidad los separe.
+
+### Representación de estado
+
+Una única variable con tres valores mutuamente excluyentes (sin definir / contenido /
+ausencia), en vez de dos datos independientes sincronizados manualmente — la
+simultaneidad de contenido y ausencia queda excluida por construcción, no por
+vigilancia. Escribir contenido siempre reemplaza una ausencia previa; declarar ausencia
+siempre reemplaza y descarta el contenido previo; ningún borrador paralelo se conserva.
+
+### Ausencia de ejemplos
+
+Se decidió no incluir ejemplos de lo que se podría declarar, por falta de evidencia
+dentro del proyecto de que la expresión libre bloquee a las personas — sería la primera
+captura de texto verdaderamente libre de todo el proyecto, y no existe ningún caso real
+que justifique anticipar esa solución (Principio 9). Se incorporarán solo si la
+validación real demuestra la necesidad, bajo las tres condiciones ya definidas en el
+diseño de UX (variados en naturaleza, explícitamente ilustrativos, en un lugar
+secundario).
+
+### Ajustes finales de coherencia narrativa
+
+- Título ajustado para anclar el dominio pensional sin introducir categorías: "¿Hay algo
+  sobre tu futuro pensional que te gustaría resolver?".
+- El reconocimiento de recepción se redactó centrado en el acto de recibir, no en el
+  acto administrativo de archivar: "Recibimos lo que nos compartiste" / "Tomamos nota de
+  que, por ahora, no tienes nada puntual que plantear" — reemplazando una redacción
+  inicial ("quedó registrado como parte de tu expediente") que desplazaba el foco hacia
+  el expediente en vez de hacia la persona.
+- Se eliminó la palabra "exactamente" del placeholder de la Capacidad C, que prometía
+  una precisión que esa capacidad todavía no puede garantizar.
+- Se corrigió la misma inconsistencia administrativa en el placeholder de la Capacidad
+  C, alineándolo con el mismo criterio narrativo ya aplicado en el reconocimiento.
+- Se eliminó una repetición mecánica de la palabra "puntual" en el subtítulo,
+  conservándola donde sí aporta consistencia terminológica (botón, reconocimiento de
+  ausencia, mensaje de bloqueo).
+- Se retiró la palabra "todavía" del botón de declarar ausencia, por reintroducir
+  sutilmente una expectativa de que "vendrá algo después" — contrario a la decisión de
+  tratar la ausencia como una afirmación legítima del momento presente, no como algo
+  pendiente.
+
+### Verificación
+
+`npm run lint`, `npm test` (129/129, sin regresiones) y `npm run build` exitosos en cada
+ronda, incluidas las rondas de ajuste narrativo posteriores a la revisión visual.
+
+### Revisión visual
+
+Realizada personalmente por el autor del proyecto sobre el servidor de desarrollo.
+Aprobada sin encontrar problemas de arquitectura, recorrido, implementación ni
+funcionamiento — confirmó específicamente la transición limpia entre contenido y
+ausencia sin residuos, el bloqueo de "Continuar" con mensaje visible, y la ausencia de
+categorías o comparaciones en el texto.
+
+### Pendiente para la Capacidad C
+
+- Determinar si la declaración contiene una decisión procesable, una pregunta
+  informativa, varios asuntos entrelazados, motivación personal mezclada, o contenido
+  fuera de alcance.
+- El vacío ya reconocido en `PerfilDecision.js` sigue sin resolver.
+- Redacción formal, todavía pendiente, del Descubrimiento Conceptual sobre "decisión
+  pensional pendiente" en PL-050, una vez exista un segundo caso real que lo confirme.
 
 ---
 

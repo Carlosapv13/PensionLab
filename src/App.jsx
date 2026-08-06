@@ -14,7 +14,8 @@ import PrimeraLectura from './pages/PrimeraLectura.jsx'
 import IndiciosRegimenTransicion from './pages/IndiciosRegimenTransicion.jsx'
 import BaseCotizacion from './pages/BaseCotizacion.jsx'
 import QueDeterminaTuResultado from './pages/QueDeterminaTuResultado.jsx'
-import ExplorarDireccionTemporal from './pages/ExplorarDireccionTemporal.jsx'
+import DeclaracionLibre from './pages/DeclaracionLibre.jsx'
+import RevisionDeclaracionTemporal from './pages/RevisionDeclaracionTemporal.jsx'
 
 function App() {
   const [vista, setVista] = useState('bienvenida')
@@ -37,6 +38,7 @@ function App() {
   const [certezaBaseCotizacion, setCertezaBaseCotizacion] = useState(null)
   const [valorBaseCotizacionDeclarado, setValorBaseCotizacionDeclarado] = useState('')
   const [salarioParaEstimarBase, setSalarioParaEstimarBase] = useState('')
+  const [declaracionLibre, setDeclaracionLibre] = useState(null)
 
   function actualizarRegimenActual(valor) {
     // trasladoRegimen depende semánticamente de regimenActual (S3-009): la
@@ -286,12 +288,21 @@ function App() {
         <QueDeterminaTuResultado
           regimenActual={regimenActual}
           onVolver={() => setVista('baseCotizacion')}
-          onContinuar={() => setVista('explorarDireccion')}
+          onContinuar={() => setVista('declaracionLibre')}
         />
       )}
 
-      {vista === 'explorarDireccion' && (
-        <ExplorarDireccionTemporal onVolver={() => setVista('queDeterminaResultado')} />
+      {vista === 'declaracionLibre' && (
+        <DeclaracionLibre
+          declaracion={declaracionLibre}
+          onCambiarDeclaracion={setDeclaracionLibre}
+          onVolver={() => setVista('queDeterminaResultado')}
+          onContinuar={() => setVista('revisionDeclaracion')}
+        />
+      )}
+
+      {vista === 'revisionDeclaracion' && (
+        <RevisionDeclaracionTemporal onVolver={() => setVista('declaracionLibre')} />
       )}
     </AppShell>
   )

@@ -2097,6 +2097,216 @@ caso de responder con el mismo valor, que no debe invalidar nada).
 
 ---
 
+## Pausa de Sprint 3 — Consolidación de principios y reconstrucción de la Fase 2 (Base Económica)
+
+**Estado:** ✅ Cerrado y aprobado — commit `3dfb35f` en `sprint-3-mvp-headless`, sin
+push. Cierre documental comiteado por separado, mismo criterio ya usado en la
+pausa anterior.
+
+### Contexto
+
+Tras cerrar el Slice "Base actual de cotización" (Slice 1 de 5 de la secuencia
+económica original), el siguiente paso previsto era "Meta de jubilación deseada"
+(edad de jubilación deseada). Antes de implementarlo, una revisión arquitectónica en
+profundidad —comprender el problema, revisar la arquitectura existente, cuestionar
+el alcance hasta agotarlo— concluyó que ese planteamiento arrastraba varios
+supuestos no examinados: que el dato buscado era necesariamente una edad, que
+capturar una prioridad del usuario era admisible, y que RAIS y RPM podían tratarse
+como responsabilidades paralelas y simétricas. Ninguno sobrevivió al análisis.
+
+### Principios de Arquitectura 12 y 13 (adoptados)
+
+Registrados formalmente en
+`docs/tecnico/arquitectura/plan-implementacion-prerrequisitos-pension-engine.md`:
+
+- **Principio 12 — PensionLab asesora decisiones pensionales, no decisiones
+  personales.** El sistema nunca interpreta la motivación del usuario ni deduce qué
+  debería querer realmente. Prueba de consistencia: mismo objetivo pensional,
+  distinta motivación personal → mismas estrategias.
+- **Principio 13 — El sistema no pide una decisión antes de agotar lo que ya
+  sabe.** Antes de solicitar información destinada a orientar decisiones futuras
+  (Bloque 3 del Expediente), PensionLab debe mostrar todo el valor que ya puede
+  entregar con los hechos que ya conoce (Bloques 1-2).
+
+### Reconstrucción de la Fase 2 — de 5 Slices por fórmula a 4 capacidades por responsabilidad
+
+La secuencia original ("salario/IBC → meta de jubilación → RAIS mínimo → RPM
+mínimo → viabilidad") organizaba los Slices por régimen y por fórmula — un reflejo
+de la estructura del código (`formulaRAIS.js`/`formulaRPM.js`), no del recorrido
+real de la persona. Reconstruida desde los problemas del usuario, la Fase 2 (Base
+Económica) queda en cuatro capacidades:
+
+- **A — Lectura estructural de la situación económica**: qué determina el
+  resultado bajo el régimen ya conocido, y qué falta para calcularlo. Sin cifra de
+  pensión.
+- **B — Explorar una dirección**: qué le gustaría a la persona explorar, en sus
+  propias palabras — no todavía un `objetivoPrincipal` comprometido.
+- **C — Explorar esa dirección con lo que el sistema sabe hoy**: responde a la
+  dirección declarada, por régimen, declarando "todavía no evaluable" donde
+  corresponda.
+- **D — Lectura de distancia y madurez de la información**: nunca un veredicto
+  binario de viabilidad.
+
+RAIS y RPM dejan de ser Slices paralelos — cada capacidad produce respuestas
+distintas por régimen dentro de una misma responsabilidad, mismo patrón que ya
+usa `PrimeraLectura.jsx`.
+
+### Vacío conceptual registrado, deliberadamente sin resolver
+
+Ningún componente de PL-230 (Motor de Evidencias, Explicabilidad) describe con
+precisión la responsabilidad de determinar qué le falta a una fórmula dado lo que
+el Expediente ya tiene — no es evidencia en el sentido de PL-230 §6.2 (no compara
+un hecho contra un umbral normativo) ni es Explicabilidad pura (§6.6, no se limita
+a traducir algo ya producido). Se registra como pregunta abierta de arquitectura,
+sin bloquear el desarrollo — mismo tratamiento que ya recibieron la Brújula
+Pensional y el cálculo de IBL en etapas anteriores del proyecto ("ubicado, no
+diseñado").
+
+---
+
+## Slice — Fase 2 (Base Económica), Capacidad A: "Qué determina tu resultado"
+
+**Estado:** ✅ Cerrado y aprobado.
+
+### Objetivo
+
+Explicar, a partir del régimen ya declarado por la persona, qué determina su
+resultado pensional y cuál es la causa exacta por la que PensionLab todavía no
+puede estimarlo con la confianza suficiente — sin capturar ningún dato nuevo, sin
+mostrar ninguna cifra, y sin comparar regímenes entre sí.
+
+### Alcance aprobado
+
+- Reutiliza exclusivamente `regimenActual` — ningún otro hecho del Expediente es
+  necesario para esta responsabilidad.
+- Tres casos: RPM (falta el IBL — historia de cotización, no el dato actual), RAIS
+  (falta el capital ya acumulado, y además un horizonte que todavía no corresponde
+  pedir — Principio 13) y régimen desconocido (ambos mecanismos en modo
+  condicional, declarando primero que el régimen mismo es la pieza faltante).
+- Explícitamente fuera de alcance: cualquier cifra de pensión, el aporte mensual
+  (exige investigación normativa propia, no realizada), continuidad futura de
+  cotización, comparación entre regímenes, y cualquier veredicto de viabilidad.
+- No repite contenido ya cubierto por `PrimeraLectura.jsx` (semanas, edad legal,
+  indicios de transición) ni por `BaseCotizacion.jsx` (IBC como cifra).
+- "Continuar" siempre habilitado — esta pantalla no captura datos nuevos, mismo
+  criterio ya usado en `ExpedientePensional.jsx`.
+
+### Archivos creados
+
+- `src/domain/determinarMecanismoYFaltantes.js` — nombre **provisional**, señalado
+  así deliberadamente: ninguna de las categorías ya fijadas (`evaluar*`,
+  `obtener*`, `resolverReglasVigentes`, `determinar*`) describe con precisión esta
+  responsabilidad. Es, en la práctica, el primer caso real del vacío conceptual
+  registrado arriba. No consulta `data/legal` ni `data/assumptions` — su contenido
+  es estructural (qué insumo exige cada fórmula), no normativo.
+- `src/domain/determinarMecanismoYFaltantes.test.js` — 16 pruebas: los tres casos
+  de régimen, régimen nulo/ausente/inesperado (tratados como desconocido, mismo
+  criterio que las evidencias existentes), y verificación de que el resultado es
+  puramente estructural (sin narrativa).
+- `src/pages/QueDeterminaTuResultado.jsx` — título también provisional. Reutiliza
+  el patrón visual de `PrimeraLectura.jsx` (bloques `.insight`); toda la redacción
+  vive en la página, el dominio solo entrega códigos.
+- `src/pages/ExplorarDireccionTemporal.jsx` — nuevo placeholder temporal,
+  reemplaza a `SiguientePasoEconomicoTemporal.jsx`. Redactado desde cero,
+  deliberadamente sin heredar la promesa de "definiremos hasta cuándo quieres
+  seguir cotizando" del placeholder anterior — esa suposición ya se había
+  descartado.
+
+### Archivos modificados
+
+- `src/App.jsx` — nuevas vistas `queDeterminaResultado` y `explorarDireccion`;
+  `BaseCotizacion` ahora continúa hacia `queDeterminaResultado` en vez de hacia el
+  placeholder anterior.
+- `src/App.css` — dos clases de título exclusivas (`screen__title--que-determina-resultado`,
+  `screen__title--explorar-direccion`), agregadas preventivamente dado que el bug
+  de superposición por herencia de `line-height: 145%` ya se repitió en casi todos
+  los Slices anteriores.
+- `docs/tecnico/arquitectura/plan-implementacion-prerrequisitos-pension-engine.md`
+  — Principios 12 y 13 (ver arriba).
+
+### Archivos eliminados
+
+- `src/pages/SiguientePasoEconomicoTemporal.jsx` — retirado únicamente después de
+  confirmar que el nuevo recorrido (`BaseCotizacion` → `QueDeterminaTuResultado` →
+  `ExplorarDireccionTemporal`) ya estaba conectado y verificado — orden explícito
+  pedido antes de implementar: primero reemplazar, después retirar.
+
+### Correcciones aplicadas durante la revisión crítica de coherencia narrativa (PL-240)
+
+Antes del cierre, una revisión activa (no solo confirmatoria) del texto completo
+encontró y corrigió tres problemas reales:
+
+1. **Lenguaje técnico innecesario**: se nombraba la sigla "Ingreso Base de
+   Liquidación (IBL)" en el mensaje de RPM, inconsistente con la propia decisión
+   de este Slice de evitar siglas técnicas de régimen (RPM/RAIS) a favor de
+   "Colpensiones"/"fondo privado". Se eliminó la sigla; la frase en lenguaje
+   corriente que ya la explicaba se mantuvo intacta.
+2. **Presuposición de continuidad futura de cotización**: la frase "hasta cuándo
+   piensas seguir cotizando" (mensaje de RAIS) presuponía que la persona sigue
+   cotizando activamente, en tensión directa con el caso `cotizaActualmente =
+   'no'` ya capturado en Historial laboral (S3-005), y rozando la "continuidad
+   futura de cotización" que el alcance de este Slice excluye explícitamente.
+   Reemplazada por "el horizonte de tiempo que tienes en mente para tu retiro",
+   que nombra el mismo vacío sin presuponer continuidad.
+3. **Promesa implícita de secuencia**: "antes de pedirte esa decisión, queríamos
+   mostrarte esto primero" daba a entender que el Slice siguiente preguntaría
+   puntualmente por ese horizonte, cuando "Explorar una dirección" (Capacidad B)
+   es deliberadamente abierto y no se compromete a esa pregunta específica.
+   Reemplazada por "eso lo construiremos contigo más adelante, no todavía".
+
+Revisado y conservado sin cambios: la repetición de "todavía" a lo largo de la
+pantalla (consistencia terminológica, no ruido); la ausencia de un bloque
+expandible de fundamento legal (el contenido es metodológico, no una cita
+normativa); "en tus propias palabras" en el placeholder siguiente (refleja una
+conclusión ya establecida sobre evitar categorías rígidas de dominio).
+
+### Verificación
+
+`npm run lint`, `npm test` (129/129, sin regresiones) y `npm run build` exitosos
+en cada ronda, incluida la ronda final tras las correcciones de coherencia
+narrativa. Revisión visual realizada personalmente por el autor del proyecto sobre
+el servidor de desarrollo, cubriendo los tres casos de régimen, navegación
+Volver/Continuar, conservación de estado, jerarquía visual y ausencia de cifras,
+comparaciones y afirmaciones prohibidas.
+
+### Commit
+
+```
+3dfb35f feat: agregar Capacidad A de la Fase 2 — Qué determina tu resultado
+```
+
+Sin push realizado — el commit permanece local en `sprint-3-mvp-headless`.
+
+### Decisiones tomadas en este Slice
+
+1. El nombre de la función de dominio y el título de la pantalla quedan
+   **provisionales**, revisables sin necesidad de reabrir el diseño funcional ni
+   el alcance — decisión explícita para no bautizar prematuramente un concepto
+   que corresponde al vacío arquitectónico ya registrado.
+2. El placeholder anterior se retira solo después de confirmar el nuevo recorrido
+   conectado y verificado, nunca antes — para no dejar, ni siquiera
+   transitoriamente, el flujo principal sin una ruta de continuación válida.
+3. La función de dominio no consulta `data/legal` ni `data/assumptions` — su
+   contenido es estructural (qué exige cada fórmula), no normativo, y no depende
+   de ninguna fecha de vigencia.
+4. Cualquier valor de `regimenActual` distinto de `'RPM'`/`'RAIS'` (incluido
+   `null` o un valor inesperado) se trata como régimen desconocido — mismo
+   criterio ya usado en `evidenciaSemanasMinimas.js` y `evidenciaEdadPension.js`.
+
+### Pendiente para el siguiente Slice
+
+- Capacidad B — "Explorar una dirección": capturar, en el lenguaje de la persona,
+  qué le gustaría explorar, sin producir todavía un `objetivoPrincipal`
+  comprometido de `PerfilDecision`.
+- El vacío conceptual sobre dónde vive, formalmente, la responsabilidad de
+  `determinarMecanismoYFaltantes.js` sigue abierto — no bloquea, pero cada nuevo
+  caso real que lo confirme acerca el momento de resolverlo.
+- Nombre definitivo de la función de dominio y del título de la pantalla, a
+  decidir sin presión, cuando exista un segundo caso real que ayude a confirmar
+  la categoría correcta.
+
+---
+
 ## Slices pendientes de Sprint 3
 
 Por definir a medida que el sprint avance.

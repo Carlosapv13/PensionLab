@@ -261,6 +261,46 @@ export function obtenerSmlv(fecha) {
 }
 
 /**
+ * Resuelve la tasa de cotización general al Sistema General de Pensiones (Art. 20
+ * Ley 100 de 1993, modificado por Art. 7 Ley 797 de 2003) — 16% del IBC.
+ *
+ * El valor se devuelve en puntos porcentuales (ej. 16), no como fracción — mismo
+ * criterio que `obtenerTopeMaximoIBC` devuelve SMLMV y no pesos: quien lo consuma
+ * decide la conversión que necesite (ej. dividir por 100), nunca se resuelve aquí.
+ *
+ * @param {string} fecha - Fecha ISO en la que se evalúa el requisito
+ * @returns {{
+ *   valor: number,
+ *   id: string,
+ *   fuente: string,
+ *   articulo: string,
+ *   estado: string,
+ *   listoParaProduccion: boolean,
+ *   vigenciaDesde: string | null,
+ *   vigenciaHasta: string | null,
+ * }}
+ */
+export function obtenerTasaCotizacion(fecha) {
+  const reglas = resolverReglasVigentes(fecha)
+  const entrada = buscarPorCampo(reglas, 'tasaCotizacion')
+
+  if (!entrada) {
+    throw new Error(`obtenerTasaCotizacion: no se encontró una entrada vigente para la fecha ${fecha}`)
+  }
+
+  return {
+    valor: entrada.valor,
+    id: entrada.id,
+    fuente: entrada.fuente,
+    articulo: entrada.articulo,
+    estado: entrada.metadataFuente.estado,
+    listoParaProduccion: entrada.metadataFuente.listoParaProduccion,
+    vigenciaDesde: entrada.vigencia?.desde ?? null,
+    vigenciaHasta: entrada.vigencia?.hasta ?? null,
+  }
+}
+
+/**
  * Resuelve la fecha de entrada en vigencia del Sistema General de Pensiones
  * (Art. 151 Ley 100 de 1993) — la fecha histórica fija contra la que se evalúa el
  * screening de indicios de régimen de transición (ver evaluarIndiciosTransicion,

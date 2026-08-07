@@ -6,6 +6,7 @@ import {
   obtenerEdadTransicion,
   obtenerTopeMaximoIBC,
   obtenerSmlv,
+  obtenerTasaCotizacion,
   resolverReglasVigentes,
 } from './index.js'
 
@@ -183,5 +184,24 @@ describe('obtenerSmlv', () => {
     // aparece entre las reglas vigentes.
     const reglasPorDefecto = resolverReglasVigentes('2026-06-15')
     expect(reglasPorDefecto.find((r) => r.campo === 'smlv')).toBeUndefined()
+  })
+})
+
+describe('obtenerTasaCotizacion', () => {
+  it('resuelve 16 puntos porcentuales, trazable a su entrada', () => {
+    const resultado = obtenerTasaCotizacion('2026-06-15')
+
+    expect(resultado.valor).toBe(16)
+    expect(resultado.id).toBe('tasa-cotizacion')
+    expect(resultado.fuente).toBe('Ley 100 de 1993')
+  })
+
+  it('devuelve la trazabilidad completa: estado y listoParaProduccion del archivo de origen', () => {
+    const resultado = obtenerTasaCotizacion('2026-06-15')
+
+    expect(resultado.estado).toBe('borrador')
+    expect(resultado.listoParaProduccion).toBe(false)
+    expect(resultado.vigenciaDesde).toBe('2006-01-01')
+    expect(resultado.vigenciaHasta).toBeNull()
   })
 })

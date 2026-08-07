@@ -1,1 +1,37 @@
-{}
+{
+  "id": "supuestos-v1",
+  "descripcion": "Supuestos de modelado aprobados para la proyección RAIS (ver domain/formulas/trazabilidad-formula-RAIS.md, Decisiones aprobadas 2026-07-30).",
+  "entradas": [
+    {
+      "id": "rentabilidad-esperada-rais-2026",
+      "campo": "rentabilidadEsperadaRAIS",
+      "valor": 0.035,
+      "unidad": "tasa real anual",
+      "descripcion": "Rentabilidad real anual esperada de un fondo moderado RAIS, usada para proyectar el capital acumulado a partir de los aportes futuros.",
+      "fuente": "Banco de la República / Superfinanciera — punto medio conservador entre el promedio de los últimos 5 años (3%) y un suavizado de largo plazo",
+      "articulo": null,
+      "vigencia": { "desde": "2026-07-30", "hasta": null },
+      "periodo": 2026
+    },
+    {
+      "id": "descuento-aporte-capitalizable-2026",
+      "campo": "descuentoSobreAporteCapitalizable",
+      "valor": 0.1875,
+      "unidad": "fracción de la cotización total",
+      "descripcion": "Fracción del aporte mensual que no queda capitalizando en la cuenta individual: comisión de administración más la prima del seguro obligatorio de invalidez y sobrevivencia.",
+      "fuente": "Tope legal combinado de comisión de administración y seguro previsional, máximo 3% del IBC (Superfinanciera)",
+      "articulo": null,
+      "vigencia": { "desde": "2026-07-30", "hasta": null }
+    },
+    {
+      "id": "meses-payout-simplificado-2026",
+      "campo": "mesesPayoutSimplificado",
+      "valor": 240,
+      "unidad": "meses",
+      "descripcion": "Horizonte de pago plano asumido para anualizar el capital proyectado — supuesto explícito de producto, no derivado de tablas de mortalidad reales.",
+      "fuente": "Supuesto de producto, aprobado explícitamente sin sustento actuarial",
+      "articulo": null,
+      "vigencia": { "desde": "2026-07-30", "hasta": null }
+    }
+  ]
+}

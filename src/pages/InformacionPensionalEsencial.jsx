@@ -197,6 +197,16 @@ function InformacionPensionalEsencial({
     onCambiarAnioInicioCotizacion(marcado ? 'desconocido' : '')
   }
 
+  function manejarEnvioPaso1(e) {
+    e.preventDefault()
+    if (puedeContinuarPaso1) setPaso(2)
+  }
+
+  function manejarEnvioPaso2(e) {
+    e.preventDefault()
+    onContinuar()
+  }
+
   return (
     <div className="screen">
       <h1 className="screen__title screen__title--informacion-pensional">
@@ -204,7 +214,7 @@ function InformacionPensionalEsencial({
       </h1>
 
       {paso === 1 && (
-        <>
+        <form onSubmit={manejarEnvioPaso1}>
           <p className="screen__subtitle">
             Vamos a construir juntos tu historia pensional. Solo te
             preguntaremos lo esencial y siempre te explicaremos para qué lo
@@ -260,20 +270,15 @@ function InformacionPensionalEsencial({
             <button type="button" className="btn btn-secondary" onClick={onVolver}>
               Volver
             </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => setPaso(2)}
-              disabled={!puedeContinuarPaso1}
-            >
+            <button type="submit" className="btn btn-primary" disabled={!puedeContinuarPaso1}>
               Continuar
             </button>
           </div>
-        </>
+        </form>
       )}
 
       {paso === 2 && (
-        <>
+        <form onSubmit={manejarEnvioPaso2}>
           <fieldset className="options">
             <legend>¿Sabes aproximadamente cuántas semanas has cotizado?</legend>
 
@@ -336,16 +341,11 @@ function InformacionPensionalEsencial({
             <button type="button" className="btn btn-secondary" onClick={() => setPaso(1)}>
               Volver
             </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={onContinuar}
-              disabled={!puedeContinuarPaso2}
-            >
+            <button type="submit" className="btn btn-primary" disabled={!puedeContinuarPaso2}>
               Continuar con mi expediente
             </button>
           </div>
-        </>
+        </form>
       )}
     </div>
   )

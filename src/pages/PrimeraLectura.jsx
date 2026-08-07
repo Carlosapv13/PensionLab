@@ -203,8 +203,13 @@ function PrimeraLectura({
       : null
   const textoCombinado = razonCompartida ? TEXTOS_NO_EVALUABLE_COMBINADO[razonCompartida] : null
 
+  function manejarEnvio(e) {
+    e.preventDefault()
+    onContinuar()
+  }
+
   return (
-    <div className="screen">
+    <form className="screen" onSubmit={manejarEnvio}>
       <h1 className="screen__title screen__title--primera-lectura">
         Una primera lectura de tu situación
       </h1>
@@ -262,11 +267,11 @@ function PrimeraLectura({
         <button type="button" className="btn btn-secondary" onClick={onVolver}>
           Volver
         </button>
-        <button type="button" className="btn btn-primary" onClick={onContinuar}>
+        <button type="submit" className="btn btn-primary">
           Continuar
         </button>
       </div>
-    </div>
+    </form>
   )
 }
 

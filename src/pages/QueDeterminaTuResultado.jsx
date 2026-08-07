@@ -75,8 +75,13 @@ function QueDeterminaTuResultado({ regimenActual, onVolver, onContinuar }) {
   const condicional = resultado.caso === 'desconocido'
   const faltaRegimen = resultado.elementosFaltantes.some((f) => f.codigo === 'FALTA_REGIMEN')
 
+  function manejarEnvio(e) {
+    e.preventDefault()
+    onContinuar()
+  }
+
   return (
-    <div className="screen">
+    <form className="screen" onSubmit={manejarEnvio}>
       <h1 className="screen__title screen__title--que-determina-resultado">
         Qué determina tu resultado
       </h1>
@@ -111,11 +116,11 @@ function QueDeterminaTuResultado({ regimenActual, onVolver, onContinuar }) {
         <button type="button" className="btn btn-secondary" onClick={onVolver}>
           Volver
         </button>
-        <button type="button" className="btn btn-primary" onClick={onContinuar}>
+        <button type="submit" className="btn btn-primary">
           Continuar
         </button>
       </div>
-    </div>
+    </form>
   )
 }
 

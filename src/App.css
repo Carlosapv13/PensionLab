@@ -262,6 +262,10 @@
   line-height: 1.15;
 }
 
+.screen__title--explora-tu-proyeccion {
+  line-height: 1.15;
+}
+
 .screen__title--revision-declaracion {
   line-height: 1.15;
 }
@@ -269,6 +273,10 @@
 .screen__subtitle {
   font-size: 18px;
   line-height: 150%;
+}
+
+.screen__subtitle--secundario {
+  font-size: 15px;
 }
 
 .btn {

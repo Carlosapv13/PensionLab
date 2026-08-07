@@ -28,8 +28,13 @@ const OPCIONES = [
  * @param {() => void} props.onVolver
  */
 function Objetivo({ objetivoSeleccionado, onSeleccionarObjetivo, onContinuar, onVolver }) {
+  function manejarEnvio(e) {
+    e.preventDefault()
+    onContinuar()
+  }
+
   return (
-    <div className="screen screen--objetivo">
+    <form className="screen screen--objetivo" onSubmit={manejarEnvio}>
       <h1 className="screen__title screen__title--objetivo">¿En qué quieres que te ayudemos hoy?</h1>
 
       <p className="screen__subtitle">
@@ -61,16 +66,11 @@ function Objetivo({ objetivoSeleccionado, onSeleccionarObjetivo, onContinuar, on
         <button type="button" className="btn btn-secondary" onClick={onVolver}>
           Volver
         </button>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={onContinuar}
-          disabled={!objetivoSeleccionado}
-        >
+        <button type="submit" className="btn btn-primary" disabled={!objetivoSeleccionado}>
           Continuar
         </button>
       </div>
-    </div>
+    </form>
   )
 }
 

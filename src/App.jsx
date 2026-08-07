@@ -14,6 +14,7 @@ import PrimeraLectura from './pages/PrimeraLectura.jsx'
 import IndiciosRegimenTransicion from './pages/IndiciosRegimenTransicion.jsx'
 import BaseCotizacion from './pages/BaseCotizacion.jsx'
 import QueDeterminaTuResultado from './pages/QueDeterminaTuResultado.jsx'
+import ExploraTuProyeccion from './pages/ExploraTuProyeccion.jsx'
 import DeclaracionLibre from './pages/DeclaracionLibre.jsx'
 import RevisionDeclaracionTemporal from './pages/RevisionDeclaracionTemporal.jsx'
 
@@ -39,6 +40,7 @@ function App() {
   const [valorBaseCotizacionDeclarado, setValorBaseCotizacionDeclarado] = useState('')
   const [salarioParaEstimarBase, setSalarioParaEstimarBase] = useState('')
   const [declaracionLibre, setDeclaracionLibre] = useState(null)
+  const [edadJubilacionDeseada, setEdadJubilacionDeseada] = useState('')
 
   function actualizarRegimenActual(valor) {
     // trasladoRegimen depende semánticamente de regimenActual (S3-009): la
@@ -288,6 +290,22 @@ function App() {
         <QueDeterminaTuResultado
           regimenActual={regimenActual}
           onVolver={() => setVista('baseCotizacion')}
+          onContinuar={() => setVista(regimenActual === 'RAIS' ? 'exploraTuProyeccion' : 'declaracionLibre')}
+        />
+      )}
+
+      {vista === 'exploraTuProyeccion' && (
+        <ExploraTuProyeccion
+          regimenActual={regimenActual}
+          fechaNacimiento={fechaNacimiento}
+          certezaBaseCotizacion={certezaBaseCotizacion}
+          valorBaseCotizacionDeclarado={valorBaseCotizacionDeclarado}
+          tipoCotizante={tipoCotizante}
+          lugarCotizacion={lugarCotizacion}
+          salarioParaEstimarBase={salarioParaEstimarBase}
+          edadJubilacionDeseada={edadJubilacionDeseada}
+          onCambiarEdadJubilacionDeseada={setEdadJubilacionDeseada}
+          onVolver={() => setVista('queDeterminaResultado')}
           onContinuar={() => setVista('declaracionLibre')}
         />
       )}

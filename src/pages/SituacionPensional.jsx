@@ -34,8 +34,13 @@ function SituacionPensional({
   onContinuar,
   onVolver,
 }) {
+  function manejarEnvio(e) {
+    e.preventDefault()
+    onContinuar()
+  }
+
   return (
-    <div className="screen">
+    <form className="screen" onSubmit={manejarEnvio}>
       <h1 className="screen__title">Situación pensional</h1>
 
       <fieldset className="options">
@@ -67,16 +72,11 @@ function SituacionPensional({
         <button type="button" className="btn btn-secondary" onClick={onVolver}>
           Volver
         </button>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={onContinuar}
-          disabled={!regimenActual}
-        >
+        <button type="submit" className="btn btn-primary" disabled={!regimenActual}>
           Continuar
         </button>
       </div>
-    </div>
+    </form>
   )
 }
 

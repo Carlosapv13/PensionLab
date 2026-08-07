@@ -2697,6 +2697,185 @@ Pendiente de crear.
 
 ---
 
+## Slice — Motor de proyección RAIS y su integración al recorrido (ExploraTuProyeccion)
+
+**Estado:** ✅ Cerrado y aprobado.
+
+### Objetivo
+
+Construir el primer motor de cálculo real de todo el proyecto — hasta este Slice,
+PensionLab nunca había mostrado una cifra pensional a una persona, solo evidencias
+de elegibilidad (semanas, edad) y explicaciones de mecanismo. Conectar `formulaRAIS.js`
+(ya pura y probada desde un Sprint anterior, nunca invocada) con los datos ya
+capturados en el recorrido, y mostrar el resultado en una pantalla nueva, mínima,
+condicional a régimen RAIS.
+
+### Alcance aprobado
+
+**Dominio:**
+- `data/assumptions/index.js` — resolver propio de supuestos (`resolverSupuestosVigentes`,
+  `obtenerSupuesto`), replicando el patrón de `data/legal` sin importarlo (Principio 1).
+- `data/assumptions/versions/supuestos-v1.json` — poblado con los 3 supuestos ya
+  aprobados de RAIS (`rentabilidadEsperadaRAIS` 0.035, `descuentoSobreAporteCapitalizable`
+  0.1875, `mesesPayoutSimplificado` 240), sin cambios de valor respecto a
+  `trazabilidad-formula-RAIS.md`.
+- `data/legal/index.js` — nuevo wrapper `obtenerTasaCotizacion(fecha)`.
+- `domain/pensionEngine/calcularProyeccionRAIS.js` — orquestador real. Consume
+  `ibcAplicableSimulacion` (nunca el valor declarado crudo); estados `'calculado'`
+  / `'no_evaluable'` (`regimen_no_rais`, `edad_jubilacion_no_declarada`), sin inventar
+  una edad de jubilación por defecto; la limitación de que el capital ya acumulado
+  no está incluido viaja estructuralmente en todo resultado calculado.
+- `domain/calcularEdadCumplida.js` — extraída de `calcularProyeccionRAIS.js` para
+  que la pantalla nueva no duplicara la misma lógica una quinta vez (el proyecto ya
+  tenía cuatro copias independientes de esta función; esta extracción resuelve solo
+  la duplicación nueva entre dominio y esta pantalla, no las cuatro preexistentes,
+  fuera de alcance de este Slice).
+
+**UI:**
+- `pages/ExploraTuProyeccion.jsx` — nueva pantalla, condicional a régimen RAIS,
+  insertada entre `QueDeterminaTuResultado` y `DeclaracionLibre`. Captura una edad
+  hipotética de jubilación (explícitamente distinguida de la edad legal ya vista en
+  `PrimeraLectura`), recalcula `ibcAplicableSimulacion` invocando `determinarBaseCotizacion`
+  con los datos crudos ya existentes en `App.jsx` (sin persistir el resultado derivado),
+  y muestra el resultado de `calcularProyeccionRAIS` en la misma pantalla — cifra,
+  horizonte usado, y la limitación de capital acumulado no incluido, siempre visible.
+- `App.jsx` — nuevo estado `edadJubilacionDeseada`; nueva vista condicional
+  (`regimenActual !== 'RAIS'` salta directo a `declaracionLibre`, mismo patrón ya
+  usado para el caso `ausencia` en un Slice anterior, hoy revertido).
+- `App.css` — clase de título exclusiva (`screen__title--explora-tu-proyeccion`) y
+  modificador `screen__subtitle--secundario` para diferenciar el peso visual del
+  texto de apoyo del texto principal.
+
+**Ajuste de cierre (pulido menor, mismo Slice) — estándar oficial de navegación por Enter:**
+
+Lo que empezó como un ajuste puntual en `Bienvenida.jsx` (Enter vía `autoFocus`) se
+generalizó, dentro del mismo Slice, a las 14 pantallas de captura del recorrido
+completo: `Bienvenida`, `Objetivo`, `DatosIniciales`, `SituacionPensional`,
+`HistorialLaboral`, `ExpedientePensional`, `CompletarExpediente`,
+`InformacionPensionalEsencial`, `HistoriaPensional`, `PrimeraLectura`,
+`IndiciosRegimenTransicion`, `BaseCotizacion`, `QueDeterminaTuResultado`,
+`ExploraTuProyeccion`.
+
+**Mecanismo adoptado, ahora estándar oficial de PensionLab para toda pantalla de
+captura futura**: el contenedor principal de cada pantalla pasa de
+`<div className="screen">` a `<form className="screen" onSubmit={...}>`; el botón
+principal pasa de `type="button" onClick={...}` a `type="submit"` (sin `onClick`,
+para que nunca haya doble disparo); "Volver" se mantiene como `type="button"`. Es
+comportamiento 100% nativo del navegador — Enter en cualquier campo de texto,
+radio, select o checkbox dispara el envío del formulario; un botón deshabilitado
+nunca participa en ese envío, ni explícito ni implícito; un `<textarea>` está
+excluido de esa regla por el propio HTML, así que `DeclaracionLibre` no requirió
+ningún cambio ni tratamiento especial para conservar Enter como salto de línea.
+`InformacionPensionalEsencial` usa dos `<form>` independientes (uno por paso), ya
+que solo uno está montado a la vez.
+
+**Revisión arquitectónica previa a la adopción como estándar**, verificada contra
+ocho criterios (autofill, navegación con Tab, radios/checkboxes, selects,
+validaciones HTML nativas, móvil, lectores de pantalla, y cualquier otra
+interacción nativa) — sin ningún riesgo bloqueante encontrado. Se verificó
+explícitamente, y no se dio por supuesto, que ningún campo con `min`/`max`/`pattern`
+nativos pueda entrar en conflicto con la validación propia de la app (todo campo
+con restricción nativa ya tiene una validación de app al menos igual de estricta
+gatillando el `disabled` del botón, y un botón deshabilitado nunca dispara
+validación nativa porque nunca intenta enviarse), y que `AppShell.jsx` no anida
+ningún `<form>` propio (habría roto el mecanismo en silencio, por ser HTML
+inválido). Tres puntos quedan registrados explícitamente como mejora futura, no
+bloqueante: agregar `autoComplete="off"` donde el autocompletado del navegador no
+tenga sentido; esta funcionalidad tiene alcance limitado en teclados numéricos
+móviles (sin tecla "Enter" propia en la mayoría de los casos); y agregar
+`aria-label` a cada `<form>` para que se anuncie como región de navegación
+(landmark) a lectores de pantalla.
+
+### Decisiones tomadas en este Slice
+
+1. RAIS, no RPM, es el único camino de cálculo alcanzable hoy — RPM sigue bloqueado
+   por la ausencia total del módulo de IBL (nunca ubicado siquiera como stub) y por
+   la falta de historial de IBC, que ninguna pantalla captura todavía.
+2. `ibcAplicableSimulacion` se recalcula en cada render dentro de la pantalla nueva,
+   sin persistirse en `App.jsx` — es barato de recalcular y evita mantener un dato
+   derivado sincronizado con su origen.
+3. Validado reproduciendo los tres casos de referencia (A, B, C) ya documentados en
+   `trazabilidad-formula-RAIS.md`, ejecutados a través del orquestador completo (no
+   solo la fórmula pura), con diferencias del orden de 10⁻⁵ — margen de redondeo de
+   la tabla publicada, no discrepancias de cálculo.
+4. Se revisó y descartó parcialmente el camino de "MVP corto" explorado antes en este
+   mismo Sprint (recorte temporal de pantallas para una demo de minutos) — decisión
+   explícita de Product Owner de mantener la visión completa del producto; este
+   Slice se integró al recorrido existente sin ocultar ni reordenar ninguna pantalla.
+
+### Verificación
+
+`npm test` (156/156), `npm run lint` y `npm run build` exitosos en cada ronda.
+Verificación numérica adicional: los tres casos de referencia de `trazabilidad-formula-RAIS.md`
+reproducidos a través de `calcularProyeccionRAIS` completo, fuera de la suite
+automatizada, ejecutados directamente contra el código real del proyecto.
+
+Verificación manual del estándar de Enter en las 14 pantallas: confirmada por el
+usuario en navegador antes del cierre de este Slice. El asistente no contó con
+herramienta de navegador disponible en esta sesión, así que la verificación en
+vivo la realizó directamente el usuario — la implementación se apoya en
+comportamiento nativo de HTML ya bien establecido (envío de formulario vía Enter,
+excepción nativa de `<textarea>`), no en lógica nueva escrita para este proyecto.
+
+### Revisión de UX (producto, no arquitectura)
+
+Se recorrieron las 16 pantallas del recorrido completo desde la perspectiva de una
+persona usando PensionLab por primera vez (qué siente, qué entiende, qué duda,
+densidad de texto, emoción/confianza, qué cambiaría). Ningún hallazgo de esa
+revisión se implementó en este Slice — quedan registrados como deuda de UX para una
+futura ronda de pulido, sin bloquear este Sprint:
+
+1. **Cierre débil del recorrido** — `RevisionDeclaracionTemporal` termina la
+   experiencia justo después de sus dos momentos más fuertes (`ExploraTuProyeccion`,
+   `DeclaracionLibre`) con un mensaje de placeholder genérico.
+2. **Redundancia percibida entre `ExpedientePensional` y `CompletarExpediente`** —
+   dos pantallas de resumen consecutivas sin información nueva entre sí.
+3. **Jerarquía visual de la cifra en `ExploraTuProyeccion`** — el primer resultado
+   pensional real de todo el producto hoy pesa visualmente igual que cualquier otro
+   bloque de evidencia ya mostrado antes.
+4. **Jerarquía visual de `PrimeraLectura`** — el impacto emocional de las dos
+   lecturas personales llega mezclado con el detalle jurídico, sin jerarquía entre
+   ambos.
+5. **Falta de "por qué te pregunto esto" en varias capturas** — lugar de residencia
+   (`DatosIniciales`), el conjunto de `HistorialLaboral`, y la relación entre "base
+   de cotización" y "salario" (`BaseCotizacion`). Patrón repetido, no un caso
+   aislado.
+
+### Deuda arquitectónica registrada (no implementada, no bloqueante)
+
+Documentada con detalle en `plan-implementacion-prerrequisitos-pension-engine.md`
+("Riesgos generales del plan"):
+
+- El manifiesto de vigencia jurídica pendiente (`LINEA_DE_TIEMPO_VIGENTE`
+  hardcodeada) ahora también aplica a `data/assumptions` (`LINEA_DE_TIEMPO_SUPUESTOS`),
+  replicado deliberadamente con la misma limitación al construir el resolver de
+  supuestos de este Slice.
+- El sistema no tiene todavía una representación estructural para dos
+  interpretaciones jurídicas simultáneamente razonables (distinto del caso ya
+  cubierto de un valor transitorio) — ejemplo real ya presente en
+  `evidenciaIndiciosTransicion.js`.
+
+### Commits
+
+```
+d170314 domain: implementar calcularProyeccionRAIS - primer motor de calculo real
+```
+
+Commit de UI + ajuste de Enter + esta documentación: pendiente de aprobación final
+antes de crearse. Sin push en ningún caso — ambos commits permanecen locales en
+`sprint-3-mvp-headless`.
+
+### Pendiente para la siguiente ronda
+
+- Confirmación manual del usuario de que Enter en `Bienvenida` funciona como se
+  espera, y de que el resto del recorrido no sufrió ninguna regresión visual.
+- Los cinco hallazgos de UX registrados arriba.
+- Los dos puntos de deuda arquitectónica registrados arriba.
+- `edadJubilacionDeseada` sigue siendo, hasta este Slice, el único dato que este
+  motor necesita y que ninguna otra capacidad del proyecto reutiliza todavía.
+
+---
+
 ## Slices pendientes de Sprint 3
 
 Por definir a medida que el sprint avance.

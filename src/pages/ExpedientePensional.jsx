@@ -73,8 +73,13 @@ function ExpedientePensional({
   onComenzarExpediente,
   onVolver,
 }) {
+  function manejarEnvio(e) {
+    e.preventDefault()
+    onComenzarExpediente()
+  }
+
   return (
-    <div className="screen">
+    <form className="screen" onSubmit={manejarEnvio}>
       <h1 className="screen__title">Expediente pensional</h1>
 
       <p className="screen__subtitle">
@@ -121,15 +126,11 @@ function ExpedientePensional({
         <button type="button" className="btn btn-secondary" onClick={onVolver}>
           Volver
         </button>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={onComenzarExpediente}
-        >
+        <button type="submit" className="btn btn-primary">
           Comenzar expediente
         </button>
       </div>
-    </div>
+    </form>
   )
 }
 

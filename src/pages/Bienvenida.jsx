@@ -5,8 +5,13 @@
  * @param {() => void} props.onComenzar
  */
 function Bienvenida({ onComenzar }) {
+  function manejarEnvio(e) {
+    e.preventDefault()
+    onComenzar()
+  }
+
   return (
-    <div className="screen">
+    <form className="screen" onSubmit={manejarEnvio}>
       <h1 className="screen__title screen__title--bienvenida">Bienvenido a PensionLab</h1>
 
       <p className="screen__subtitle">
@@ -17,10 +22,10 @@ function Bienvenida({ onComenzar }) {
         Toma una mejor decisión.
       </p>
 
-      <button type="button" className="btn btn-primary" onClick={onComenzar}>
+      <button type="submit" className="btn btn-primary" autoFocus>
         Comenzar
       </button>
-    </div>
+    </form>
   )
 }
 

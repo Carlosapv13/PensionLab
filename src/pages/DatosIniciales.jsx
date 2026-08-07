@@ -247,8 +247,13 @@ function DatosIniciales({
   const puedeContinuar =
     esFechaNacimientoValida(fechaNacimiento) && Boolean(sexo) && Boolean(lugarResidencia)
 
+  function manejarEnvio(e) {
+    e.preventDefault()
+    onContinuar()
+  }
+
   return (
-    <div className="screen">
+    <form className="screen" onSubmit={manejarEnvio}>
       <h1 className="screen__title">Datos iniciales</h1>
 
       <fieldset className="field-group">
@@ -366,16 +371,11 @@ function DatosIniciales({
         <button type="button" className="btn btn-secondary" onClick={onVolver}>
           Volver
         </button>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={onContinuar}
-          disabled={!puedeContinuar}
-        >
+        <button type="submit" className="btn btn-primary" disabled={!puedeContinuar}>
           Continuar
         </button>
       </div>
-    </div>
+    </form>
   )
 }
 

@@ -117,8 +117,13 @@ function IndiciosRegimenTransicion({
 
   const faltaDetalleTraslado = trasladoRegimen === 'si' && !detalleTraslado
 
+  function manejarEnvio(e) {
+    e.preventDefault()
+    onContinuar()
+  }
+
   return (
-    <div className="screen">
+    <form className="screen" onSubmit={manejarEnvio}>
       <h1 className="screen__title screen__title--indicios-transicion">
         Posibles indicios de régimen de transición
       </h1>
@@ -190,16 +195,11 @@ function IndiciosRegimenTransicion({
         <button type="button" className="btn btn-secondary" onClick={onVolver}>
           Volver
         </button>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={onContinuar}
-          disabled={faltaDetalleTraslado}
-        >
+        <button type="submit" className="btn btn-primary" disabled={faltaDetalleTraslado}>
           Continuar
         </button>
       </div>
-    </div>
+    </form>
   )
 }
 

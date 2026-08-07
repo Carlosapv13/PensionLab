@@ -30,8 +30,13 @@ function CompletarExpediente({ infoEsencialCompletada, onVolver, onContinuar }) 
     ? 'Historia pensional'
     : 'Información pensional esencial'
 
+  function manejarEnvio(e) {
+    e.preventDefault()
+    onContinuar()
+  }
+
   return (
-    <div className="screen">
+    <form className="screen" onSubmit={manejarEnvio}>
       <h1 className="screen__title screen__title--completar-expediente">Completemos tu expediente</h1>
 
       <p className="screen__subtitle">
@@ -62,11 +67,11 @@ function CompletarExpediente({ infoEsencialCompletada, onVolver, onContinuar }) 
         <button type="button" className="btn btn-secondary" onClick={onVolver}>
           Volver
         </button>
-        <button type="button" className="btn btn-primary" onClick={onContinuar}>
+        <button type="submit" className="btn btn-primary">
           Continuar con mi expediente
         </button>
       </div>
-    </div>
+    </form>
   )
 }
 

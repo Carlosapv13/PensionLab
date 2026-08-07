@@ -94,8 +94,13 @@ function HistoriaPensional({
     },
   ]
 
+  function manejarEnvio(e) {
+    e.preventDefault()
+    onContinuar()
+  }
+
   return (
-    <div className="screen">
+    <form className="screen" onSubmit={manejarEnvio}>
       <h1 className="screen__title screen__title--historia-pensional">
         Esto es lo que ya sabemos de tu historia
       </h1>
@@ -142,16 +147,11 @@ function HistoriaPensional({
         <button type="button" className="btn btn-secondary" onClick={onVolver}>
           Volver
         </button>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={onContinuar}
-          disabled={!trasladoRegimen}
-        >
+        <button type="submit" className="btn btn-primary" disabled={!trasladoRegimen}>
           Continuar
         </button>
       </div>
-    </div>
+    </form>
   )
 }
 

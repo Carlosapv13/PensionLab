@@ -26,23 +26,10 @@
 import { obtenerSmlv, obtenerTopeMaximoIBC, obtenerTasaCotizacion } from '../../data/legal/index.js'
 import { obtenerSupuesto } from '../../data/assumptions/index.js'
 import { formulaRAIS } from '../formulas/formulaRAIS.js'
+import { calcularEdadCumplida } from '../calcularEdadCumplida.js'
 
 function hoyISO() {
   return new Date().toISOString().slice(0, 10)
-}
-
-function calcularEdadCumplida(fechaNacimiento, fechaReferencia) {
-  const nacimiento = new Date(fechaNacimiento)
-  const referencia = new Date(fechaReferencia)
-
-  let edad = referencia.getUTCFullYear() - nacimiento.getUTCFullYear()
-  const antesDelCumpleanos =
-    referencia.getUTCMonth() < nacimiento.getUTCMonth() ||
-    (referencia.getUTCMonth() === nacimiento.getUTCMonth() &&
-      referencia.getUTCDate() < nacimiento.getUTCDate())
-
-  if (antesDelCumpleanos) edad -= 1
-  return edad
 }
 
 const LIMITACION_CAPITAL_NO_INCLUIDO = {

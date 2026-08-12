@@ -5,6 +5,7 @@
 
 import ley1001993 from './versions/ley100-1993.json' with { type: 'json' }
 import vigente2026 from './versions/vigente-2026.json' with { type: 'json' }
+import ipcHistorico from './versions/ipc-historico.json' with { type: 'json' }
 
 // reforma-2024.json NO participa de esta línea de tiempo a propósito: la reforma
 // pensional 2024 (Ley 2381 de 2024) está suspendida por la Corte Constitucional
@@ -346,6 +347,50 @@ export function obtenerFechaEntradaVigenciaSistema(fecha) {
 }
 
 /**
+ * Resuelve el Índice de Precios al Consumidor (IPC) de diciembre de un año específico,
+ * usado para indexar Ingresos Base de Cotización históricos en el cálculo del IBL (Art. 21
+ * Ley 100 de 1993 — ver domain/formulas/formulaIBL.js).
+ *
+ * Deliberadamente NO pasa por resolverReglasVigentes/LINEA_DE_TIEMPO_VIGENTE: ese mecanismo
+ * resuelve "el valor vigente en una fecha dada" (un valor por campo, según ventana de
+ * vigencia), mientras que el IPC necesita lo opuesto — una serie con un valor distinto por
+ * año, consultado por año exacto, nunca "el vigente hoy". Forzarlo al patrón existente
+ * sería una mala adaptación, no una reutilización real; por eso vive en su propio archivo
+ * (ipc-historico.json) con su propio resolver, junto a los demás en este módulo.
+ *
+ * ipc-historico.json está hoy marcado como borrador (ver su campo `procedencia`): el valor
+ * es un índice autoconstruido por PensionLab a partir de variaciones anuales oficiales del
+ * DANE, no el nivel de índice bruto que el DANE publica — matemáticamente equivalente para
+ * calcular razones entre años, pero pendiente de reemplazar por el dato oficial exacto.
+ *
+ * @param {number} anio
+ * @returns {{
+ *   valor: number,
+ *   id: string,
+ *   anio: number,
+ *   fuente: string,
+ *   estado: string,
+ *   listoParaProduccion: boolean,
+ * }}
+ */
+export function obtenerIPC(anio) {
+  const entrada = ipcHistorico.entradas.find((e) => e.anio === anio)
+
+  if (!entrada) {
+    throw new Error(`obtenerIPC: no hay IPC cargado para el año ${anio} en ipc-historico.json`)
+  }
+
+  return {
+    valor: entrada.valor,
+    id: entrada.id,
+    anio: entrada.anio,
+    fuente: ipcHistorico.fuente,
+    estado: ipcHistorico.estado,
+    listoParaProduccion: ipcHistorico.listoParaProduccion,
+  }
+}
+
+/**
  * Resuelve el umbral de edad del régimen de transición (Art. 36, inciso 2, Ley 100
  * de 1993), según sexo — 35 años o más (mujeres) / 40 años o más (hombres) al
  * momento de entrar en vigencia el Sistema (ver obtenerFechaEntradaVigenciaSistema).
@@ -389,5 +434,108 @@ export function obtenerEdadTransicion(fecha, sexo) {
     listoParaProduccion: entrada.metadataFuente.listoParaProduccion,
     vigenciaDesde: entrada.vigencia?.desde ?? null,
     vigenciaHasta: entrada.vigencia?.hasta ?? null,
+  }
+}
+
+const CAMPOS_TASA_REEMPLAZO = [
+  ['tasaReemplazoConstante', 'tasaReemplazoConstante'],
+  ['tasaReemplazoPendiente', 'tasaReemplazoPendiente'],
+  ['tasaReemplazoMinima', 'tasaReemplazoMinima'],
+  ['tasaReemplazoMaxima', 'tasaReemplazoMaxima'],
+  ['semanasPorIncrementoAdicional', 'semanasPorIncrementoAdicional'],
+  ['incrementoPorcentualPorTramo', 'incrementoPorcentualPorTramo'],
+]
+
+/**
+ * Resuelve el umbral fijo de semanas cotizadas (Art. 21, inciso 2, Ley 100 de 1993) que
+ * habilita la alternativa de IBL de toda la vida laboral cuando resulta superior a la de
+ * los últimos 10 años — "podrá optar", opción legal del afiliado, nunca una elección
+ * automática de PensionLab (ver domain/seleccionarPeriodosIBL.js).
+ *
+ * Deliberadamente distinto de `obtenerSemanasMinimas` (elegibilidad de vejez, con
+ * cronograma progresivo para mujeres desde 2026): este umbral es fijo, no varía por sexo
+ * ni por año, aunque coincida numéricamente en 1250 con el mínimo de la mujer durante 2026
+ * — ver la nota de la propia entrada en vigente-2026.json.
+ *
+ * @param {string} fecha - Fecha ISO en la que se evalúa el requisito
+ * @returns {{
+ *   valor: number,
+ *   id: string,
+ *   fuente: string,
+ *   articulo: string,
+ *   estado: string,
+ *   listoParaProduccion: boolean,
+ *   vigenciaDesde: string | null,
+ *   vigenciaHasta: string | null,
+ * }}
+ */
+export function obtenerSemanasHabilitanAlternativaIBL(fecha) {
+  const reglas = resolverReglasVigentes(fecha)
+  const entrada = buscarPorCampo(reglas, 'semanasHabilitanAlternativaIBL')
+
+  if (!entrada) {
+    throw new Error(`obtenerSemanasHabilitanAlternativaIBL: no se encontró una entrada vigente para la fecha ${fecha}`)
+  }
+
+  return {
+    valor: entrada.valor,
+    id: entrada.id,
+    fuente: entrada.fuente,
+    articulo: entrada.articulo,
+    estado: entrada.metadataFuente.estado,
+    listoParaProduccion: entrada.metadataFuente.listoParaProduccion,
+    vigenciaDesde: entrada.vigencia?.desde ?? null,
+    vigenciaHasta: entrada.vigencia?.hasta ?? null,
+  }
+}
+
+/**
+ * Resuelve, en un solo llamado, los 6 parámetros legales que formulaRPM.js necesita en
+ * `parametrosLegales` para calcular la tasa de reemplazo RPM (Art. 34 Ley 100 de 1993,
+ * modificado por Art. 10 Ley 797 de 2003) — ya cargados individualmente en
+ * vigente-2026.json, pero sin un resolver agrupado hasta ahora (solo
+ * formulaRPM.test.js los usaba, hardcodeados). Mismo criterio de agrupación que
+ * calcularProyeccionRAIS.js ya aplica llamando varios `obtener*` sueltos, pero reunidos
+ * aquí en un solo resolver porque los 6 siempre se consumen juntos, nunca por separado.
+ *
+ * `semanasBaseIncrementoRPM` NO es un campo propio de vigente-2026.json: reutiliza
+ * deliberadamente `obtenerSemanasMinimas(fecha, 'M', 'RPM')` (ancla fija en 1300, para
+ * ambos sexos) — decisión de producto ya documentada en trazabilidad-formula-RPM.md
+ * ("Punto de controversia"), no una norma nueva. No usar el requisito de semanas mínimas
+ * de la persona (que sí varía por sexo/año) para este campo.
+ *
+ * @param {string} fecha - Fecha ISO en la que se evalúa el requisito
+ * @returns {{
+ *   tasaReemplazoConstante: number,
+ *   tasaReemplazoPendiente: number,
+ *   tasaReemplazoMinima: number,
+ *   tasaReemplazoMaxima: number,
+ *   semanasBaseIncrementoRPM: number,
+ *   semanasPorIncrementoAdicional: number,
+ *   incrementoPorcentualPorTramo: number,
+ *   idsUsados: string[],
+ * }}
+ */
+export function obtenerParametrosTasaReemplazoRPM(fecha) {
+  const reglas = resolverReglasVigentes(fecha)
+  const valores = {}
+  const idsUsados = []
+
+  for (const [clave, campo] of CAMPOS_TASA_REEMPLAZO) {
+    const entrada = buscarPorCampo(reglas, campo)
+    if (!entrada) {
+      throw new Error(`obtenerParametrosTasaReemplazoRPM: no se encontró '${campo}' vigente para la fecha ${fecha}`)
+    }
+    valores[clave] = entrada.valor
+    idsUsados.push(entrada.id)
+  }
+
+  const anclaIncremento = obtenerSemanasMinimas(fecha, 'M', 'RPM')
+  idsUsados.push(anclaIncremento.id)
+
+  return {
+    ...valores,
+    semanasBaseIncrementoRPM: anclaIncremento.valor,
+    idsUsados,
   }
 }

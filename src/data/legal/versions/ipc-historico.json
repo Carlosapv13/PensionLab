@@ -1,0 +1,22 @@
+{
+  "id": "ipc-historico-dane",
+  "descripcion": "Serie de índice de precios al consumidor (IPC), valor de diciembre de cada año, usada para indexar Ingresos Base de Cotización históricos según Art. 21 Ley 100 de 1993 (Slice 'Primera lectura económica RPM desde historia estructurada'). Cubre únicamente 2015-2025 — los años verificados por búsqueda web y suficientes para el fixture funcional de este Slice (10 años de ventana de evaluabilidad). No es la serie histórica completa de PensionLab: para historias reales anteriores a 2015 hace falta extenderla con datos igualmente verificados, nunca con cifras recordadas de memoria (ver 'notas').",
+  "fuente": "DANE (Departamento Administrativo Nacional de Estadística de Colombia) — variación porcentual anual del IPC a diciembre de cada año.",
+  "procedencia": "El campo 'variacionAnualPorcentualDane' de cada entrada proviene de la publicación oficial de DANE, verificada por búsqueda web el 2026-08-09 (cruzada entre dane.gov.co/.../ipc-historico y un agregador — consultorcontable.com — que cita la misma serie oficial; ambas fuentes coincidieron exactamente). El campo 'valor' NO es el nivel de índice bruto que publica el DANE (esa tabla vive en archivos Excel/anexos que esta sesión no pudo leer como texto, tanto en dane.gov.co como en los portales de series históricas del Banco de la República) — es un índice autoconstruido por PensionLab, compuesto acumulando esas variaciones anuales oficiales desde una base propia (diciembre de 2015 = 100). Es matemáticamente equivalente al índice oficial para calcular la razón entre dos años (que es todo lo que la indexación del IBL necesita — ver formulaIBL.js), pero 'valor' no debe citarse fuera de PensionLab como 'el índice oficial del DANE'.",
+  "estado": "borrador",
+  "listoParaProduccion": false,
+  "notas": "Pendiente antes de marcar 'publicado': (1) reemplazar 'valor' por los niveles de índice oficiales exactos (base dic-2018=100) descargando los anexos Excel de DANE, en vez del índice autoconstruido; (2) extender la serie hacia años anteriores a 2015 cuando una historia real lo exija, SIEMPRE con la misma disciplina de verificación por fuente oficial de esta entrada — nunca con cifras recordadas de memoria ni de una fuente comercial como procedencia definitiva (se intentó extender a 2000-2014 en una ronda anterior con datos recordados; se revirtió explícitamente por no cumplir ese estándar — ver historial de commits); (3) la cifra de 2025 (5.10% de variación anual) es la más reciente encontrada — si se usa en un contexto de mayor exigencia que un fixture funcional, debe reverificarse contra la fuente primaria antes de confiar en ella.",
+  "entradas": [
+    { "id": "ipc-dic-2015", "anio": 2015, "valor": 100.00, "unidad": "índice (base propia dic-2015=100)", "variacionAnualPorcentualDane": 6.77 },
+    { "id": "ipc-dic-2016", "anio": 2016, "valor": 105.75, "unidad": "índice (base propia dic-2015=100)", "variacionAnualPorcentualDane": 5.75 },
+    { "id": "ipc-dic-2017", "anio": 2017, "valor": 110.08, "unidad": "índice (base propia dic-2015=100)", "variacionAnualPorcentualDane": 4.09 },
+    { "id": "ipc-dic-2018", "anio": 2018, "valor": 113.58, "unidad": "índice (base propia dic-2015=100)", "variacionAnualPorcentualDane": 3.18 },
+    { "id": "ipc-dic-2019", "anio": 2019, "valor": 117.89, "unidad": "índice (base propia dic-2015=100)", "variacionAnualPorcentualDane": 3.80 },
+    { "id": "ipc-dic-2020", "anio": 2020, "valor": 119.79, "unidad": "índice (base propia dic-2015=100)", "variacionAnualPorcentualDane": 1.61 },
+    { "id": "ipc-dic-2021", "anio": 2021, "valor": 126.52, "unidad": "índice (base propia dic-2015=100)", "variacionAnualPorcentualDane": 5.62 },
+    { "id": "ipc-dic-2022", "anio": 2022, "valor": 143.12, "unidad": "índice (base propia dic-2015=100)", "variacionAnualPorcentualDane": 13.12 },
+    { "id": "ipc-dic-2023", "anio": 2023, "valor": 156.41, "unidad": "índice (base propia dic-2015=100)", "variacionAnualPorcentualDane": 9.28 },
+    { "id": "ipc-dic-2024", "anio": 2024, "valor": 164.54, "unidad": "índice (base propia dic-2015=100)", "variacionAnualPorcentualDane": 5.20 },
+    { "id": "ipc-dic-2025", "anio": 2025, "valor": 172.93, "unidad": "índice (base propia dic-2015=100)", "variacionAnualPorcentualDane": 5.10 }
+  ]
+}

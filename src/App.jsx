@@ -17,6 +17,15 @@ import QueDeterminaTuResultado from './pages/QueDeterminaTuResultado.jsx'
 import ExploraTuProyeccion from './pages/ExploraTuProyeccion.jsx'
 import DeclaracionLibre from './pages/DeclaracionLibre.jsx'
 import RevisionDeclaracionTemporal from './pages/RevisionDeclaracionTemporal.jsx'
+import ExploraTuProyeccionRPM from './pages/ExploraTuProyeccionRPM.jsx'
+
+// Import estático, pero solo se monta bajo import.meta.env.DEV (ver el
+// return más abajo) — Vite sustituye ese flag por el literal `false` en
+// `vite build` para producción, y Rollup elimina por dead-code-elimination
+// todo lo que quede dentro del `&&` correspondiente, incluido este import y
+// su árbol de dependencias (src/dev/**). Exclusivamente de desarrollo.
+import PanelDesarrollo from './dev/PanelDesarrollo.jsx'
+import { construirSettersEdicion } from './dev/construirSettersEdicion.js'
 
 function App() {
   const [vista, setVista] = useState('bienvenida')
@@ -41,6 +50,10 @@ function App() {
   const [salarioParaEstimarBase, setSalarioParaEstimarBase] = useState('')
   const [declaracionLibre, setDeclaracionLibre] = useState(null)
   const [edadJubilacionDeseada, setEdadJubilacionDeseada] = useState('')
+  // Slice "Primera lectura económica RPM desde historia estructurada": historia de
+  // cotización estructurada (PeriodoCotizacion[]) — en este Slice solo se puebla vía el
+  // panel de desarrollo, nunca por una pantalla real de captura (fuera de alcance).
+  const [historiaCotizacion, setHistoriaCotizacion] = useState([])
 
   function actualizarRegimenActual(valor) {
     // trasladoRegimen depende semánticamente de regimenActual (S3-009): la
@@ -140,8 +153,97 @@ function App() {
     setCertezaBaseCotizacion(valor)
   }
 
+  // Agrupa el estado editable existente y sus setters crudos, exclusivamente
+  // para el panel de desarrollo (src/dev/) — no crea estado nuevo, solo
+  // referencia el que ya existe arriba. Mismo criterio de "un olvido debe
+  // ser visible" que src/dev/estadoApp.js: si se agrega un campo nuevo de
+  // estado aquí arriba, este objeto debe actualizarse a mano.
+  const estadoEditableDev = {
+    objetivoSeleccionado,
+    fechaNacimiento,
+    sexo,
+    lugarResidencia,
+    regimenActual,
+    tipoCotizante,
+    lugarCotizacion,
+    cotizaActualmente,
+    anioInicioCotizacion,
+    nivelConocimientoSemanas,
+    semanasCotizadas,
+    infoEsencialCompletada,
+    anioConfirmadoEdadTemprana,
+    semanasConfirmadasPara,
+    trasladoRegimen,
+    detalleTraslado,
+    certezaBaseCotizacion,
+    valorBaseCotizacionDeclarado,
+    salarioParaEstimarBase,
+    declaracionLibre,
+    edadJubilacionDeseada,
+    historiaCotizacion,
+  }
+
+  const settersEstadoEditableDev = {
+    objetivoSeleccionado: setObjetivoSeleccionado,
+    fechaNacimiento: setFechaNacimiento,
+    sexo: setSexo,
+    lugarResidencia: setLugarResidencia,
+    regimenActual: setRegimenActual,
+    tipoCotizante: setTipoCotizante,
+    lugarCotizacion: setLugarCotizacion,
+    cotizaActualmente: setCotizaActualmente,
+    anioInicioCotizacion: setAnioInicioCotizacion,
+    nivelConocimientoSemanas: setNivelConocimientoSemanas,
+    semanasCotizadas: setSemanasCotizadas,
+    infoEsencialCompletada: setInfoEsencialCompletada,
+    anioConfirmadoEdadTemprana: setAnioConfirmadoEdadTemprana,
+    semanasConfirmadasPara: setSemanasConfirmadasPara,
+    trasladoRegimen: setTrasladoRegimen,
+    detalleTraslado: setDetalleTraslado,
+    certezaBaseCotizacion: setCertezaBaseCotizacion,
+    valorBaseCotizacionDeclarado: setValorBaseCotizacionDeclarado,
+    salarioParaEstimarBase: setSalarioParaEstimarBase,
+    declaracionLibre: setDeclaracionLibre,
+    edadJubilacionDeseada: setEdadJubilacionDeseada,
+    historiaCotizacion: setHistoriaCotizacion,
+  }
   return (
-    <AppShell>
+    <>
+      {import.meta.env.DEV && (
+        <PanelDesarrollo
+          valores={estadoEditableDev}
+          // Carga de fixture (aplicarFixture.js) vs. edición manual posterior
+          // son operaciones distintas y usan setters distintos, a propósito:
+          //   - Cargar un fixture es atómico sobre el estado completo —
+          //     siempre setters crudos, para que un reset+aplicar no dispare
+          //     cascadas pensadas para una única interacción de usuario.
+          //   - Editar un campo después de cargarlo debe comportarse igual
+          //     que si ocurriera en la pantalla productiva real: usa la misma
+          //     función `actualizar*` que esa pantalla ya usa cuando existe
+          //     (preserva sus invariantes — ej. cambiar regimenActual
+          //     invalida trasladoRegimen), y el setter crudo cuando el campo
+          //     no tiene una. No es un sistema de dependencias nuevo:
+          //     construirSettersEdicion solo selecciona cuál función de las
+          //     que ya existen arriba usar por campo.
+          // Calculado aquí adentro, no como constante del cuerpo de App, para
+          // que la llamada misma quede dentro del bloque eliminado del build
+          // de producción — no solo el componente que la consume.
+          settersCarga={settersEstadoEditableDev}
+          settersEdicion={construirSettersEdicion(settersEstadoEditableDev, {
+            regimenActual: actualizarRegimenActual,
+            trasladoRegimen: actualizarTrasladoRegimen,
+            anioInicioCotizacion: actualizarAnioInicioCotizacion,
+            nivelConocimientoSemanas: actualizarNivelConocimientoSemanas,
+            semanasCotizadas: actualizarSemanasCotizadas,
+            tipoCotizante: actualizarTipoCotizante,
+            lugarCotizacion: actualizarLugarCotizacion,
+            certezaBaseCotizacion: actualizarCertezaBaseCotizacion,
+          })}
+          vistaActual={vista}
+          onIrAVista={setVista}
+        />
+      )}
+      <AppShell>
       {vista === 'bienvenida' && (
         <Bienvenida onComenzar={() => setVista('objetivo')} />
       )}
@@ -290,7 +392,15 @@ function App() {
         <QueDeterminaTuResultado
           regimenActual={regimenActual}
           onVolver={() => setVista('baseCotizacion')}
-          onContinuar={() => setVista(regimenActual === 'RAIS' ? 'exploraTuProyeccion' : 'declaracionLibre')}
+          onContinuar={() =>
+            setVista(
+              regimenActual === 'RPM'
+                ? 'exploraTuProyeccionRPM'
+                : regimenActual === 'RAIS'
+                  ? 'exploraTuProyeccion'
+                  : 'declaracionLibre'
+            )
+          }
         />
       )}
 
@@ -310,6 +420,13 @@ function App() {
         />
       )}
 
+      {vista === 'exploraTuProyeccionRPM' && (
+        <ExploraTuProyeccionRPM
+          historiaCotizacion={historiaCotizacion}
+          onVolver={() => setVista('queDeterminaResultado')}
+        />
+      )}
+
       {vista === 'declaracionLibre' && (
         <DeclaracionLibre
           declaracion={declaracionLibre}
@@ -322,7 +439,8 @@ function App() {
       {vista === 'revisionDeclaracion' && (
         <RevisionDeclaracionTemporal onVolver={() => setVista('declaracionLibre')} />
       )}
-    </AppShell>
+      </AppShell>
+    </>
   )
 }
 

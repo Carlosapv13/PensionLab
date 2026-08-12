@@ -7,6 +7,9 @@ import {
   obtenerTopeMaximoIBC,
   obtenerSmlv,
   obtenerTasaCotizacion,
+  obtenerIPC,
+  obtenerParametrosTasaReemplazoRPM,
+  obtenerSemanasHabilitanAlternativaIBL,
   resolverReglasVigentes,
 } from './index.js'
 
@@ -184,6 +187,84 @@ describe('obtenerSmlv', () => {
     // aparece entre las reglas vigentes.
     const reglasPorDefecto = resolverReglasVigentes('2026-06-15')
     expect(reglasPorDefecto.find((r) => r.campo === 'smlv')).toBeUndefined()
+  })
+})
+
+// obtenerIPC no pasa por resolverReglasVigentes/LINEA_DE_TIEMPO_VIGENTE (ver su JSDoc):
+// consulta directamente ipc-historico.json por año exacto, no por fecha de vigencia.
+
+describe('obtenerIPC', () => {
+  it('resuelve el índice de diciembre de un año cargado, trazable a su entrada', () => {
+    const resultado = obtenerIPC(2020)
+
+    expect(resultado.valor).toBe(119.79)
+    expect(resultado.id).toBe('ipc-dic-2020')
+    expect(resultado.anio).toBe(2020)
+    expect(resultado.fuente).toMatch(/DANE/)
+  })
+
+  it('refleja el estado borrador del archivo de origen, sin ocultarlo', () => {
+    const resultado = obtenerIPC(2025)
+
+    expect(resultado.estado).toBe('borrador')
+    expect(resultado.listoParaProduccion).toBe(false)
+  })
+
+  it('lanza un error explícito para un año no cargado, en vez de interpolar o asumir', () => {
+    expect(() => obtenerIPC(1999)).toThrow(/no hay IPC cargado para el año 1999/)
+  })
+})
+
+// obtenerParametrosTasaReemplazoRPM agrupa los 6 campos que formulaRPM.js necesita en
+// parametrosLegales — antes solo formulaRPM.test.js los hardcodeaba.
+
+describe('obtenerParametrosTasaReemplazoRPM', () => {
+  it('resuelve los 6 parámetros de vigente-2026.json más el ancla de incremento reutilizada', () => {
+    const resultado = obtenerParametrosTasaReemplazoRPM('2026-06-15')
+
+    expect(resultado).toMatchObject({
+      tasaReemplazoConstante: 65.5,
+      tasaReemplazoPendiente: 0.5,
+      tasaReemplazoMinima: 55,
+      tasaReemplazoMaxima: 80,
+      semanasPorIncrementoAdicional: 50,
+      incrementoPorcentualPorTramo: 1.5,
+    })
+  })
+
+  it('semanasBaseIncrementoRPM reutiliza semanasMinimasPensionHombre (1300), no el mínimo de la mujer', () => {
+    // Aunque 2026 ya está en el cronograma de mujeres (1250 en 2026-01-01), el ancla del
+    // incremento debe seguir en 1300 para ambos sexos — ver "Punto de controversia" en
+    // trazabilidad-formula-RPM.md.
+    const resultado = obtenerParametrosTasaReemplazoRPM('2026-06-15')
+
+    expect(resultado.semanasBaseIncrementoRPM).toBe(1300)
+  })
+
+  it('devuelve los ids de las 7 entradas usadas, para trazabilidad', () => {
+    const resultado = obtenerParametrosTasaReemplazoRPM('2026-06-15')
+
+    expect(resultado.idsUsados).toHaveLength(7)
+    expect(resultado.idsUsados).toContain('semanas-minimas-pension-hombre')
+    expect(resultado.idsUsados).toContain('tasa-reemplazo-constante')
+  })
+})
+
+describe('obtenerSemanasHabilitanAlternativaIBL', () => {
+  it('resuelve el umbral fijo de 1250 semanas, distinto de la elegibilidad de vejez', () => {
+    const resultado = obtenerSemanasHabilitanAlternativaIBL('2026-06-15')
+
+    expect(resultado.valor).toBe(1250)
+    expect(resultado.id).toBe('semanas-habilitan-alternativa-ibl')
+    expect(resultado.articulo).toBe('Art. 21, inciso 2, Ley 100 de 1993')
+  })
+
+  it('no varía entre 2026 y un año posterior (a diferencia del cronograma de mujeres)', () => {
+    const resultado2026 = obtenerSemanasHabilitanAlternativaIBL('2026-06-15')
+    const resultado2030 = obtenerSemanasHabilitanAlternativaIBL('2030-06-15')
+
+    expect(resultado2026.valor).toBe(1250)
+    expect(resultado2030.valor).toBe(1250)
   })
 })
 

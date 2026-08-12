@@ -270,6 +270,10 @@
   line-height: 1.15;
 }
 
+.screen__title--explora-tu-proyeccion-rpm {
+  line-height: 1.15;
+}
+
 .screen__subtitle {
   font-size: 18px;
   line-height: 150%;
@@ -482,6 +486,35 @@
 .insight__message {
   margin: 0;
   font-size: 16px;
+}
+
+.comparacion-caminos__supuestos {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.comparacion-caminos__supuestos-titulo {
+  margin: 0;
+}
+
+/* Lista compacta en vez de párrafos apilados — mismo contenido, menos altura
+   entre ítems. Reutiliza el tono de .option__hint (13px, var(--text)) en vez
+   de introducir un estilo nuevo. Siempre visible (sin <details>): esta
+   sección es donde vive la Convención Económica v1, no un detalle opcional. */
+.comparacion-caminos__supuestos-lista {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.comparacion-caminos__supuestos-lista li {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.4;
 }
 
 .legal-detail summary {

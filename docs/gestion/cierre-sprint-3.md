@@ -2876,6 +2876,174 @@ antes de crearse. Sin push en ningún caso — ambos commits permanecen locales 
 
 ---
 
+## Slice RPM — Lectura económica RPM con historia estructurada (ExploraTuProyeccionRPM)
+
+**Estado:** ✅ Implementación completada. Revisión técnica completada. Revisión visual
+manual completada. Revisión narrativa completada. Staging técnico limpio y verificado de
+forma aislada. Cierre aprobado para commit.
+
+### Objetivo
+
+Construir la primera lectura económica del régimen RPM, basada exclusivamente en la
+historia de cotización observada hasta hoy — nunca proyectada hacia una edad futura de
+retiro, y nunca presentada como la pensión que la persona recibirá al pensionarse. Mismo
+criterio de honestidad ya aplicado en `ExploraTuProyeccion.jsx` (RAIS) y
+`QueDeterminaTuResultado.jsx`.
+
+### Capacidades implementadas
+
+- Selección de períodos para el IBL (`seleccionarPeriodosIBL.js`), incluida la frontera de
+  evaluabilidad frente a huecos, solapamientos y cotización parcial dentro de la ventana.
+- Cálculo del IBL ordinario (`formulaIBL.js`), indexado año a año contra IPC histórico.
+- Soporte de la alternativa legal de vida laboral (Art. 21, inciso 2, Ley 100 de 1993)
+  cuando la condición de habilitación se cumple, comparada numéricamente contra el
+  ordinario sin asumir de antemano cuál resulta mayor.
+- Cálculo de semanas observadas (a partir de `diasCotizados`, nunca de duración calendario
+  asumida).
+- Cálculo de la tasa de reemplazo RPM sobre el IBL aplicable.
+- Cálculo del resultado económico sobre la historia observada hasta hoy
+  (`calcularPensionRPM.js`, orquestador completo).
+- Pantalla `ExploraTuProyeccionRPM.jsx`.
+- Integración de la ruta normal hacia esa pantalla desde `QueDeterminaTuResultado`
+  (`regimenActual === 'RPM'`), sin retirar ninguna ruta existente.
+- Fixture de desarrollo `rpm-empleada-historia-evaluable` para verificación manual.
+- Infraestructura mínima de desarrollo (`src/dev/`: `PanelDesarrollo.jsx`,
+  `aplicarFixture.js`, `construirSettersEdicion.js`, `estadoApp.js`, `fixtures.js`)
+  necesaria para cargar y verificar el caso — no existe todavía una pantalla real de
+  captura de historia laboral estructurada (fuera de alcance de este Slice).
+- Respaldo legal (`data/legal/versions/vigente-2026.json`, entrada 15) y estructura de IPC
+  histórico (`data/legal/versions/ipc-historico.json`) incorporados en este Slice.
+
+### Archivos en el staging de este cierre
+
+**Creados:** `domain/seleccionarPeriodosIBL.js` (+ test), `domain/formulas/formulaIBL.js`
+(+ test), `domain/formulas/trazabilidad-formula-IBL.md`,
+`domain/pensionEngine/calcularPensionRPM.test.js`, `pages/ExploraTuProyeccionRPM.jsx`,
+`data/legal/versions/ipc-historico.json`, `format/formatearDinero.js` (+ test),
+`hooks/useCampoMonetario.js`, `hooks/useRestaurarFocoAlMontar.js`, `dev/PanelDesarrollo.jsx`,
+`dev/aplicarFixture.js` (+ test), `dev/construirSettersEdicion.js` (+ test),
+`dev/estadoApp.js`, `dev/fixtures.js`.
+
+**Modificados:** `domain/pensionEngine/calcularPensionRPM.js` (de stub del Sprint 1 a
+implementación completa), `data/legal/index.js` (+ test), `data/legal/versions/vigente-2026.json`,
+`pages/BaseCotizacion.jsx` (fix monetario, ver más abajo), `App.jsx` y `App.css`
+(ruteo hacia RPM y estilos exclusivos — ver "Decisiones de alcance" para lo que
+deliberadamente NO se incluyó de estos dos archivos, que en el working tree tienen más
+cambios que los staged).
+
+### Salvaguarda de producto
+
+Queda explícito, tanto en el código como en esta documentación, que el resultado mostrado:
+
+- **No** es una proyección futura.
+- **No** incluye los años que todavía faltan por cotizar.
+- **No** proyecta IBL ni semanas hacia la edad de retiro.
+- **No** debe presentarse como "tu pensión".
+- Representa únicamente una lectura económica de la historia observada hasta hoy — un
+  punto de partida, no una proyección futura.
+
+### Revisión manual realizada
+
+La revisión visual manual confirmó, con el fixture `rpm-empleada-historia-evaluable`:
+
+- IBL: $3.762.588.
+- Semanas observadas: 521,9.
+- Tasa de reemplazo: 64,43%.
+- Resultado económico actual: $2.424.068 mensuales.
+- Título corregido, sin superposición.
+- Explicaciones narrativas incorporadas para IBL y tasa de reemplazo (qué representan, no
+  solo cómo se calcularon).
+- Salvaguarda inline incorporada junto al resultado económico, para que ese bloque no
+  dependa únicamente del subtítulo superior o del bloque de limitaciones.
+
+`totalDiasCotizados` no se expone como dato de UI: el dominio lo calcula (es la base de
+`semanasObservadas`), pero se decidió no mostrarlo por ahora.
+
+### Decisiones de alcance — qué queda fuera de este cierre
+
+Quedaron explícitamente fuera del staging y de este cierre, por pertenecer a otros
+trabajos en curso o a decisiones arquitectónicas separadas — nada de esto se perdió,
+permanece sin staging en el working tree:
+
+- El Motor de caminos RAIS (`generarCaminosRAIS.js`, la expansión de
+  `ExploraTuProyeccion.jsx`, `ExploraTuProyeccion.helpers.js`,
+  `ExploraTuProyeccion.limitaciones.test.js`, y los cambios asociados en
+  `determinarBaseCotizacion.js`, `formulaRAIS.js`, `data/assumptions/`).
+- La capacidad de reconocimiento (`domain/reconocimiento/evaluarAptitud.js`,
+  `evaluarDeclaracion.js`) y su wiring en `RevisionDeclaracionTemporal.jsx`.
+- `tienePrimeraLecturaValor.js` y su integración en `App.jsx`.
+- La retirada de `DeclaracionLibre`/`RevisionDeclaracionTemporal` del recorrido principal —
+  el staged de este cierre las conserva exactamente como estaban, sin retirarlas ni
+  restaurarlas.
+- El rollout transversal de `useRestaurarFocoAlMontar` a las otras 12 pantallas del
+  recorrido — el staged conserva únicamente el archivo del hook y su uso en
+  `ExploraTuProyeccionRPM.jsx`.
+- La validación de `BaseCotizacion.jsx` para valor declarado por debajo del piso legal —
+  capacidad distinta, con revisión y cierre propios.
+- Los otros 3 inputs monetarios (`saldoAcumuladoDeclarado`, `objetivoPensionMensual`,
+  `restriccionCostoPensionalAdicionalMaximoMensual`), ubicados en
+  `ExploraTuProyeccion.jsx`: **el fix monetario de este cierre corresponde únicamente a
+  los 2 campos de `BaseCotizacion.jsx`** (`valorBaseCotizacionDeclarado`,
+  `salarioParaEstimarBase`); los otros 3 se cerrarán junto con el Slice del Motor de
+  caminos RAIS.
+- `docs/producto/oportunidades-futuras.md`.
+- Los dos `.docx` sin trackear (PL-230, PL-240).
+
+**Siguiente decisión arquitectónica pendiente, inmediatamente después de este cierre**: qué
+hacer con la retirada de `DeclaracionLibre`/`RevisionDeclaracionTemporal` del recorrido
+principal — detectada durante el cierre de este Slice, sin documentar ni autorizar
+todavía.
+
+### Limitaciones conocidas
+
+- `data/legal/versions/ipc-historico.json` es, según su propio campo `estado`, un
+  **borrador** (`listoParaProduccion: false`), no una fuente oficial definitiva: `valor`
+  es un índice **autoconstruido** por PensionLab (acumulando variaciones anuales oficiales
+  de DANE verificadas por búsqueda web, desde una base propia dic-2015=100), no el nivel de
+  índice bruto que publica el DANE. Cubre únicamente 2015-2025. Pendiente antes de
+  publicarse: reemplazar `valor` por los niveles oficiales exactos, y extender la serie
+  hacia años anteriores a 2015 cuando una historia real lo exija, siempre con la misma
+  disciplina de verificación por fuente oficial (nunca con cifras recordadas de memoria).
+- La entrada legal 15 (`semanas-habilitan-alternativa-ibl`, `vigente-2026.json`) tiene
+  respaldo textual directo del propio artículo, pero **todavía no pasó la misma revisión
+  cruzada formal** que las 13 entradas originales ya validadas contra
+  `trazabilidad-normativa.md` — así lo registra la propia nota del archivo.
+- La alternativa de vida laboral no tiene, hoy, un fixture visible en la UI que la active:
+  requeriría ≈1.250 semanas (≈24 años) de historia, y eso a su vez requeriría IPC real de
+  más años de los que `ipc-historico.json` cubre actualmente (2015-2025). La propiedad de
+  que esa alternativa puede resultar mayor o menor según la historia queda probada con
+  datos sintéticos en `formulaIBL.test.js`, no con un caso visible en pantalla.
+
+Estas limitaciones ya estaban identificadas durante el desarrollo del Slice; se registran
+aquí tal como están, sin abrir trabajo nuevo en esta ronda de cierre.
+
+### Verificación técnica final del staged
+
+Verificado de forma aislada (worktree temporal sobre un commit "dangling" construido desde
+el árbol del índice staged, nunca referenciado por ninguna rama, ya eliminado tras la
+verificación) — no contra el working tree completo, que todavía mezcla otros trabajos:
+
+- 17 archivos de tests, **221/221 en verde**.
+- `npm run lint` — sin errores.
+- `npm run build` — build de producción exitoso.
+- El staged es autosuficiente: no depende de ningún archivo que permanece sin staging.
+
+### Estado al cierre
+
+- Slice RPM implementado.
+- Revisión técnica completada.
+- Revisión visual manual completada.
+- Revisión narrativa completada.
+- Staging técnico limpio y verificado de forma aislada.
+- Cierre aprobado para commit.
+
+### Commit
+
+Este documento forma parte del commit de cierre del Slice RPM; el identificador
+definitivo queda registrado en el historial Git.
+
+---
+
 ## Slices pendientes de Sprint 3
 
 Por definir a medida que el sprint avance.

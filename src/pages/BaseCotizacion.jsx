@@ -32,6 +32,8 @@
 // captura ni resultado propio.
 
 import { determinarBaseCotizacion } from '../domain/determinarBaseCotizacion.js'
+import { useCampoMonetario } from '../hooks/useCampoMonetario.js'
+import { formatearPesos } from '../format/formatearDinero.js'
 
 const OPCIONES_CERTEZA = [
   { valor: 'conocido', texto: 'Lo conozco.' },
@@ -63,10 +65,6 @@ function textoAyudaContextual(tipoCotizante, lugarCotizacion) {
     return 'Es el valor total que reportas hoy para tus aportes a pensión.'
   }
   return 'Es el valor sobre el que actualmente se calculan tus aportes a pensión.'
-}
-
-function formatearPesos(valor) {
-  return `$${Math.round(valor).toLocaleString('es-CO')}`
 }
 
 function textoResultado(resultado) {
@@ -167,6 +165,11 @@ function BaseCotizacion({
     ? resultado.limitaciones.filter((l) => CODIGOS_LIMITACION_FUENTE.includes(l.codigo))
     : []
 
+  // Llamados incondicionalmente (Reglas de los Hooks), aunque sus campos
+  // solo se rendericen bajo ciertas condiciones más abajo.
+  const campoValorDeclarado = useCampoMonetario(valorBaseCotizacionDeclarado, onCambiarValorBaseCotizacionDeclarado)
+  const campoSalarioParaEstimar = useCampoMonetario(salarioParaEstimarBase, onCambiarSalarioParaEstimarBase)
+
   function manejarEnvio(e) {
     e.preventDefault()
     onContinuar()
@@ -212,10 +215,8 @@ function BaseCotizacion({
           <input
             type="text"
             inputMode="numeric"
-            pattern="[0-9]*"
             className="field__input"
-            value={valorBaseCotizacionDeclarado}
-            onChange={(e) => onCambiarValorBaseCotizacionDeclarado(e.target.value.replace(/\D/g, ''))}
+            {...campoValorDeclarado}
           />
         </label>
       )}
@@ -233,10 +234,8 @@ function BaseCotizacion({
           <input
             type="text"
             inputMode="numeric"
-            pattern="[0-9]*"
             className="field__input"
-            value={salarioParaEstimarBase}
-            onChange={(e) => onCambiarSalarioParaEstimarBase(e.target.value.replace(/\D/g, ''))}
+            {...campoSalarioParaEstimar}
           />
         </label>
       )}

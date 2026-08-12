@@ -3,7 +3,7 @@
   "descripcion": "Normativa pensional colombiana efectivamente aplicable en 2026 (Ley 100 de 1993 / Ley 797 de 2003, más Sentencia C-197 de 2023). La reforma pensional 2024 (Ley 2381) queda deliberadamente fuera: sigue suspendida por la Corte Constitucional (Auto 841 de 2025).",
   "estado": "borrador",
   "listoParaProduccion": false,
-  "notas": "Borrador bloqueado: 13 de 14 entradas están validadas contra trazabilidad-normativa.md. La entrada 'smlv' queda con estadoJuridico='transitorio' (Decreto 1469/2025 suspendido provisionalmente por el Consejo de Estado, valor sostenido por Decreto 0159/2026) y por eso resolverReglasVigentes() la excluye por defecto. No marcar 'publicado' hasta que el SMLV 2026 quede firme y se verifique el texto oficial de cada artículo contra Diario Oficial/SUIN-Juriscol.",
+  "notas": "Borrador bloqueado: 13 de las 14 entradas originales están validadas contra trazabilidad-normativa.md. La entrada 'smlv' queda con estadoJuridico='transitorio' (Decreto 1469/2025 suspendido provisionalmente por el Consejo de Estado, valor sostenido por Decreto 0159/2026) y por eso resolverReglasVigentes() la excluye por defecto. La entrada 15, 'semanas-habilitan-alternativa-ibl' (Art. 21, inciso 2 Ley 100/1993), se agregó en el Slice 'Primera lectura económica RPM desde historia estructurada' — respaldo textual directo del propio artículo, pero todavía no pasó la misma revisión cruzada formal que las 13 originales validadas. No marcar 'publicado' hasta que el SMLV 2026 quede firme, se verifique el texto oficial de cada artículo contra Diario Oficial/SUIN-Juriscol, y se valide formalmente la entrada 15.",
   "entradas": [
     {
       "id": "edad-pension-mujer",
@@ -132,6 +132,16 @@
       "fuente": "Ley 100 de 1993",
       "articulo": "Art. 34 Ley 100 de 1993, modificado por Art. 10 Ley 797 de 2003",
       "vigencia": { "desde": "2003-01-29", "hasta": null }
+    },
+    {
+      "id": "semanas-habilitan-alternativa-ibl",
+      "campo": "semanasHabilitanAlternativaIBL",
+      "valor": 1250,
+      "unidad": "semanas",
+      "fuente": "Ley 100 de 1993",
+      "articulo": "Art. 21, inciso 2, Ley 100 de 1993",
+      "vigencia": { "desde": "1994-04-01", "hasta": null },
+      "notas": "Umbral fijo de semanas cotizadas que habilita, como opción legal del afiliado ('podrá optar'), calcular el IBL como el promedio de toda la vida laboral cuando resulte superior al de los últimos 10 años — no varía por sexo ni por año, a diferencia de semanasMinimasPensionMujer/Hombre (elegibilidad de vejez, sí sujeta a cronograma). No confundir ambos campos: coinciden numéricamente en 1250 solo durante 2026 para las mujeres, por coincidencia del cronograma de la Sentencia C-197 de 2023, no por ser el mismo concepto."
     }
   ]
 }

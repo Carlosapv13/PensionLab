@@ -16,6 +16,7 @@ import BaseCotizacion from './pages/BaseCotizacion.jsx'
 import QueDeterminaTuResultado from './pages/QueDeterminaTuResultado.jsx'
 import ExploraTuProyeccion from './pages/ExploraTuProyeccion.jsx'
 import ExploraTuProyeccionRPM from './pages/ExploraTuProyeccionRPM.jsx'
+import { tienePrimeraLecturaValor } from './domain/tienePrimeraLecturaValor.js'
 
 // Import estático, pero solo se monta bajo import.meta.env.DEV (ver el
 // return más abajo) — Vite sustituye ese flag por el literal `false` en
@@ -159,6 +160,24 @@ function App() {
       setSalarioParaEstimarBase('')
     }
     setCertezaBaseCotizacion(valor)
+  }
+
+  // PrimeraLectura se omite cuando ninguna de sus dos evidencias tiene algo
+  // interpretable que mostrar (ej. régimen RAIS: ambas devuelven
+  // 'regimen_no_rpm') — el criterio se deriva exclusivamente del resultado
+  // estructurado del dominio, nunca de texto. No se guarda como bandera de
+  // estado: se recalcula en cada transición con los datos vigentes, para que
+  // un cambio posterior (ej. de régimen) nunca deje una decisión obsoleta.
+  function vistaSegunValorDePrimeraLectura(siConValor, siSinValor) {
+    return tienePrimeraLecturaValor({
+      sexo,
+      regimenActual,
+      nivelConocimientoSemanas,
+      semanasCotizadas,
+      fechaNacimiento,
+    })
+      ? siConValor
+      : siSinValor
   }
 
   function actualizarCertezaSaldoAcumulado(valor) {
@@ -372,7 +391,7 @@ function App() {
           trasladoRegimen={trasladoRegimen}
           onCambiarTrasladoRegimen={actualizarTrasladoRegimen}
           onVolver={() => setVista('informacionPensional')}
-          onContinuar={() => setVista('primeraLectura')}
+          onContinuar={() => setVista(vistaSegunValorDePrimeraLectura('primeraLectura', 'indiciosTransicion'))}
         />
       )}
 
@@ -395,7 +414,7 @@ function App() {
           trasladoRegimen={trasladoRegimen}
           detalleTraslado={detalleTraslado}
           onCambiarDetalleTraslado={setDetalleTraslado}
-          onVolver={() => setVista('primeraLectura')}
+          onVolver={() => setVista(vistaSegunValorDePrimeraLectura('primeraLectura', 'historiaPensional'))}
           onContinuar={() => setVista('baseCotizacion')}
         />
       )}

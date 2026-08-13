@@ -1,22 +1,32 @@
 // Pantalla funcional de Objetivo: el usuario elige qué quiere lograr con el
 // análisis (Slice S3-002).
 
+// Solo dos objetivos tienen una capacidad real detrás en esta versión: ambos
+// desembocan en el mismo Slice RAIS ya construido, así que el flujo no se
+// ramifica entre ellos. "Comparar caminos que ya conozco" y "Validar una
+// estrategia que ya tengo" se conservan visibles (nunca se ocultan) pero
+// deshabilitadas — la capacidad que necesitarían todavía no existe (ver
+// docs/producto/oportunidades-futuras.md).
 const OPCIONES = [
   {
     texto: 'Descubrir mis opciones pensionales.',
     ayuda: 'Conoce caminos que posiblemente no habías considerado.',
+    disponible: true,
   },
   {
     texto: 'Comparar caminos que ya conozco.',
     ayuda: 'Revisa sus beneficios, costos, tiempos y riesgos.',
+    disponible: false,
   },
   {
     texto: 'Validar una estrategia que ya tengo.',
     ayuda: 'Comprueba sus supuestos y compárala con otras alternativas.',
+    disponible: false,
   },
   {
     texto: 'No estoy seguro, quiero que PensionLab me guíe.',
     ayuda: 'Recomendable si todavía no conoces tu mejor estrategia.',
+    disponible: true,
   },
 ]
 
@@ -45,18 +55,24 @@ function Objetivo({ objetivoSeleccionado, onSeleccionarObjetivo, onContinuar, on
       <fieldset className="options">
         <legend className="visually-hidden">¿En qué quieres que te ayudemos hoy?</legend>
 
-        {OPCIONES.map(({ texto, ayuda }) => (
+        {OPCIONES.map(({ texto, ayuda, disponible }) => (
           <label key={texto} className="option">
             <input
               type="radio"
               name="objetivo"
               value={texto}
               checked={objetivoSeleccionado === texto}
+              disabled={!disponible}
               onChange={() => onSeleccionarObjetivo(texto)}
             />
             <span>
-              {texto}
+              <span className="option__label">{texto}</span>
               <span className="option__hint">{ayuda}</span>
+              {!disponible && (
+                <span className="option__hint">
+                  <span aria-hidden="true">⊘</span> No disponible todavía en esta versión.
+                </span>
+              )}
             </span>
           </label>
         ))}

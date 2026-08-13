@@ -703,6 +703,22 @@
   flex-shrink: 0;
 }
 
+/* Opción deshabilitada (ej. objetivos sin capacidad todavía en Objetivo.jsx):
+   mismo fondo y borde que una opción disponible sin marcar — la diferencia
+   se percibe en la intensidad del texto, antes de leer el contenido. Radio
+   nativo deshabilitado + cursor "not-allowed" cubren la señal no visual. */
+.option:has(input:disabled) {
+  cursor: not-allowed;
+}
+
+.option:has(input:disabled) .option__label {
+  opacity: 0.62;
+}
+
+.option:has(input:disabled) .option__hint {
+  opacity: 0.55;
+}
+
 .field-group {
   display: flex;
   flex-direction: column;

@@ -5,6 +5,9 @@
 // sobre traslados de régimen (Tiempo 3) — una sola conversación continua,
 // no una pantalla de resumen seguida de un formulario aparte.
 
+import { useRef } from 'react'
+import { useRestaurarFocoAlMontar } from '../hooks/useRestaurarFocoAlMontar.js'
+
 const HOY = new Date().toISOString().slice(0, 10)
 const ANIO_ACTUAL = Number(HOY.slice(0, 4))
 
@@ -94,13 +97,16 @@ function HistoriaPensional({
     },
   ]
 
+  const formRef = useRef(null)
+  useRestaurarFocoAlMontar(formRef)
+
   function manejarEnvio(e) {
     e.preventDefault()
     onContinuar()
   }
 
   return (
-    <form className="screen" onSubmit={manejarEnvio}>
+    <form className="screen" onSubmit={manejarEnvio} ref={formRef}>
       <h1 className="screen__title screen__title--historia-pensional">
         Esto es lo que ya sabemos de tu historia
       </h1>

@@ -4,6 +4,7 @@
 // un selector nativo, para no obligar a navegar muchos años atrás.
 
 import { useState, useRef, useEffect } from 'react'
+import { useRestaurarFocoAlMontar } from '../hooks/useRestaurarFocoAlMontar.js'
 
 const HOY = new Date().toISOString().slice(0, 10)
 const ANIO_ACTUAL = Number(HOY.slice(0, 4))
@@ -247,13 +248,16 @@ function DatosIniciales({
   const puedeContinuar =
     esFechaNacimientoValida(fechaNacimiento) && Boolean(sexo) && Boolean(lugarResidencia)
 
+  const formRef = useRef(null)
+  useRestaurarFocoAlMontar(formRef)
+
   function manejarEnvio(e) {
     e.preventDefault()
     onContinuar()
   }
 
   return (
-    <form className="screen" onSubmit={manejarEnvio}>
+    <form className="screen" onSubmit={manejarEnvio} ref={formRef}>
       <h1 className="screen__title">Datos iniciales</h1>
 
       <fieldset className="field-group">

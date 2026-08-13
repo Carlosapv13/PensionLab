@@ -4,6 +4,9 @@
 // No captura datos nuevos, no modifica estados existentes y no implementa
 // reglas ni cálculos pensionales.
 
+import { useRef } from 'react'
+import { useRestaurarFocoAlMontar } from '../hooks/useRestaurarFocoAlMontar.js'
+
 const MESES_LARGOS = [
   'enero',
   'febrero',
@@ -73,13 +76,16 @@ function ExpedientePensional({
   onComenzarExpediente,
   onVolver,
 }) {
+  const formRef = useRef(null)
+  useRestaurarFocoAlMontar(formRef)
+
   function manejarEnvio(e) {
     e.preventDefault()
     onComenzarExpediente()
   }
 
   return (
-    <form className="screen" onSubmit={manejarEnvio}>
+    <form className="screen" onSubmit={manejarEnvio} ref={formRef}>
       <h1 className="screen__title">Expediente pensional</h1>
 
       <p className="screen__subtitle">

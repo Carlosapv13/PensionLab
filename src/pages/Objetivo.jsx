@@ -1,6 +1,9 @@
 // Pantalla funcional de Objetivo: el usuario elige qué quiere lograr con el
 // análisis (Slice S3-002).
 
+import { useRef } from 'react'
+import { useRestaurarFocoAlMontar } from '../hooks/useRestaurarFocoAlMontar.js'
+
 // Solo dos objetivos tienen una capacidad real detrás en esta versión: ambos
 // desembocan en el mismo Slice RAIS ya construido, así que el flujo no se
 // ramifica entre ellos. "Comparar caminos que ya conozco" y "Validar una
@@ -38,13 +41,16 @@ const OPCIONES = [
  * @param {() => void} props.onVolver
  */
 function Objetivo({ objetivoSeleccionado, onSeleccionarObjetivo, onContinuar, onVolver }) {
+  const formRef = useRef(null)
+  useRestaurarFocoAlMontar(formRef)
+
   function manejarEnvio(e) {
     e.preventDefault()
     onContinuar()
   }
 
   return (
-    <form className="screen screen--objetivo" onSubmit={manejarEnvio}>
+    <form className="screen screen--objetivo" onSubmit={manejarEnvio} ref={formRef}>
       <h1 className="screen__title screen__title--objetivo">¿En qué quieres que te ayudemos hoy?</h1>
 
       <p className="screen__subtitle">

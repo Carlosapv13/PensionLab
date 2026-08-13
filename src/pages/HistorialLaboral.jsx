@@ -3,6 +3,9 @@
 // fecha de inicio de cotización, semanas, salario, IBC, aportes ni historia
 // salarial — eso queda para slices posteriores.
 
+import { useRef } from 'react'
+import { useRestaurarFocoAlMontar } from '../hooks/useRestaurarFocoAlMontar.js'
+
 const OPCIONES_TIPO_COTIZANTE = [
   {
     valor: 'empleado',
@@ -68,13 +71,16 @@ function HistorialLaboral({
   const puedeContinuar =
     Boolean(tipoCotizante) && Boolean(lugarCotizacion) && Boolean(cotizaActualmente)
 
+  const formRef = useRef(null)
+  useRestaurarFocoAlMontar(formRef)
+
   function manejarEnvio(e) {
     e.preventDefault()
     onContinuar()
   }
 
   return (
-    <form className="screen" onSubmit={manejarEnvio}>
+    <form className="screen" onSubmit={manejarEnvio} ref={formRef}>
       <h1 className="screen__title">Historial laboral</h1>
 
       <p className="screen__subtitle">

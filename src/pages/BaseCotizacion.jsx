@@ -31,7 +31,9 @@
 // cierre-sprint-3.md) pesó más que la ganancia narrativa de una pantalla sin
 // captura ni resultado propio.
 
+import { useRef } from 'react'
 import { determinarBaseCotizacion } from '../domain/determinarBaseCotizacion.js'
+import { useRestaurarFocoAlMontar } from '../hooks/useRestaurarFocoAlMontar.js'
 import { useCampoMonetario } from '../hooks/useCampoMonetario.js'
 import { formatearPesos } from '../format/formatearDinero.js'
 import CampoMonetario from '../components/CampoMonetario.jsx'
@@ -219,13 +221,16 @@ function BaseCotizacion({
   const campoValorDeclarado = useCampoMonetario(valorBaseCotizacionDeclarado, onCambiarValorBaseCotizacionDeclarado)
   const campoSalarioParaEstimar = useCampoMonetario(salarioParaEstimarBase, onCambiarSalarioParaEstimarBase)
 
+  const formRef = useRef(null)
+  useRestaurarFocoAlMontar(formRef)
+
   function manejarEnvio(e) {
     e.preventDefault()
     onContinuar()
   }
 
   return (
-    <form className="screen" onSubmit={manejarEnvio}>
+    <form className="screen" onSubmit={manejarEnvio} ref={formRef}>
       <h1 className="screen__title screen__title--base-cotizacion">El valor sobre el que cotizas hoy</h1>
 
       <p className="screen__subtitle">

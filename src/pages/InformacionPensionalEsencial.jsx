@@ -6,7 +6,8 @@
 // cronológica mínima entre los dos datos — no reglas legales ni cálculos de
 // dominio.
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
+import { useRestaurarFocoAlMontar } from '../hooks/useRestaurarFocoAlMontar.js'
 
 const HOY = new Date().toISOString().slice(0, 10)
 const ANIO_ACTUAL = Number(HOY.slice(0, 4))
@@ -168,6 +169,13 @@ function InformacionPensionalEsencial({
 }) {
   const [paso, setPaso] = useState(() => (anioInicioCotizacion ? 2 : 1))
 
+  // Dos <form> independientes, solo uno montado a la vez (ver nota de
+  // arriba) — cada uno necesita su propia ref para que el hook de foco
+  // opere sobre el que realmente está en el DOM en cada momento.
+  const formRefPaso1 = useRef(null)
+  const formRefPaso2 = useRef(null)
+  useRestaurarFocoAlMontar(paso === 1 ? formRefPaso1 : formRefPaso2)
+
   const anioNacimiento = fechaNacimiento ? Number(fechaNacimiento.slice(0, 4)) : null
   const noRecuerdaAnio = anioInicioCotizacion === 'desconocido'
   const estadoAnio = calcularEstadoAnio(anioInicioCotizacion, anioNacimiento)
@@ -214,7 +222,7 @@ function InformacionPensionalEsencial({
       </h1>
 
       {paso === 1 && (
-        <form onSubmit={manejarEnvioPaso1}>
+        <form onSubmit={manejarEnvioPaso1} ref={formRefPaso1}>
           <p className="screen__subtitle">
             Vamos a construir juntos tu historia pensional. Solo te
             preguntaremos lo esencial y siempre te explicaremos para qué lo
@@ -278,7 +286,7 @@ function InformacionPensionalEsencial({
       )}
 
       {paso === 2 && (
-        <form onSubmit={manejarEnvioPaso2}>
+        <form onSubmit={manejarEnvioPaso2} ref={formRefPaso2}>
           <fieldset className="options">
             <legend>¿Sabes aproximadamente cuántas semanas has cotizado?</legend>
 

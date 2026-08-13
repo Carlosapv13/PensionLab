@@ -3,6 +3,9 @@
 // expediente pensional — no captura fecha de inicio de cotización, semanas,
 // salario, IBC, aportes, historial laboral, traslados ni cálculos.
 
+import { useRef } from 'react'
+import { useRestaurarFocoAlMontar } from '../hooks/useRestaurarFocoAlMontar.js'
+
 const OPCIONES_REGIMEN = [
   {
     valor: 'RPM',
@@ -34,13 +37,16 @@ function SituacionPensional({
   onContinuar,
   onVolver,
 }) {
+  const formRef = useRef(null)
+  useRestaurarFocoAlMontar(formRef)
+
   function manejarEnvio(e) {
     e.preventDefault()
     onContinuar()
   }
 
   return (
-    <form className="screen" onSubmit={manejarEnvio}>
+    <form className="screen" onSubmit={manejarEnvio} ref={formRef}>
       <h1 className="screen__title">Situación pensional</h1>
 
       <fieldset className="options">

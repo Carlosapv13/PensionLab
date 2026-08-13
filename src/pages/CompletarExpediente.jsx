@@ -8,6 +8,9 @@
 // bloque mostrado dependen del estado real capturado (infoEsencialCompletada),
 // no de una etiqueta fija.
 
+import { useRef } from 'react'
+import { useRestaurarFocoAlMontar } from '../hooks/useRestaurarFocoAlMontar.js'
+
 const BLOQUES_BASE = [
   'Objetivo',
   'Datos personales',
@@ -30,13 +33,16 @@ function CompletarExpediente({ infoEsencialCompletada, onVolver, onContinuar }) 
     ? 'Historia pensional'
     : 'Información pensional esencial'
 
+  const formRef = useRef(null)
+  useRestaurarFocoAlMontar(formRef)
+
   function manejarEnvio(e) {
     e.preventDefault()
     onContinuar()
   }
 
   return (
-    <form className="screen" onSubmit={manejarEnvio}>
+    <form className="screen" onSubmit={manejarEnvio} ref={formRef}>
       <h1 className="screen__title screen__title--completar-expediente">Completemos tu expediente</h1>
 
       <p className="screen__subtitle">

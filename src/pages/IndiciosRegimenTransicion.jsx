@@ -21,7 +21,9 @@
 // Bloque 5 — Resultados, Decisión 14). Se diseñará solo cuando exista una segunda
 // evidencia real que produzca la misma tensión de ubicación en el recorrido lineal.
 
+import { useRef } from 'react'
 import { evaluarIndiciosTransicion } from '../domain/evidenciaIndiciosTransicion.js'
+import { useRestaurarFocoAlMontar } from '../hooks/useRestaurarFocoAlMontar.js'
 
 const TEXTOS_NO_EVALUABLE = {
   sexo_no_valido: 'Todavía no podemos hacer esta lectura con la información que tenemos.',
@@ -117,13 +119,16 @@ function IndiciosRegimenTransicion({
 
   const faltaDetalleTraslado = trasladoRegimen === 'si' && !detalleTraslado
 
+  const formRef = useRef(null)
+  useRestaurarFocoAlMontar(formRef)
+
   function manejarEnvio(e) {
     e.preventDefault()
     onContinuar()
   }
 
   return (
-    <form className="screen" onSubmit={manejarEnvio}>
+    <form className="screen" onSubmit={manejarEnvio} ref={formRef}>
       <h1 className="screen__title screen__title--indicios-transicion">
         Posibles indicios de régimen de transición
       </h1>

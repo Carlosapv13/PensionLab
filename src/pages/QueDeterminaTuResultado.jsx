@@ -13,7 +13,9 @@
 // (determinarMecanismoYFaltantes.js) entrega solo códigos estructurales; toda la
 // redacción vive aquí, mismo criterio ya corregido en determinarBaseCotizacion.js.
 
+import { useRef } from 'react'
 import { determinarMecanismoYFaltantes } from '../domain/determinarMecanismoYFaltantes.js'
+import { useRestaurarFocoAlMontar } from '../hooks/useRestaurarFocoAlMontar.js'
 
 const TEXTO_MECANISMO = {
   MECANISMO_IBL_SEMANAS: {
@@ -86,13 +88,16 @@ function QueDeterminaTuResultado({ regimenActual, onVolver, onContinuar }) {
   // "Motor de caminos RAIS".
   const tieneCapacidadPosterior = regimenActual === 'RAIS' || regimenActual === 'RPM'
 
+  const formRef = useRef(null)
+  useRestaurarFocoAlMontar(formRef)
+
   function manejarEnvio(e) {
     e.preventDefault()
     if (tieneCapacidadPosterior) onContinuar()
   }
 
   return (
-    <form className="screen" onSubmit={manejarEnvio}>
+    <form className="screen" onSubmit={manejarEnvio} ref={formRef}>
       <h1 className="screen__title screen__title--que-determina-resultado">
         Qué determina tu resultado
       </h1>

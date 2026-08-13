@@ -3,8 +3,10 @@
 // las traduce a lenguaje conversacional. No captura ningún dato nuevo —
 // interpreta, de forma trazable y calificada, lo que ya se sabe.
 
+import { useRef } from 'react'
 import { evaluarSemanasMinimas } from '../domain/evidenciaSemanasMinimas.js'
 import { evaluarEdadPension } from '../domain/evidenciaEdadPension.js'
+import { useRestaurarFocoAlMontar } from '../hooks/useRestaurarFocoAlMontar.js'
 
 const TEXTOS_NO_EVALUABLE_SEMANAS = {
   regimen_no_rpm:
@@ -203,13 +205,16 @@ function PrimeraLectura({
       : null
   const textoCombinado = razonCompartida ? TEXTOS_NO_EVALUABLE_COMBINADO[razonCompartida] : null
 
+  const formRef = useRef(null)
+  useRestaurarFocoAlMontar(formRef)
+
   function manejarEnvio(e) {
     e.preventDefault()
     onContinuar()
   }
 
   return (
-    <form className="screen" onSubmit={manejarEnvio}>
+    <form className="screen" onSubmit={manejarEnvio} ref={formRef}>
       <h1 className="screen__title screen__title--primera-lectura">
         Una primera lectura de tu situación
       </h1>

@@ -9,7 +9,7 @@ no perder la idea, no una promesa de construirla.
 
 ---
 
-## 4. Formateo monetario en vivo mientras se escribe
+## Formateo monetario en vivo mientras se escribe
 
 **Origen de la idea:** surgió durante el mini-Slice "Formato monetario
 consistente en campos de entrada" (revisión UX del MVP): los 5 campos

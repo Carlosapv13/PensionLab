@@ -41,16 +41,27 @@ const LIMITACION_CAPITAL_NO_INCLUIDO = {
     'esta cifra.',
 }
 
+const LIMITACION_ANUALIZACION_SIMPLIFICADA = {
+  codigo: 'ANUALIZACION_SIMPLIFICADA',
+  mensaje:
+    'El resultado se calcula sobre un horizonte de pago fijo, sin tablas de mortalidad reales, ' +
+    'sin Garantía de Pensión Mínima y sin bono pensional — sigue siendo una proyección parcial, ' +
+    'incluso cuando ya incluye tu capital acumulado.',
+}
+
 /**
  * @param {Object} input
  * @param {('RPM'|'RAIS'|'desconocido'|null)} input.regimenActual
  * @param {string} input.fechaNacimiento - ISO
  * @param {(number|null|undefined)} input.edadJubilacionDeseada
  * @param {number} input.ibcAplicableSimulacion
+ * @param {number} [input.capitalInicial] - Capital ya acumulado en la cuenta individual RAIS
+ *   (Slice "Motor de caminos RAIS"), opcional, default 0 — mismo comportamiento de siempre
+ *   cuando se omite. Se pasa tal cual a formulaRAIS, que ya sabe capitalizarlo.
  * @param {string} [input.fecha] - ISO, por defecto hoy; parametrizable para pruebas
  * @returns {{
  *   estado: 'calculado' | 'no_evaluable',
- *   razonNoEvaluable: 'regimen_no_rais' | 'edad_jubilacion_no_declarada' | null,
+ *   razonNoEvaluable: 'regimen_no_rais' | 'edad_jubilacion_no_declarada' | 'ibc_no_valido' | 'capital_inicial_no_valido' | null,
  *   pensionMensualProyectada: number | null,
  *   fechaCalculo: string | null,
  *   parametrosLegalesUsados: {
@@ -71,6 +82,7 @@ export function calcularProyeccionRAIS({
   fechaNacimiento,
   edadJubilacionDeseada,
   ibcAplicableSimulacion,
+  capitalInicial = 0,
   fecha = hoyISO(),
 }) {
   function noEvaluable(razonNoEvaluable) {
@@ -93,6 +105,30 @@ export function calcularProyeccionRAIS({
     return noEvaluable('edad_jubilacion_no_declarada')
   }
 
+  // Defensa genérica del propio contrato (Principio de Arquitectura 11): esta
+  // función no asume que quien la llama ya filtró un ibcAplicableSimulacion
+  // inválido, aunque hoy el único caller (ExploraTuProyeccion.jsx) ya lo hace.
+  // Deliberadamente genérica — solo descarta lo que no puede ser un salario
+  // real (nulo, no numérico, cero o negativo). No compara contra el piso
+  // legal de 1 SMLV ni ninguna regla jurídica: esa regla vive exclusivamente
+  // en determinarBaseCotizacion.js (razonNoApto), para no duplicarla aquí con
+  // un criterio potencialmente distinto.
+  if (
+    ibcAplicableSimulacion === null ||
+    ibcAplicableSimulacion === undefined ||
+    !Number.isFinite(ibcAplicableSimulacion) ||
+    ibcAplicableSimulacion <= 0
+  ) {
+    return noEvaluable('ibc_no_valido')
+  }
+
+  // Misma defensa genérica que ibcAplicableSimulacion (Principio 11) — capitalInicial
+  // es opcional (default 0, siempre válido), pero si se provee explícitamente debe ser
+  // un número finito no negativo. No se corrige en silencio a 0: se declara no evaluable.
+  if (!Number.isFinite(capitalInicial) || capitalInicial < 0) {
+    return noEvaluable('capital_inicial_no_valido')
+  }
+
   const edadActual = calcularEdadCumplida(fechaNacimiento, fecha)
 
   const smlv = obtenerSmlv(fecha)
@@ -107,6 +143,7 @@ export function calcularProyeccionRAIS({
       edadActual,
       edadJubilacionDeseada,
       salarioActual: ibcAplicableSimulacion,
+      capitalInicial,
     },
     parametrosLegales: {
       smlv: smlv.valor,
@@ -135,6 +172,14 @@ export function calcularProyeccionRAIS({
       descuentoSobreAporteCapitalizable: { valor: descuento.valor, id: descuento.id },
       mesesPayoutSimplificado: { valor: horizontePago.valor, id: horizontePago.id },
     },
-    limitaciones: [LIMITACION_CAPITAL_NO_INCLUIDO],
+    // CAPITAL_ACUMULADO_NO_INCLUIDO solo aplica cuando capitalInicial es 0 — con el
+    // Slice "Motor de caminos RAIS", cuando sí se declara un saldo, el mensaje ya no
+    // sería cierto (el capital SÍ se incluyó). ANUALIZACION_SIMPLIFICADA sigue
+    // aplicando siempre: mortalidad real, FGPM y bono pensional nunca se modelan aquí,
+    // con o sin saldo declarado.
+    limitaciones:
+      capitalInicial === 0
+        ? [LIMITACION_CAPITAL_NO_INCLUIDO, LIMITACION_ANUALIZACION_SIMPLIFICADA]
+        : [LIMITACION_ANUALIZACION_SIMPLIFICADA],
   }
 }

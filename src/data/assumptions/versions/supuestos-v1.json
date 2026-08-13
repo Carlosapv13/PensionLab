@@ -32,6 +32,16 @@
       "fuente": "Supuesto de producto, aprobado explícitamente sin sustento actuarial",
       "articulo": null,
       "vigencia": { "desde": "2026-07-30", "hasta": null }
+    },
+    {
+      "id": "ibc-constante-terminos-reales-2026",
+      "campo": "ibcConstanteEnTerminosReales",
+      "valor": true,
+      "unidad": "convención económica",
+      "descripcion": "Convención económica (no un factor numérico de cálculo): el IBC constante que usa formulaRAIS.js a lo largo del horizonte se interpreta como un nivel constante de poder adquisitivo en pesos de hoy, no como el mismo número nominal de pesos durante todo el horizonte. No representa una indexación computacional mensual o anual del IBC dentro de la fórmula — no hay ningún ajuste año a año en el cálculo. El valor nominal que una persona tendría que aportar en años futuros no se calcula todavía en esta versión.",
+      "fuente": "Convención de producto aprobada tras la auditoría de coherencia económica de RAIS (Convención Económica v1) — ver domain/formulas/trazabilidad-formula-RAIS.md, sección 'RAIS en términos reales'",
+      "articulo": null,
+      "vigencia": { "desde": "2026-08-09", "hasta": null }
     }
   ]
 }

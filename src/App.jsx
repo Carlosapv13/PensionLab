@@ -48,6 +48,16 @@ function App() {
   const [salarioParaEstimarBase, setSalarioParaEstimarBase] = useState('')
   const [declaracionLibre, setDeclaracionLibre] = useState(null)
   const [edadJubilacionDeseada, setEdadJubilacionDeseada] = useState('')
+  // Slice "Motor de caminos RAIS": saldo acumulado (mismo patrón de certeza ya
+  // usado para la base de cotización), objetivo de pensión mensual y la
+  // restricción opcional de esfuerzo máximo que el propio usuario declara.
+  const [certezaSaldoAcumulado, setCertezaSaldoAcumulado] = useState(null)
+  const [saldoAcumuladoDeclarado, setSaldoAcumuladoDeclarado] = useState('')
+  const [objetivoPensionMensual, setObjetivoPensionMensual] = useState('')
+  // Cuánto más puede destinar la persona exclusivamente a su aporte pensional
+  // (no a IBC, no a seguridad social total — ver generarCaminosRAIS.js).
+  const [restriccionCostoPensionalAdicionalMaximoMensual, setRestriccionCostoPensionalAdicionalMaximoMensual] =
+    useState('')
   // Slice "Primera lectura económica RPM desde historia estructurada": historia de
   // cotización estructurada (PeriodoCotizacion[]) — en este Slice solo se puebla vía el
   // panel de desarrollo, nunca por una pantalla real de captura (fuera de alcance).
@@ -151,6 +161,16 @@ function App() {
     setCertezaBaseCotizacion(valor)
   }
 
+  function actualizarCertezaSaldoAcumulado(valor) {
+    // Mismo criterio que actualizarCertezaBaseCotizacion: saldoAcumuladoDeclarado
+    // solo tiene sentido con 'conocido'/'aproximado' — cambiar la certeza invalida
+    // el valor que ya no aplica.
+    if (valor !== 'conocido' && valor !== 'aproximado') {
+      setSaldoAcumuladoDeclarado('')
+    }
+    setCertezaSaldoAcumulado(valor)
+  }
+
   // Agrupa el estado editable existente y sus setters crudos, exclusivamente
   // para el panel de desarrollo (src/dev/) — no crea estado nuevo, solo
   // referencia el que ya existe arriba. Mismo criterio de "un olvido debe
@@ -178,6 +198,10 @@ function App() {
     salarioParaEstimarBase,
     declaracionLibre,
     edadJubilacionDeseada,
+    certezaSaldoAcumulado,
+    saldoAcumuladoDeclarado,
+    objetivoPensionMensual,
+    restriccionCostoPensionalAdicionalMaximoMensual,
     historiaCotizacion,
   }
 
@@ -203,6 +227,10 @@ function App() {
     salarioParaEstimarBase: setSalarioParaEstimarBase,
     declaracionLibre: setDeclaracionLibre,
     edadJubilacionDeseada: setEdadJubilacionDeseada,
+    certezaSaldoAcumulado: setCertezaSaldoAcumulado,
+    saldoAcumuladoDeclarado: setSaldoAcumuladoDeclarado,
+    objetivoPensionMensual: setObjetivoPensionMensual,
+    restriccionCostoPensionalAdicionalMaximoMensual: setRestriccionCostoPensionalAdicionalMaximoMensual,
     historiaCotizacion: setHistoriaCotizacion,
   }
   return (
@@ -236,6 +264,7 @@ function App() {
             tipoCotizante: actualizarTipoCotizante,
             lugarCotizacion: actualizarLugarCotizacion,
             certezaBaseCotizacion: actualizarCertezaBaseCotizacion,
+            certezaSaldoAcumulado: actualizarCertezaSaldoAcumulado,
           })}
           vistaActual={vista}
           onIrAVista={setVista}
@@ -405,8 +434,19 @@ function App() {
           tipoCotizante={tipoCotizante}
           lugarCotizacion={lugarCotizacion}
           salarioParaEstimarBase={salarioParaEstimarBase}
+          trasladoRegimen={trasladoRegimen}
           edadJubilacionDeseada={edadJubilacionDeseada}
           onCambiarEdadJubilacionDeseada={setEdadJubilacionDeseada}
+          certezaSaldoAcumulado={certezaSaldoAcumulado}
+          onCambiarCertezaSaldoAcumulado={actualizarCertezaSaldoAcumulado}
+          saldoAcumuladoDeclarado={saldoAcumuladoDeclarado}
+          onCambiarSaldoAcumuladoDeclarado={setSaldoAcumuladoDeclarado}
+          objetivoPensionMensual={objetivoPensionMensual}
+          onCambiarObjetivoPensionMensual={setObjetivoPensionMensual}
+          restriccionCostoPensionalAdicionalMaximoMensual={restriccionCostoPensionalAdicionalMaximoMensual}
+          onCambiarRestriccionCostoPensionalAdicionalMaximoMensual={
+            setRestriccionCostoPensionalAdicionalMaximoMensual
+          }
           onVolver={() => setVista('queDeterminaResultado')}
         />
       )}

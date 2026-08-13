@@ -62,6 +62,35 @@ describe('calcularProyeccionRAIS — no_evaluable: edad_jubilacion_no_declarada'
   })
 })
 
+describe('calcularProyeccionRAIS — no_evaluable: ibc_no_valido (defensa genérica del contrato)', () => {
+  it('ibcAplicableSimulacion null', () => {
+    const r = calcularProyeccionRAIS({ ...CASO_BASE, ibcAplicableSimulacion: null })
+    expect(r.estado).toBe('no_evaluable')
+    expect(r.razonNoEvaluable).toBe('ibc_no_valido')
+    expect(r.pensionMensualProyectada).toBeNull()
+  })
+
+  it('ibcAplicableSimulacion undefined', () => {
+    const r = calcularProyeccionRAIS({ ...CASO_BASE, ibcAplicableSimulacion: undefined })
+    expect(r.razonNoEvaluable).toBe('ibc_no_valido')
+  })
+
+  it('ibcAplicableSimulacion en cero', () => {
+    const r = calcularProyeccionRAIS({ ...CASO_BASE, ibcAplicableSimulacion: 0 })
+    expect(r.razonNoEvaluable).toBe('ibc_no_valido')
+  })
+
+  it('ibcAplicableSimulacion negativo', () => {
+    const r = calcularProyeccionRAIS({ ...CASO_BASE, ibcAplicableSimulacion: -100 })
+    expect(r.razonNoEvaluable).toBe('ibc_no_valido')
+  })
+
+  it('ibcAplicableSimulacion no numérico (NaN), nunca lanza', () => {
+    const r = calcularProyeccionRAIS({ ...CASO_BASE, ibcAplicableSimulacion: NaN })
+    expect(r.razonNoEvaluable).toBe('ibc_no_valido')
+  })
+})
+
 describe('calcularProyeccionRAIS — trazabilidad', () => {
   it('incluye los ids de los valores legales usados', () => {
     const r = calcularProyeccionRAIS(CASO_BASE)
@@ -90,16 +119,46 @@ describe('calcularProyeccionRAIS — trazabilidad', () => {
 })
 
 describe('calcularProyeccionRAIS — limitación crítica', () => {
-  it('el resultado calculado siempre incluye la limitación de capital no incluido', () => {
+  it('sin capitalInicial (default 0): incluye la limitación de capital no incluido, más la de anualización simplificada', () => {
     const r = calcularProyeccionRAIS(CASO_BASE)
 
+    expect(r.limitaciones).toHaveLength(2)
+    expect(r.limitaciones.map((l) => l.codigo)).toContain('CAPITAL_ACUMULADO_NO_INCLUIDO')
+    expect(r.limitaciones.find((l) => l.codigo === 'CAPITAL_ACUMULADO_NO_INCLUIDO').mensaje).toMatch(
+      /no incluye el capital/i
+    )
+    expect(r.limitaciones.map((l) => l.codigo)).toContain('ANUALIZACION_SIMPLIFICADA')
+  })
+
+  it('con capitalInicial > 0 (Slice "Motor de caminos RAIS"): ya no incluye la limitación de capital no incluido, porque dejaría de ser cierta', () => {
+    const r = calcularProyeccionRAIS({ ...CASO_BASE, capitalInicial: 5000000 })
+
     expect(r.limitaciones).toHaveLength(1)
-    expect(r.limitaciones[0].codigo).toBe('CAPITAL_ACUMULADO_NO_INCLUIDO')
-    expect(r.limitaciones[0].mensaje).toMatch(/no incluye el capital/i)
+    expect(r.limitaciones[0].codigo).toBe('ANUALIZACION_SIMPLIFICADA')
   })
 
   it('un resultado no_evaluable no lleva limitaciones (no hay cálculo del que advertir)', () => {
     const r = calcularProyeccionRAIS({ ...CASO_BASE, regimenActual: 'RPM' })
     expect(r.limitaciones).toEqual([])
+  })
+})
+
+describe('calcularProyeccionRAIS — capitalInicial (Slice "Motor de caminos RAIS")', () => {
+  it('con capitalInicial: produce una pensión mayor que sin él, para el mismo caso', () => {
+    const sinCapital = calcularProyeccionRAIS(CASO_BASE)
+    const conCapital = calcularProyeccionRAIS({ ...CASO_BASE, capitalInicial: 20000000 })
+
+    expect(conCapital.pensionMensualProyectada).toBeGreaterThan(sinCapital.pensionMensualProyectada)
+  })
+
+  it('no_evaluable: capital_inicial_no_valido cuando es negativo', () => {
+    const r = calcularProyeccionRAIS({ ...CASO_BASE, capitalInicial: -1 })
+    expect(r.estado).toBe('no_evaluable')
+    expect(r.razonNoEvaluable).toBe('capital_inicial_no_valido')
+  })
+
+  it('no_evaluable: capital_inicial_no_valido cuando no es finito (NaN)', () => {
+    const r = calcularProyeccionRAIS({ ...CASO_BASE, capitalInicial: NaN })
+    expect(r.razonNoEvaluable).toBe('capital_inicial_no_valido')
   })
 })

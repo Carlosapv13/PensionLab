@@ -35,6 +35,10 @@ export const VALORES_POR_DEFECTO = {
   salarioParaEstimarBase: '',
   declaracionLibre: null,
   edadJubilacionDeseada: '',
+  certezaSaldoAcumulado: null,
+  saldoAcumuladoDeclarado: '',
+  objetivoPensionMensual: '',
+  restriccionCostoPensionalAdicionalMaximoMensual: '',
   // Slice "Primera lectura económica RPM desde historia estructurada": historia de
   // cotización estructurada (PeriodoCotizacion[]) — en este Slice solo se puebla vía
   // fixtures de desarrollo, nunca por una pantalla real de captura (fuera de alcance).
@@ -76,7 +80,29 @@ export const VISTAS_CONOCIDAS = [
 // exploraTuProyeccionRPM: presencia únicamente de los dos campos sin los que
 // calcularPensionRPM.js ni siquiera llega a evaluar la historia (regimenActual,
 // historiaCotizacion) — ver ExploraTuProyeccionRPM.jsx.
+//
+// exploraTuProyeccion: presencia únicamente (nunca valores/reglas de
+// negocio, eso es responsabilidad exclusiva del dominio) de los campos
+// estructurales sin los que generarCaminosRAIS.js ni siquiera llega a
+// evaluar el perfil o directamente devuelve DATOS_INCOMPLETOS — ver
+// perfilAplica en ExploraTuProyeccion.jsx y las validaciones de
+// generarCaminosRAIS.js. restriccionCostoPensionalAdicionalMaximoMensual
+// queda fuera a propósito: el dominio ya la trata como opcional (sin ella,
+// sin límite propio, no bloquea la generación de caminos).
 export const CAMPOS_MINIMOS_POR_VISTA = {
   declaracionLibre: ['regimenActual', 'fechaNacimiento', 'sexo'],
   exploraTuProyeccionRPM: ['regimenActual', 'historiaCotizacion'],
+  exploraTuProyeccion: [
+    'regimenActual',
+    'tipoCotizante',
+    'lugarCotizacion',
+    'trasladoRegimen',
+    'fechaNacimiento',
+    'edadJubilacionDeseada',
+    'certezaBaseCotizacion',
+    'valorBaseCotizacionDeclarado',
+    'certezaSaldoAcumulado',
+    'saldoAcumuladoDeclarado',
+    'objetivoPensionMensual',
+  ],
 }

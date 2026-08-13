@@ -488,6 +488,105 @@
   font-size: 16px;
 }
 
+/* Comparación de caminos (ExploraTuProyeccion) — ver el comentario junto a
+   .comparacion-caminos en el JSX para el porqué de CSS Grid en vez de
+   <table>. .camino-columna usa display:contents para que sus celdas hijas
+   sean items directos de .comparacion-caminos: así el DOM puede quedar en
+   orden "por camino" (bueno para el apilado en móvil) mientras el grid
+   alinea por fila en escritorio. Cada celda fija su columna con --col
+   (una custom property por camino, calculada en JSX) y su fila con una
+   clase fija por tipo de variable — nunca con grid-auto-flow, porque una
+   columna "descartada" emite menos celdas que una viable y el flujo
+   automático las desalinearía. */
+.comparacion-caminos__contexto {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.comparacion-caminos {
+  display: grid;
+  grid-template-columns: repeat(var(--comparacion-caminos-columnas), minmax(220px, 1fr));
+  grid-template-rows: repeat(6, auto);
+  gap: 16px;
+  width: 100%;
+}
+
+.camino-columna {
+  display: contents;
+}
+
+.camino-celda {
+  grid-column: var(--col);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 14px;
+  border-inline: 1px solid var(--border);
+}
+
+.camino-celda--encabezado {
+  grid-row: 1;
+  padding-top: 14px;
+  padding-bottom: 10px;
+  border-top: 1px solid var(--accent);
+  border-bottom: 1px solid var(--border);
+}
+
+.camino-columna--alineado .camino-celda--encabezado {
+  border-top-width: 3px;
+}
+
+.camino-celda--esfuerzo {
+  grid-row: 2;
+}
+
+.camino-celda--base {
+  grid-row: 3;
+}
+
+.camino-celda--proyeccion {
+  grid-row: 4;
+}
+
+.camino-celda--objetivo {
+  grid-row: 5;
+}
+
+.camino-celda--notas {
+  grid-row: 6;
+  padding-top: 6px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.camino-celda--descartado {
+  grid-row: 2 / -1;
+  padding: 14px;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+}
+
+.camino-celda__etiqueta {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.camino-celda__valor {
+  font-size: 16px;
+  color: var(--text-h);
+}
+
+.camino-celda__valor--titulo {
+  margin: 0;
+  font-weight: 600;
+}
+
+.camino-celda__nota {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
 .comparacion-caminos__supuestos {
   display: flex;
   flex-direction: column;
@@ -682,6 +781,27 @@
 
   .date-fields {
     flex-direction: column;
+  }
+
+  /* Apila los caminos en vez de comprimir columnas — cada celda ya trae su
+     propia etiqueta junto al valor (ver .camino-celda en el bloque de
+     arriba), así que apilar no pierde legibilidad. Sin esto, --col seguiría
+     ubicando cada camino en su propia columna (2ª, 3ª...) que ya no existe
+     en un grid de una sola columna, y el navegador crearía columnas
+     implícitas fuera de pantalla — exactamente el scroll horizontal que no
+     queremos. */
+  .comparacion-caminos {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+  }
+
+  .camino-celda {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .camino-columna:not(:first-child) .camino-celda--encabezado {
+    margin-top: 16px;
   }
 }
 

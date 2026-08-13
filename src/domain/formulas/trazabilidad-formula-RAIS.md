@@ -203,6 +203,53 @@ simulador no la incluye).
 5. Contrato de las dos funciones y el agrupamiento en tres parámetros (`datosUsuario` /
    `parametrosLegales` / `parametrosSupuestos`) — aprobado sin cambios.
 
+## RAIS en términos reales (Convención Económica v1) — decisión aprobada (2026-08-09)
+
+Una auditoría económica posterior (Sprint "Motor de caminos RAIS") encontró que el motor
+comparaba `objetivoValorMensual` directamente contra `resultado.valor` sin que el código, la
+documentación ni la UI declararan en qué referencia temporal estaban esas cifras — ni
+"pesos de hoy" ni "pesos nominales futuros" de forma consistente. La auditoría trazó la
+matemática real (no la intención) y encontró que `rentabilidadEsperadaRAIS` ya está
+etiquetada `"unidad": "tasa real anual"` en `data/assumptions`, pero esa etiqueta nunca se
+conectaba con nada — el código la componía exactamente igual que compondría una tasa
+nominal, sobre un IBC congelado sin ningún mecanismo de indexación por IPC ni SMMLV.
+
+**Hallazgo central de la auditoría, con implicación directa para esta decisión:** bajo la
+convención "todo en pesos de hoy / términos reales", la aritmética de este documento
+(Pasos 1 a 3, arriba) **ya es válida sin modificarla**. Un aporte constante interpretado
+como aporte real constante, compuesto con una tasa real, produce un capital real; ese
+capital real anualizado con la misma tasa real produce una mesada real — es la técnica
+estándar de proyectar enteramente en términos constantes, sin necesidad de modelar
+inflación explícita, siempre que se declare y no se mezcle con nada nominal.
+
+**Decisión aprobada:**
+
+1. `ibcAplicableSimulacion`, `saldoAcumulado`, `objetivoValorMensual` y `resultado.valor`
+   de `generarCaminosRAIS.js` se interpretan, de aquí en adelante, en pesos de hoy (poder
+   adquisitivo constante) — no como pesos nominales futuros. **`formulaRAIS.js` y
+   `calcularProyeccionRAIS.js` no se modifican**: su aritmética ya es correcta bajo esta
+   lectura: el cambio es de interpretación declarada, nunca de cálculo.
+2. El supuesto que sostiene esta lectura para el IBC —que `salarioConstante` ya nombraba
+   en este documento sin llegar a implementarse como dato (ver Metodología, arriba)— queda
+   formalmente registrado como `ibcConstanteEnTerminosReales` en
+   `data/assumptions/versions/supuestos-v1.json`. Su `descripcion` deja explícito que **no**
+   es una indexación computacional del IBC dentro de la fórmula, sino la convención bajo la
+   cual se lee su resultado — el valor nominal que una persona tendría que aportar en años
+   futuros no se calcula en esta versión.
+3. La convención viaja al usuario como limitación estructural de cada escenario
+   (`PROYECCION_EN_TERMINOS_REALES` en `generarCaminosRAIS.js`), no únicamente en este
+   documento — mismo criterio que ya rige el resto de las limitaciones de este Slice.
+4. **Tope de 25 SMMLV usado para el camino alternativo:** se sigue evaluando con el SMMLV
+   vigente en la fecha de la simulación — PensionLab no proyecta todavía el SMMLV futuro.
+   Esta decisión declara únicamente ese hecho, sin afirmar nada sobre cómo evolucionará el
+   SMMLV real: el tope debe entenderse como una restricción construida con los parámetros
+   legales actuales, una limitación de esta versión — registrado como
+   `TOPE_IBC_CON_SMMLV_VIGENTE`, específico del camino alternativo (nunca del camino base,
+   que no usa ese tope).
+5. El piso legal (1 SMLV) que valida la base declarada en `determinarBaseCotizacion.js`
+   queda fuera de esta decisión — es una verificación en el momento presente (hoy contra
+   hoy), no una proyección, y no tiene la ambigüedad que motivó esta auditoría.
+
 ## Fuentes consultadas
 
 - [Desempeño financiero de los fondos de pensiones obligatorias en Colombia — Banco de la República](https://www.banrep.gov.co/sites/default/files/publicaciones/archivos/desempeno_financiero.pdf)

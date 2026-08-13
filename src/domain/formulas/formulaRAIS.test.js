@@ -3,6 +3,8 @@ import {
   calcularAporteCapitalizableRAIS,
   calcularCapitalProyectadoRAIS,
   formulaRAIS,
+  resolverIBCNecesarioRAIS,
+  resolverMesesNecesariosRAIS,
 } from './formulaRAIS.js'
 
 // Parámetros de referencia, tomados de trazabilidad-formula-RAIS.md ("Supuestos
@@ -92,5 +94,115 @@ describe('formulaRAIS', () => {
       })
       expect(pension).toBeLessThan(1)
     }
+  })
+})
+
+describe('calcularCapitalProyectadoRAIS — capitalInicial (Slice "Motor de caminos RAIS")', () => {
+  it('sin capitalInicial (default 0): idéntico al comportamiento ya probado', () => {
+    const capital = calcularCapitalProyectadoRAIS({
+      datosUsuario: casos[0].datosUsuario,
+      parametrosLegales,
+      parametrosSupuestos,
+    })
+    expect(capital).toBeCloseTo(casos[0].capitalEsperado, 4)
+  })
+
+  it('con capitalInicial: se capitaliza al mismo ritmo que los aportes, no se queda estático', () => {
+    const capitalSinInicial = calcularCapitalProyectadoRAIS({
+      datosUsuario: casos[0].datosUsuario,
+      parametrosLegales,
+      parametrosSupuestos,
+    })
+    const capitalConInicial = calcularCapitalProyectadoRAIS({
+      datosUsuario: { ...casos[0].datosUsuario, capitalInicial: 10 },
+      parametrosLegales,
+      parametrosSupuestos,
+    })
+    // 10 SMLV capitalizados durante 15 años (180 meses) a la tasa esperada,
+    // no simplemente sumados sin crecer.
+    const tasaMensual = Math.pow(1.035, 1 / 12) - 1
+    const capitalInicialEsperado = 10 * Math.pow(1 + tasaMensual, 180)
+    expect(capitalConInicial - capitalSinInicial).toBeCloseTo(capitalInicialEsperado, 4)
+  })
+
+  it('capitalInicial en 0 explícito produce el mismo resultado que omitirlo', () => {
+    const conCero = calcularCapitalProyectadoRAIS({
+      datosUsuario: { ...casos[1].datosUsuario, capitalInicial: 0 },
+      parametrosLegales,
+      parametrosSupuestos,
+    })
+    const omitido = calcularCapitalProyectadoRAIS({
+      datosUsuario: casos[1].datosUsuario,
+      parametrosLegales,
+      parametrosSupuestos,
+    })
+    expect(conCero).toBeCloseTo(omitido, 10)
+  })
+})
+
+describe('resolverIBCNecesarioRAIS — inversa de formulaRAIS respecto al salario/IBC', () => {
+  it('ida y vuelta: el IBC resuelto, ejecutado de nuevo, reproduce el objetivo', () => {
+    const datosUsuario = { edadActual: 52, edadJubilacionDeseada: 62, capitalInicial: 80 }
+    const pensionObjetivo = 0.6
+
+    const ibcNecesario = resolverIBCNecesarioRAIS({
+      datosUsuario,
+      parametrosLegales,
+      parametrosSupuestos,
+      pensionObjetivo,
+    })
+
+    const pensionResultante = formulaRAIS({
+      datosUsuario: { ...datosUsuario, salarioActual: ibcNecesario },
+      parametrosLegales,
+      parametrosSupuestos,
+    })
+
+    expect(pensionResultante).toBeCloseTo(pensionObjetivo, 6)
+  })
+
+  it('si el objetivo ya se alcanza solo con capitalInicial, devuelve un IBC menor al que produciría un aporte positivo (caso límite, sin defenderse — mismo criterio que el resto del archivo)', () => {
+    const datosUsuario = { edadActual: 52, edadJubilacionDeseada: 62, capitalInicial: 1000 }
+    const ibcNecesario = resolverIBCNecesarioRAIS({
+      datosUsuario,
+      parametrosLegales,
+      parametrosSupuestos,
+      pensionObjetivo: 0.1,
+    })
+    expect(ibcNecesario).toBeLessThan(0)
+  })
+})
+
+describe('resolverMesesNecesariosRAIS — inversa de formulaRAIS respecto al horizonte', () => {
+  it('ida y vuelta: los meses resueltos, ejecutados de nuevo, reproducen el objetivo', () => {
+    const salarioActual = 4
+    const capitalInicial = 20
+    const pensionObjetivo = 0.5
+
+    const meses = resolverMesesNecesariosRAIS({
+      datosUsuario: { salarioActual, capitalInicial },
+      parametrosLegales,
+      parametrosSupuestos,
+      pensionObjetivo,
+    })
+
+    const pensionResultante = formulaRAIS({
+      datosUsuario: { salarioActual, capitalInicial, edadActual: 0, edadJubilacionDeseada: meses / 12 },
+      parametrosLegales,
+      parametrosSupuestos,
+    })
+
+    expect(pensionResultante).toBeCloseTo(pensionObjetivo, 4)
+  })
+
+  it('objetivo ya alcanzado hoy: devuelve un número de meses <= 0, nunca null', () => {
+    const meses = resolverMesesNecesariosRAIS({
+      datosUsuario: { salarioActual: 4, capitalInicial: 1000 },
+      parametrosLegales,
+      parametrosSupuestos,
+      pensionObjetivo: 0.1,
+    })
+    expect(meses).not.toBeNull()
+    expect(meses).toBeLessThanOrEqual(0)
   })
 })

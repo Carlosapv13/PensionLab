@@ -49,6 +49,39 @@ export const FIXTURES = [
     },
   },
   {
+    id: 'rais-independiente-colombia',
+    nombre: 'RAIS — independiente — Colombia (perfil soportado)',
+    // Único perfil para el que ExploraTuProyeccion.jsx genera y compara
+    // caminos (perfilAplica === true): RAIS, independiente, cotización en
+    // Colombia, sin traslados de régimen — ver generarCaminosRAIS.js. Los
+    // valores de objetivoPensionMensual/valorBaseCotizacionDeclarado están
+    // elegidos para que aparezcan ambos caminos (base y "aumentar tu base
+    // de cotización"), no solo el base.
+    vistaSugerida: 'exploraTuProyeccion',
+    datos: {
+      objetivoSeleccionado: 'Descubrir mis opciones pensionales.',
+      lugarResidencia: 'Colombia',
+      cotizaActualmente: 'si',
+      sexo: 'Mujer',
+      fechaNacimiento: '1986-03-10',
+      regimenActual: 'RAIS',
+      trasladoRegimen: 'no',
+      tipoCotizante: 'independiente',
+      lugarCotizacion: 'colombia',
+      nivelConocimientoSemanas: 'aproximado',
+      semanasCotizadas: '850',
+      anioInicioCotizacion: '2010',
+      certezaBaseCotizacion: 'conocido',
+      valorBaseCotizacionDeclarado: '7000000',
+      infoEsencialCompletada: true,
+      edadJubilacionDeseada: '65',
+      certezaSaldoAcumulado: 'conocido',
+      saldoAcumuladoDeclarado: '80000000',
+      objetivoPensionMensual: '4500000',
+      restriccionCostoPensionalAdicionalMaximoMensual: '500000',
+    },
+  },
+  {
     id: 'rpm-empleada-historia-evaluable',
     nombre: 'RPM — empleada — historia evaluable (10 años, sin alternativa de vida laboral)',
     // Slice "Primera lectura económica RPM desde historia estructurada": única historia de

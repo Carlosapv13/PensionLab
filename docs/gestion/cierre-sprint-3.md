@@ -3158,6 +3158,166 @@ definitivo queda registrado en el historial Git.
 
 ---
 
+## Slice — Motor de caminos RAIS (ExploraTuProyeccion)
+
+**Estado:** ✅ Implementación completada. Revisión técnica completada. Revisión manual
+completada. Revisión narrativa/rotulado completada. Staging técnico limpio y
+verificado de forma aislada. Cierre aprobado para commit.
+
+### Objetivo
+
+Transformar `ExploraTuProyeccion.jsx` de mostrar una cifra pensional aislada (Sprint
+3, primera versión) a construir y comparar caminos pensionales reales — responder
+"¿con cuánto podría pensionarme, y qué tendría que hacer distinto?" en vez de un
+único número sin alternativas. Perfil aprobado para esta primera versión: RAIS,
+independiente, cotización en Colombia, sin traslados de régimen previos. Fuera de
+ese perfil, la pantalla lo explica honestamente y permite continuar — nunca bloquea
+el recorrido general de la app. La comparación nunca impone una decisión: expone los
+caminos y su distancia al objetivo, la elección queda en la persona.
+
+### Capacidades implementadas
+
+- **Camino base** — mantener la base de cotización actual, siempre calculable.
+- **Camino alternativo** — aumentar la base de cotización, generado solo cuando el
+  camino base no alcanza el objetivo declarado (nunca se inventa una alternativa
+  cuando no hace falta).
+- **Resolución algebraica del IBC necesario** (`resolverIBCNecesarioRAIS`) — inversa
+  de `formulaRAIS`, sin investigación normativa nueva.
+- **Cálculo de tiempo necesario para alcanzar el objetivo** (`resolverMesesNecesariosRAIS`)
+  — dato complementario del camino base, nunca un tercer camino.
+- **Capital inicial / saldo acumulado** — `calcularProyeccionRAIS.js` y `formulaRAIS.js`
+  ahora capitalizan el saldo ya acumulado, resolviendo la limitación crítica que
+  Sprint 1 había dejado documentada y pendiente.
+- **Distancia al objetivo** (`distanciaObjetivo`) — delta y cumplimiento, nunca
+  ambiguo.
+- **Orientación determinista** (`calcularOrientacion`) — reglas explícitas, nunca
+  texto generativo; nunca selecciona un camino con estado `potencial`.
+- **Restricción económica opcional** del usuario, convertida correctamente a un
+  límite de IBC (dividiendo por la tasa de cotización, nunca sumando directamente).
+- **Tope legal de IBC** (25 SMMLV) — el camino alternativo nunca lo excede; si el IBC
+  actual ya está en el tope, se declara descartado con razón explícita, no se
+  oculta.
+- **Convención Económica v1** — todas las cifras (IBC, saldo, objetivo, resultado) se
+  interpretan en pesos de hoy, nunca como pesos nominales futuros; decisión
+  registrada en `trazabilidad-formula-RAIS.md` y como supuesto explícito
+  (`ibcConstanteEnTerminosReales`) en `data/assumptions/versions/supuestos-v1.json`.
+- **Separación entre aumento de IBC y aporte pensional adicional real** — el esfuerzo
+  mostrado es siempre `costoPensionalAdicionalMensual` (16% del aumento de IBC),
+  nunca el aumento de IBC en sí mismo.
+
+### Revisión manual
+
+Realizada con el fixture `rais-independiente-colombia` (`src/dev/fixtures.js`).
+Datos del fixture: IBC actual $7.000.000, saldo acumulado $80.000.000, objetivo
+$4.500.000 mensuales, horizonte hasta los 65 años.
+
+Resultados observados y confirmados en pantalla:
+- **Camino base**: $3.585.045 mensuales — no alcanza el objetivo.
+- **Camino alternativo**: IBC propuesto aproximado $9.568.135; aporte pensional
+  adicional mensual aproximado $410.902; alcanza exactamente $4.500.000 mensuales.
+- **Orientación**: el camino alternativo queda marcado como el único que cumple el
+  objetivo (`UNICO_CUMPLE`).
+
+Ninguna de estas cifras se produjo por inspección visual únicamente — se verificaron
+también de forma analítica, ejecutando `determinarBaseCotizacion` y
+`generarCaminosRAIS` directamente contra los datos reales del fixture, coincidiendo
+exactamente con lo mostrado en pantalla.
+
+### Ajustes finales de comunicación aprobados
+
+Tres hallazgos de una revisión crítica dedicada, los tres de redacción/rotulado —
+ningún cálculo ni dato de dominio cambió:
+- Etiqueta `"Esfuerzo adicional mensual"` → **`"Aporte pensional adicional mensual"`**,
+  para no sugerir que la cifra cubre el costo económico total (salud, riesgos
+  laborales quedan fuera, ya declarado en `COSTO_SOLO_PENSIONAL`).
+- Etiqueta `"Proyección mensual (pesos de hoy)"` → **`"Proyección parcial mensual
+  (pesos de hoy)"`**, para que el calificador "parcial" viaje con la cifra en vez de
+  vivir solo en el párrafo introductorio.
+- La nota temporal del camino base se reescribió para aclarar explícitamente que
+  continuar cotizando después del horizonte elegido **no determina la edad de
+  pensión** — evita que una persona confunda ese dato (calculado bajo un mecanismo
+  distinto al de la comparación principal) con una edad legal de retiro.
+- Para esa última redacción, `textoProyeccionTemporal` recibió un tercer parámetro
+  (`edadJubilacionDeseada`), alimentado con `edadValida` —el mismo valor ya validado
+  que gobierna el resto de la pantalla— **únicamente para construir el texto**; sin
+  cambiar dominio, cálculos, ni ningún otro comportamiento.
+
+### Principios de producto
+
+El Motor cumple, con disciplina verificada durante su revisión, los principios ya
+establecidos de PensionLab:
+- Muestra múltiples caminos cuando existen — nunca colapsa a una única respuesta.
+- No inventa alternativas — el camino alternativo solo se genera cuando el base no
+  alcanza el objetivo.
+- No impone una decisión — la orientación marca el camino más alineado sin obligar a
+  elegirlo; ambos quedan visibles.
+- Distingue hechos, supuestos y proyecciones — `parametrosLegalesUsados` vs.
+  `parametrosSupuestosUsados` estructuralmente separados; la UI separa "lo que el
+  dominio determinó" de "supuestos y limitaciones de esta proyección".
+- Comunica las limitaciones — cada escenario viable declara sus limitaciones,
+  ninguna cifra se muestra sin advertencia.
+- No confunde aumento de IBC con costo económico total — separación ya verificada en
+  Capacidades implementadas y en los Ajustes finales de comunicación.
+
+### Dependencias
+
+La validación de piso legal (`determinarBaseCotizacion.js`) ya fue cerrada
+previamente, en el commit `9e3ac22`. Este Slice la **consume sin modificarla** — no
+forma parte de este staging ni de este commit.
+
+### Limitaciones conocidas
+
+Documentadas con detalle en `trazabilidad-formula-RAIS.md` y ya declaradas
+estructuralmente en cada escenario viable, no solo en este documento:
+- Perfil estrecho: RAIS, independiente, Colombia, sin traslados — cualquier otra
+  combinación queda fuera de esta primera versión.
+- `rentabilidadEsperadaRAIS` (3.5% real anual), `descuentoSobreAporteCapitalizable`
+  (18.75%) y `mesesPayoutSimplificado` (240 meses) son supuestos de producto de
+  confianza baja-media, no hechos verificados.
+- Sin Garantía de Pensión Mínima (FGPM).
+- Sin tablas de mortalidad reales — horizonte de pago plano, igual para cualquier
+  sexo o edad de retiro.
+- Sin bono pensional.
+- Todavía no verifica la viabilidad legal de retiro a la edad elegida.
+- El saldo acumulado se trata como si correspondiera a hoy (`SALDO_TRATADO_COMO_ACTUAL`),
+  aunque el extracto real pueda tener semanas o meses de antigüedad.
+- El tope de 25 SMMLV se evalúa con el SMMLV vigente en la fecha de la simulación,
+  no proyectado (`TOPE_IBC_CON_SMMLV_VIGENTE`).
+- Sin camino de aporte voluntario — investigación normativa/producto pendiente.
+- Convención Económica v1: todas las cifras en términos reales (pesos de hoy), nunca
+  nominales — el valor nominal futuro no se calcula todavía.
+
+### Fuera de alcance
+
+Explícitamente no mezclado con este Slice, y sin staging:
+- `tienePrimeraLecturaValor` y su integración en `App.jsx`.
+- El rollout transversal de `useRestaurarFocoAlMontar` a las 11 pantallas restantes.
+- `Objetivo.jsx` y su CSS asociado (`.option:has(input:disabled)`).
+- La capacidad de reconocimiento (`domain/reconocimiento/`).
+- `docs/producto/oportunidades-futuras.md`.
+- Los dos `.docx` sin trackear.
+- Ampliación del perfil a empleados, cotización desde el exterior, o traslados de
+  régimen — deliberadamente pospuesta, no parte de esta primera versión.
+
+### Verificación técnica
+
+Verificado de forma aislada (worktree temporal sobre un commit "dangling"
+construido desde el árbol del índice staged, nunca referenciado por ninguna rama,
+ya eliminado tras la verificación) — no contra el working tree completo, que
+todavía mezcla el trabajo fuera de alcance listado arriba:
+- 19 archivos de tests, **312/312 en verde**.
+- `npm run lint` — sin errores.
+- `npm run build` — build de producción exitoso.
+- El staged es autosuficiente: no depende de ningún archivo que permanece sin
+  staging.
+
+### Commit
+
+Este documento forma parte del commit de cierre del Slice Motor de caminos RAIS; el
+identificador definitivo queda registrado en el historial Git.
+
+---
+
 ## Slices pendientes de Sprint 3
 
 Por definir a medida que el sprint avance.

@@ -4,10 +4,17 @@ import { CLAVES_ESTADO_EDITABLE, VALORES_POR_DEFECTO } from './estadoApp.js'
 import { FIXTURES } from './fixtures.js'
 
 const FIXTURE_RAIS_EMPLEADO = FIXTURES.find((f) => f.id === 'rais-empleado-colombia')
+const FIXTURE_RAIS_INDEPENDIENTE = FIXTURES.find((f) => f.id === 'rais-independiente-colombia')
 
 describe('validarFixture — claves reconocidas', () => {
   it('el fixture aprobado (RAIS empleado) es válido para su vista sugerida', () => {
     const r = validarFixture(FIXTURE_RAIS_EMPLEADO, FIXTURE_RAIS_EMPLEADO.vistaSugerida)
+    expect(r.valido).toBe(true)
+    expect(r.errores).toEqual([])
+  })
+
+  it('el fixture aprobado (RAIS independiente, perfil soportado) es válido para su vista sugerida', () => {
+    const r = validarFixture(FIXTURE_RAIS_INDEPENDIENTE, FIXTURE_RAIS_INDEPENDIENTE.vistaSugerida)
     expect(r.valido).toBe(true)
     expect(r.errores).toEqual([])
   })
@@ -34,6 +41,43 @@ describe('validarFixture — campos mínimos según la vista destino', () => {
   it('una vista sin campos mínimos catalogados no exige nada adicional', () => {
     const r = validarFixture({ id: 'x', nombre: 'x', vistaSugerida: 'bienvenida', datos: {} }, 'bienvenida')
     expect(r.valido).toBe(true)
+  })
+
+  // exploraTuProyeccion: los mínimos existen específicamente para garantizar
+  // que un fixture apuntado ahí llegue a la generación de caminos
+  // (generarCaminosRAIS.js), no solo a que la pantalla "tenga sentido".
+  it.each([
+    'regimenActual',
+    'tipoCotizante',
+    'lugarCotizacion',
+    'trasladoRegimen',
+    'fechaNacimiento',
+    'edadJubilacionDeseada',
+    'certezaBaseCotizacion',
+    'valorBaseCotizacionDeclarado',
+    'certezaSaldoAcumulado',
+    'saldoAcumuladoDeclarado',
+    'objetivoPensionMensual',
+  ])('rechaza un fixture para exploraTuProyeccion sin %s', (claveFaltante) => {
+    const resto = Object.fromEntries(
+      Object.entries(FIXTURE_RAIS_INDEPENDIENTE.datos).filter(([clave]) => clave !== claveFaltante)
+    )
+    const fixtureIncompleto = { ...FIXTURE_RAIS_INDEPENDIENTE, datos: resto }
+    const r = validarFixture(fixtureIncompleto, 'exploraTuProyeccion')
+    expect(r.valido).toBe(false)
+    expect(r.errores.some((e) => e.includes(claveFaltante))).toBe(true)
+  })
+
+  it('no exige restriccionCostoPensionalAdicionalMaximoMensual para exploraTuProyeccion (opcional en el dominio)', () => {
+    const resto = Object.fromEntries(
+      Object.entries(FIXTURE_RAIS_INDEPENDIENTE.datos).filter(
+        ([clave]) => clave !== 'restriccionCostoPensionalAdicionalMaximoMensual'
+      )
+    )
+    const fixtureSinRestriccion = { ...FIXTURE_RAIS_INDEPENDIENTE, datos: resto }
+    const r = validarFixture(fixtureSinRestriccion, 'exploraTuProyeccion')
+    expect(r.valido).toBe(true)
+    expect(r.errores).toEqual([])
   })
 })
 

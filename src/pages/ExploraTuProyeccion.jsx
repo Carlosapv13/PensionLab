@@ -41,6 +41,7 @@ import { calcularEdadCumplida } from '../domain/calcularEdadCumplida.js'
 import { useRestaurarFocoAlMontar } from '../hooks/useRestaurarFocoAlMontar.js'
 import { useCampoMonetario } from '../hooks/useCampoMonetario.js'
 import { formatearPesos } from '../format/formatearDinero.js'
+import CampoMonetario from '../components/CampoMonetario.jsx'
 import {
   calcularLimitacionesComunes,
   limitacionesEspecificas,
@@ -357,7 +358,7 @@ function ExploraTuProyeccion({
               {(certezaSaldoAcumulado === 'conocido' || certezaSaldoAcumulado === 'aproximado') && (
                 <label className="field">
                   <span className="field__label">Saldo acumulado (en pesos)</span>
-                  <input type="text" inputMode="numeric" className="field__input" {...campoSaldo} />
+                  <CampoMonetario {...campoSaldo} />
                 </label>
               )}
 
@@ -376,12 +377,7 @@ function ExploraTuProyeccion({
                       En pesos de hoy — el poder de compra que tiene ese dinero actualmente, no el número que
                       verías nominalmente dentro de 25 años.
                     </p>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      className="field__input"
-                      {...campoObjetivo}
-                    />
+                    <CampoMonetario {...campoObjetivo} />
                   </label>
 
                   <label className="field">
@@ -393,12 +389,7 @@ function ExploraTuProyeccion({
                       aportes obligatorios —como salud y, cuando corresponda, riesgos laborales— también podrían
                       aumentar. Esta primera versión todavía no calcula esos costos.
                     </p>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      className="field__input"
-                      {...campoRestriccion}
-                    />
+                    <CampoMonetario {...campoRestriccion} />
                   </label>
                 </>
               )}

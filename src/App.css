@@ -405,6 +405,27 @@
   outline-offset: 2px;
 }
 
+.campo-monetario {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.campo-monetario__prefijo {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 16px;
+  pointer-events: none;
+}
+
+.campo-monetario__input {
+  padding-left: 28px;
+}
+
 .field__input:disabled {
   opacity: 0.5;
   cursor: not-allowed;

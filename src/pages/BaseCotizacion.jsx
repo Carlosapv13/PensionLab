@@ -34,6 +34,7 @@
 import { determinarBaseCotizacion } from '../domain/determinarBaseCotizacion.js'
 import { useCampoMonetario } from '../hooks/useCampoMonetario.js'
 import { formatearPesos } from '../format/formatearDinero.js'
+import CampoMonetario from '../components/CampoMonetario.jsx'
 
 const OPCIONES_CERTEZA = [
   { valor: 'conocido', texto: 'Lo conozco.' },
@@ -260,12 +261,7 @@ function BaseCotizacion({
       {requiereValorDeclarado && (
         <label className="field">
           <span className="field__label">Valor sobre el que cotizas (en pesos)</span>
-          <input
-            type="text"
-            inputMode="numeric"
-            className="field__input"
-            {...campoValorDeclarado}
-          />
+          <CampoMonetario {...campoValorDeclarado} />
         </label>
       )}
 
@@ -279,12 +275,7 @@ function BaseCotizacion({
             integral, pagos no constitutivos de salario ni varias relaciones laborales simultáneas. No reemplaza
             una base verificada. Puedes continuar sin usar esta ayuda.
           </p>
-          <input
-            type="text"
-            inputMode="numeric"
-            className="field__input"
-            {...campoSalarioParaEstimar}
-          />
+          <CampoMonetario {...campoSalarioParaEstimar} />
         </label>
       )}
 

@@ -24,8 +24,12 @@ import { useRestaurarFocoAlMontar } from '../hooks/useRestaurarFocoAlMontar.js'
 import { formatearPesos } from '../format/formatearDinero.js'
 
 const TEXTO_SIN_HISTORIA =
-  'Todavía no tenemos tu historia de cotización estructurada — esta lectura solo puede ' +
-  'construirse a partir de ella. Más adelante construiremos contigo la forma de cargarla.'
+  'Conocemos algunos datos generales de tu historia, pero esta lectura económica necesita ' +
+  'además conocer cómo estuvieron distribuidas tus cotizaciones y bases de cotización a lo ' +
+  'largo del tiempo. Esta versión de PensionLab todavía no permite cargar esa historia con ' +
+  'el detalle necesario.'
+
+const TEXTO_CIERRE_SIN_HISTORIA = 'Hasta aquí llega la lectura económica RPM en esta versión de PensionLab.'
 
 const TEXTO_NO_EVALUABLE = {
   VACIOS_EN_VENTANA_IBL_NO_SOPORTADOS:
@@ -101,7 +105,12 @@ function ExploraTuProyeccionRPM({ historiaCotizacion, onVolver }) {
 
       <p className="screen__subtitle screen__subtitle--secundario">{TEXTO_NO_ES_PROYECCION}</p>
 
-      {sinHistoria && <p className="screen__subtitle">{TEXTO_SIN_HISTORIA}</p>}
+      {sinHistoria && (
+        <>
+          <p className="screen__subtitle">{TEXTO_SIN_HISTORIA}</p>
+          <p className="screen__subtitle screen__subtitle--secundario">{TEXTO_CIERRE_SIN_HISTORIA}</p>
+        </>
+      )}
 
       {resultado && resultado.estado === 'no_evaluable' && (
         <div className="insight">

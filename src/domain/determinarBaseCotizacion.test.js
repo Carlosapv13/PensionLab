@@ -76,7 +76,7 @@ describe('determinarBaseCotizacion — valor declarado (conocido/aproximado)', (
     expect(r.ibcActualDeclarado).toBe(50000000)
   })
 
-  it('valor por debajo del piso doméstico: se advierte, nunca se corrige', () => {
+  it('valor por debajo del piso doméstico: se excluye de la simulación, sin corregir el dato original', () => {
     const r = determinarBaseCotizacion({
       certeza: 'conocido',
       valorDeclarado: '500000',
@@ -86,8 +86,39 @@ describe('determinarBaseCotizacion — valor declarado (conocido/aproximado)', (
       fecha: FECHA,
     })
 
-    expect(r.ibcAplicableSimulacion).toBe(500000)
+    expect(r.ibcAplicableSimulacion).toBeNull()
+    expect(r.razonNoApto).toBe('valor_bajo_piso_legal')
+    expect(r.ibcActualDeclarado).toBe(500000)
     expect(r.limitaciones.map((l) => l.codigo)).toContain('VALOR_BAJO_PISO_LEGAL')
+  })
+
+  it('valor exactamente igual al piso: apto, el corte es estrictamente por debajo', () => {
+    const r = determinarBaseCotizacion({
+      certeza: 'conocido',
+      valorDeclarado: String(SMLV),
+      tipoCotizante: 'independiente',
+      lugarCotizacion: 'colombia',
+      salarioParaEstimar: '',
+      fecha: FECHA,
+    })
+
+    expect(r.ibcAplicableSimulacion).toBe(SMLV)
+    expect(r.razonNoApto).toBeNull()
+  })
+
+  it('aproximado, por debajo del piso doméstico: mismo tratamiento que conocido', () => {
+    const r = determinarBaseCotizacion({
+      certeza: 'aproximado',
+      valorDeclarado: '70000',
+      tipoCotizante: 'independiente',
+      lugarCotizacion: 'colombia',
+      salarioParaEstimar: '',
+      fecha: FECHA,
+    })
+
+    expect(r.ibcAplicableSimulacion).toBeNull()
+    expect(r.razonNoApto).toBe('valor_bajo_piso_legal')
+    expect(r.ibcActualDeclarado).toBe(70000)
   })
 
   it('cotización desde el exterior: nunca valida el piso, lo declara como limitación explícita', () => {
@@ -103,6 +134,7 @@ describe('determinarBaseCotizacion — valor declarado (conocido/aproximado)', (
     expect(r.limitaciones.map((l) => l.codigo)).toContain('PISO_EXTERIOR_NO_EVALUADO')
     expect(r.limitaciones.map((l) => l.codigo)).not.toContain('VALOR_BAJO_PISO_LEGAL')
     expect(r.ibcAplicableSimulacion).toBe(500000)
+    expect(r.razonNoApto).toBeNull()
   })
 
   it('conserva normaUsada (tope) para "Ver fundamento legal"', () => {
@@ -192,6 +224,23 @@ describe('determinarBaseCotizacion — desconocido, empleado con ayuda de salari
     expect(r.ibcActualCalculado).toBe(50000000)
     expect(r.ibcAplicableSimulacion).toBe(TOPE_PESOS)
     expect(r.ajustesAplicados[0].codigo).toBe('TOPE_MAXIMO_IBC')
+    expect(r.razonNoApto).toBeNull()
+  })
+
+  it('salario estimado por debajo del piso doméstico: antes esta ruta no lo evaluaba, ahora es consistente con conocido/aproximado', () => {
+    const r = determinarBaseCotizacion({
+      certeza: 'desconocido',
+      valorDeclarado: '',
+      tipoCotizante: 'empleado',
+      lugarCotizacion: 'colombia',
+      salarioParaEstimar: '70000',
+      fecha: FECHA,
+    })
+
+    expect(r.ibcAplicableSimulacion).toBeNull()
+    expect(r.razonNoApto).toBe('valor_bajo_piso_legal')
+    expect(r.ibcActualCalculado).toBe(70000)
+    expect(r.limitaciones.map((l) => l.codigo)).toContain('VALOR_BAJO_PISO_LEGAL')
   })
 
   it('empleado desconocido sin usar la ayuda de salario: queda sin valor, sin bloquear', () => {

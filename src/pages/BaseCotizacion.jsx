@@ -68,7 +68,42 @@ function textoAyudaContextual(tipoCotizante, lugarCotizacion) {
 }
 
 function textoResultado(resultado) {
-  const { origenDatoIbc, certezaValorDeclarado, ibcAplicableSimulacion } = resultado
+  const { origenDatoIbc, certezaValorDeclarado, ibcAplicableSimulacion, ibcActualDeclarado, ibcActualCalculado, razonNoApto } =
+    resultado
+
+  // Distinto del caso "sin dato en absoluto" de abajo: aquí sí hay un valor
+  // capturado (declarado o estimado), pero el dominio ya determinó que no es
+  // apto para simulación por estar bajo el piso legal — nunca se oculta lo
+  // que la persona escribió, y nunca se reutiliza el mensaje genérico de
+  // "todavía no tenemos este dato", que sería falso en este caso.
+  if (ibcAplicableSimulacion === null && razonNoApto === 'valor_bajo_piso_legal') {
+    const valorCapturado = ibcActualDeclarado ?? ibcActualCalculado
+
+    // Solo la ruta "declarado por el usuario" (conocido/aproximado) bloquea
+    // Continuar (ver puedeContinuar más abajo) — la persona afirmó conocer
+    // este valor, y el dominio ya determinó que no puede ser correcto, así
+    // que el mensaje debe explicar el bloqueo y las dos salidas posibles:
+    // corregirlo o declarar que no lo conoce. La ruta de estimación desde
+    // salario (origenDatoIbc === 'calculado_desde_dato_declarado') es una
+    // ayuda opcional de menor confianza — nunca bloquea, mismo criterio ya
+    // usado para "Puedes continuar sin usar esta ayuda" — así que conserva un
+    // mensaje que solo informa, sin hablar de un bloqueo que no existe ahí.
+    if (origenDatoIbc === 'declarado_por_usuario') {
+      const prefijo = certezaValorDeclarado === 'aproximado' ? 'aproximadamente ' : ''
+      return (
+        `Registramos ${prefijo}${formatearPesos(valorCapturado)}, pero ese valor está por debajo del salario ` +
+        'mínimo legal, así que no podemos continuar con él como base de tus simulaciones. Puedes corregir el ' +
+        'valor si crees que hay un error, o elegir "No lo conozco" para continuar sin él — no lo usaremos hasta ' +
+        'que puedas confirmarlo.'
+      )
+    }
+
+    return (
+      `Con tu salario calculamos ${formatearPesos(valorCapturado)} como estimación, pero ese valor está por ` +
+      'debajo del salario mínimo legal — no lo usaremos todavía para tus simulaciones. Puedes continuar igual; ' +
+      'lo guardamos tal como lo diste.'
+    )
+  }
 
   if (ibcAplicableSimulacion === null) {
     return (
@@ -111,8 +146,10 @@ const CODIGOS_LIMITACION_FUENTE = ['FUENTE_LEGAL_NO_LISTA_PARA_PRODUCCION', 'SML
 
 // Cuando no hay valor determinado, la limitación BASE_COTIZACION_NO_DETERMINADA
 // ya queda comunicada como mensaje principal (ver textoResultado) — repetirla
-// en el desplegable de limitaciones sería la misma idea dos veces.
-const CODIGOS_LIMITACION_YA_COMUNICADA_EN_MENSAJE = ['BASE_COTIZACION_NO_DETERMINADA']
+// en el desplegable de limitaciones sería la misma idea dos veces. Mismo
+// criterio para VALOR_BAJO_PISO_LEGAL: cuando dispara razonNoApto, ya queda
+// comunicada como mensaje principal.
+const CODIGOS_LIMITACION_YA_COMUNICADA_EN_MENSAJE = ['BASE_COTIZACION_NO_DETERMINADA', 'VALOR_BAJO_PISO_LEGAL']
 
 /**
  * @param {Object} props
@@ -152,7 +189,18 @@ function BaseCotizacion({
 
   const requiereValorDeclarado = certezaBaseCotizacion === 'conocido' || certezaBaseCotizacion === 'aproximado'
   const faltaValorDeclarado = requiereValorDeclarado && valorBaseCotizacionDeclarado.trim() === ''
-  const puedeContinuar = Boolean(certezaBaseCotizacion) && !faltaValorDeclarado
+
+  // Bloquea únicamente cuando la persona afirmó conocer el valor (conocido/
+  // aproximado) y el dominio ya determinó que no es apto para simulación —
+  // nunca para la ruta de estimación desde salario (origenDatoIbc
+  // 'calculado_desde_dato_declarado'), que es una ayuda opcional de menor
+  // confianza y nunca fue pensada para bloquear el recorrido. Tampoco afecta
+  // a lugarCotizacion === 'exterior' ni a otros casos no evaluables: el
+  // dominio nunca fija razonNoApto ahí (ver determinarBaseCotizacion.js).
+  const valorDeclaradoNoApto =
+    requiereValorDeclarado && resultado?.razonNoApto === 'valor_bajo_piso_legal'
+
+  const puedeContinuar = Boolean(certezaBaseCotizacion) && !faltaValorDeclarado && !valorDeclaradoNoApto
 
   const limitacionesFuncionales = resultado
     ? resultado.limitaciones.filter(

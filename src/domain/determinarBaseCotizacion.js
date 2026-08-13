@@ -59,6 +59,57 @@ function validarMonto(valor) {
   return numero
 }
 
+/**
+ * Evalúa si `valor` es apto para usarse como base de simulación frente al
+ * piso legal (1 SMLV) — distinto de `aplicarTopeMaximoIBC`, que corrige
+ * hacia abajo un exceso; esta función nunca corrige, solo decide si el
+ * dominio ya sabe que el valor es demasiado bajo para ser una base de
+ * cotización real.
+ *
+ * Para `lugarCotizacion === 'exterior'` nunca se evalúa (mismo criterio ya
+ * existente: hay una discrepancia normativa sin resolver sobre cuál es el
+ * mínimo aplicable desde el exterior — no afirmamos más de lo que sabemos).
+ * El mensaje de la limitación usa lenguaje prudente a propósito: declara el
+ * hecho (por debajo del salario mínimo legal) sin afirmar universalmente que
+ * ningún caso puede cotizar por menos — pueden existir casos particulares de
+ * cotización que este Slice todavía no evalúa.
+ *
+ * @param {number} valorNumerico
+ * @param {number} pisoEnPesos
+ * @param {'colombia'|'exterior'|'ambos'|null} lugarCotizacion
+ * @returns {{ apto: boolean, razonNoApto: 'valor_bajo_piso_legal' | null, limitacion: Object | null }}
+ */
+function evaluarPisoLegal(valorNumerico, pisoEnPesos, lugarCotizacion) {
+  if (lugarCotizacion === 'exterior') {
+    return {
+      apto: true,
+      razonNoApto: null,
+      limitacion: {
+        codigo: 'PISO_EXTERIOR_NO_EVALUADO',
+        mensaje:
+          'No verificamos todavía si tu base cumple el mínimo legal para cotización desde el exterior — hay una ' +
+          'discrepancia normativa sin resolver sobre cuál es ese mínimo. No corregimos tu valor por esto.',
+      },
+    }
+  }
+
+  if (valorNumerico < pisoEnPesos) {
+    return {
+      apto: false,
+      razonNoApto: 'valor_bajo_piso_legal',
+      limitacion: {
+        codigo: 'VALOR_BAJO_PISO_LEGAL',
+        mensaje:
+          'El valor que indicaste está por debajo del salario mínimo legal — no lo usaremos como base para las ' +
+          'simulaciones hasta que puedas confirmarlo. Puede haber casos particulares de cotización que esta ' +
+          'lectura todavía no evalúa.',
+      },
+    }
+  }
+
+  return { apto: true, razonNoApto: null, limitacion: null }
+}
+
 function construirNormaUsada(entrada) {
   return {
     id: entrada.id,
@@ -132,6 +183,7 @@ function resultadoBase() {
     ajustesAplicados: [],
     limitaciones: [],
     normaUsada: null,
+    razonNoApto: null,
   }
 }
 
@@ -153,6 +205,7 @@ function resultadoBase() {
  *   ajustesAplicados: Array<{ codigo: string, valorAntes: number, valorDespues: number, normaUsada: Object }>,
  *   limitaciones: Array<{ codigo: string, mensaje: string }>,
  *   normaUsada: { id: string, fuente: string, articulo: string, estado: string, listoParaProduccion: boolean, vigenciaDesde: string | null, vigenciaHasta: string | null } | null,
+ *   razonNoApto: 'valor_bajo_piso_legal' | null,
  * }}
  */
 export function determinarBaseCotizacion({
@@ -184,33 +237,24 @@ export function determinarBaseCotizacion({
 
     const limitaciones = limitacionesFuenteLegal(tope, smlv)
 
-    if (lugarCotizacion === 'exterior') {
-      limitaciones.push({
-        codigo: 'PISO_EXTERIOR_NO_EVALUADO',
-        mensaje:
-          'No verificamos todavía si tu base cumple el mínimo legal para cotización desde el exterior — hay una ' +
-          'discrepancia normativa sin resolver sobre cuál es ese mínimo. No corregimos tu valor por esto.',
-      })
-    } else {
-      const pisoEnPesos = smlv.valor
-      if (valorNumerico < pisoEnPesos) {
-        limitaciones.push({
-          codigo: 'VALOR_BAJO_PISO_LEGAL',
-          mensaje: 'El valor que indicaste está por debajo del mínimo legal de 1 salario mínimo — verifica ese dato.',
-        })
-      }
-    }
+    const { apto, razonNoApto, limitacion: limitacionPiso } = evaluarPisoLegal(
+      valorNumerico,
+      smlv.valor,
+      lugarCotizacion
+    )
+    if (limitacionPiso) limitaciones.push(limitacionPiso)
 
     return {
       ibcActualDeclarado: valorNumerico,
       ibcActualCalculado: null,
-      ibcAplicableSimulacion: valorFinal,
+      ibcAplicableSimulacion: apto ? valorFinal : null,
       origenDatoIbc: 'declarado_por_usuario',
       certezaValorDeclarado: certeza,
       confianzaReglaAplicada: 'validada_directamente_aplicable',
       ajustesAplicados,
       limitaciones,
       normaUsada: normaTope,
+      razonNoApto,
     }
   }
 
@@ -233,16 +277,28 @@ export function determinarBaseCotizacion({
         },
       ]
 
+      // Misma regla de piso legal que la ruta conocido/aproximado — antes esta
+      // ruta no la evaluaba en absoluto (asimetría corregida como parte del
+      // Hallazgo 1: "consistente para conocido, aproximado y cualquier
+      // estimación derivada").
+      const { apto, razonNoApto, limitacion: limitacionPiso } = evaluarPisoLegal(
+        salarioNumerico,
+        smlv.valor,
+        lugarCotizacion
+      )
+      if (limitacionPiso) limitaciones.push(limitacionPiso)
+
       return {
         ibcActualDeclarado: null,
         ibcActualCalculado: salarioNumerico,
-        ibcAplicableSimulacion: valorFinal,
+        ibcAplicableSimulacion: apto ? valorFinal : null,
         origenDatoIbc: 'calculado_desde_dato_declarado',
         certezaValorDeclarado: 'desconocido',
         confianzaReglaAplicada: 'aplicable_con_supuestos',
         ajustesAplicados,
         limitaciones,
         normaUsada: normaTope,
+        razonNoApto,
       }
     }
   }

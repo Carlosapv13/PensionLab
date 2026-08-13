@@ -50,6 +50,13 @@ const TEXTO_FALTA_REGIMEN =
   'Todavía no sabemos si cotizas en Colpensiones o en un fondo privado, y esa es, ' +
   'en sí misma, la primera pieza que nos falta.'
 
+// Cierre explícito para los regímenes sin una capacidad posterior en esta
+// versión (todo lo que no sea RAIS): en vez de un "Continuar" que no lleva a
+// ningún lado, esta pantalla termina aquí para ese caso, con Volver
+// disponible — mismo criterio de honestidad ya aplicado en ExploraTuProyeccion.jsx.
+const TEXTO_CIERRE_SIN_CAPACIDAD_POSTERIOR =
+  'PensionLab todavía no puede continuar este análisis en esta versión.'
+
 function BloqueMecanismo({ codigo, condicional }) {
   const texto = TEXTO_MECANISMO[codigo]
   return (
@@ -74,10 +81,14 @@ function QueDeterminaTuResultado({ regimenActual, onVolver, onContinuar }) {
   const resultado = determinarMecanismoYFaltantes({ regimenActual })
   const condicional = resultado.caso === 'desconocido'
   const faltaRegimen = resultado.elementosFaltantes.some((f) => f.codigo === 'FALTA_REGIMEN')
+  // Slice "Primera lectura económica RPM desde historia estructurada": RPM deja de ser un
+  // callejón sin salida en esta pantalla, igual que RAIS ya no lo era desde el Slice
+  // "Motor de caminos RAIS".
+  const tieneCapacidadPosterior = regimenActual === 'RAIS' || regimenActual === 'RPM'
 
   function manejarEnvio(e) {
     e.preventDefault()
-    onContinuar()
+    if (tieneCapacidadPosterior) onContinuar()
   }
 
   return (
@@ -107,18 +118,24 @@ function QueDeterminaTuResultado({ regimenActual, onVolver, onContinuar }) {
         />
       ))}
 
-      <p className="screen__subtitle">
-        Así se construye tu expediente: pieza por pieza, no de una sola vez. Seguiremos
-        avanzando paso a paso.
-      </p>
+      {tieneCapacidadPosterior ? (
+        <p className="screen__subtitle">
+          Así se construye tu expediente: pieza por pieza, no de una sola vez. Seguiremos
+          avanzando paso a paso.
+        </p>
+      ) : (
+        <p className="screen__subtitle">{TEXTO_CIERRE_SIN_CAPACIDAD_POSTERIOR}</p>
+      )}
 
       <div className="screen__actions">
         <button type="button" className="btn btn-secondary" onClick={onVolver}>
           Volver
         </button>
-        <button type="submit" className="btn btn-primary">
-          Continuar
-        </button>
+        {tieneCapacidadPosterior && (
+          <button type="submit" className="btn btn-primary">
+            Continuar
+          </button>
+        )}
       </div>
     </form>
   )

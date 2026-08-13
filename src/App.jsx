@@ -15,8 +15,6 @@ import IndiciosRegimenTransicion from './pages/IndiciosRegimenTransicion.jsx'
 import BaseCotizacion from './pages/BaseCotizacion.jsx'
 import QueDeterminaTuResultado from './pages/QueDeterminaTuResultado.jsx'
 import ExploraTuProyeccion from './pages/ExploraTuProyeccion.jsx'
-import DeclaracionLibre from './pages/DeclaracionLibre.jsx'
-import RevisionDeclaracionTemporal from './pages/RevisionDeclaracionTemporal.jsx'
 import ExploraTuProyeccionRPM from './pages/ExploraTuProyeccionRPM.jsx'
 
 // Import estático, pero solo se monta bajo import.meta.env.DEV (ver el
@@ -393,13 +391,7 @@ function App() {
           regimenActual={regimenActual}
           onVolver={() => setVista('baseCotizacion')}
           onContinuar={() =>
-            setVista(
-              regimenActual === 'RPM'
-                ? 'exploraTuProyeccionRPM'
-                : regimenActual === 'RAIS'
-                  ? 'exploraTuProyeccion'
-                  : 'declaracionLibre'
-            )
+            setVista(regimenActual === 'RPM' ? 'exploraTuProyeccionRPM' : 'exploraTuProyeccion')
           }
         />
       )}
@@ -416,7 +408,6 @@ function App() {
           edadJubilacionDeseada={edadJubilacionDeseada}
           onCambiarEdadJubilacionDeseada={setEdadJubilacionDeseada}
           onVolver={() => setVista('queDeterminaResultado')}
-          onContinuar={() => setVista('declaracionLibre')}
         />
       )}
 
@@ -425,19 +416,6 @@ function App() {
           historiaCotizacion={historiaCotizacion}
           onVolver={() => setVista('queDeterminaResultado')}
         />
-      )}
-
-      {vista === 'declaracionLibre' && (
-        <DeclaracionLibre
-          declaracion={declaracionLibre}
-          onCambiarDeclaracion={setDeclaracionLibre}
-          onVolver={() => setVista('queDeterminaResultado')}
-          onContinuar={() => setVista('revisionDeclaracion')}
-        />
-      )}
-
-      {vista === 'revisionDeclaracion' && (
-        <RevisionDeclaracionTemporal onVolver={() => setVista('declaracionLibre')} />
       )}
       </AppShell>
     </>

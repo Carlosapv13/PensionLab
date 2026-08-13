@@ -3044,6 +3044,120 @@ definitivo queda registrado en el historial Git.
 
 ---
 
+## Slice — Simplificación del recorrido MVP (retiro de DeclaracionLibre/RevisionDeclaracionTemporal)
+
+**Estado:** Implementación completada. Revisión técnica completada. Revisión manual
+completada (con Atlas). Staging técnico limpio y verificado de forma aislada. Cierre
+aprobado para commit.
+
+### Contexto y decisión previa
+
+Retoma la decisión arquitectónica que quedó explícitamente pendiente al cerrar el Slice
+RPM. `DeclaracionLibre.jsx`/`RevisionDeclaracionTemporal.jsx` habían sido retiradas de la
+navegación activa en el working tree sin pasar por el proceso formal de cierre — la única
+justificación existente vivía informalmente en `docs/producto/oportunidades-futuras.md`
+(entrada 2), no en un Slice aprobado. Un análisis dedicado (arquitectura, reconstrucción de
+la decisión desde evidencia del repositorio, cinco alternativas de producto evaluadas)
+concluyó y recomendó la **Alternativa D — retirar ambas pantallas del recorrido principal,
+conservando su código y la capacidad de reconocimiento sin borrar ni conectar** — aprobada
+con Atlas antes de implementar nada.
+
+Hallazgos clave del análisis que motivan esta decisión:
+- Ningún archivo de `domain/` ni `models/` lee jamás el estado `declaracionLibre` — la
+  declaración se capturaba pero no alimentaba ninguna decisión real.
+- `DeclaracionLibre` nunca explicaba para qué se usaría lo declarado (Principio A de
+  PL-240, "Explicar antes de preguntar") y, para regímenes distintos de RAIS, se
+  preguntaba antes de haber mostrado ningún valor calculado (Principio de Arquitectura
+  13, "el sistema no pide una decisión antes de agotar lo que ya sabe").
+- La capacidad de reconocimiento (`domain/reconocimiento/`) fue diseñada como "zona de
+  mediación" entre la Capacidad B (`DeclaracionLibre`) y `PerfilDecision` (Bloque 3) — con
+  ambos extremos inactivos hoy, no tiene consumidor alcanzable, pero sigue siendo el
+  diseño correcto si se retoma texto libre más adelante.
+
+### Alcance aprobado
+
+**`src/App.jsx`:**
+- Se retiran los imports de `DeclaracionLibre` y `RevisionDeclaracionTemporal`.
+- Se retiran sus dos bloques de render (`vista === 'declaracionLibre'`,
+  `vista === 'revisionDeclaracion'`).
+- `QueDeterminaTuResultado.onContinuar` queda en dos ramas, sin fallback a
+  `declaracionLibre`: `RPM → exploraTuProyeccionRPM`; cualquier otro caso →
+  `exploraTuProyeccion`. (El segundo caso solo es alcanzable con `regimenActual === 'RAIS'`
+  porque `QueDeterminaTuResultado.jsx` ya no renderiza el botón "Continuar" para ningún
+  otro régimen — ver más abajo; ambos cambios se aprobaron y comitean como una unidad
+  correcta, no por separado.)
+- `<ExploraTuProyeccion>` deja de recibir `onContinuar={() => setVista('declaracionLibre')}`.
+- Se conserva sin cambios: el estado `declaracionLibre`/`setDeclaracionLibre` (sigue
+  formando parte del espejo del panel de desarrollo), y todo lo demás del archivo.
+
+**`src/pages/QueDeterminaTuResultado.jsx`:**
+- Nueva constante `TEXTO_CIERRE_SIN_CAPACIDAD_POSTERIOR`.
+- Nueva variable derivada `tieneCapacidadPosterior = regimenActual === 'RAIS' ||
+  regimenActual === 'RPM'`.
+- `manejarEnvio` solo invoca `onContinuar()` cuando `tieneCapacidadPosterior`.
+- El subtítulo final y el botón "Continuar" se renderizan condicionalmente: con
+  capacidad posterior, el texto y botón ya existentes; sin ella, el texto de cierre
+  honesto y ningún botón "Continuar" — solo "Volver".
+
+**Explícitamente conservado, sin borrar ni conectar:**
+- `src/pages/DeclaracionLibre.jsx` — el archivo sigue existiendo íntegro. Solo se retiró
+  del recorrido; no fue eliminado.
+- `src/pages/RevisionDeclaracionTemporal.jsx` — mismo criterio: archivo íntegro,
+  únicamente inalcanzable desde `App.jsx`.
+- `src/domain/reconocimiento/` (`evaluarAptitud.js`, `evaluarDeclaracion.js` + tests) —
+  completo, sin tocar, sin conectar a ningún consumidor.
+- `PerfilDecision` (`src/models/PerfilDecision.js`) — sigue siendo un contrato dormido, sin
+  desarrollo nuevo; pospuesto para después del MVP de Oscar.
+
+### Recorrido resultante (confirmado en revisión manual)
+
+- **RAIS**: `QueDeterminaTuResultado → ExploraTuProyeccion`, sin pasar por
+  `DeclaracionLibre` ni `RevisionDeclaracionTemporal`; termina ahí mientras esa sea la
+  última capacidad real disponible.
+- **RPM**: `QueDeterminaTuResultado → ExploraTuProyeccionRPM`, mismo criterio.
+- **Sin régimen/capacidad posterior**: el recorrido termina en `QueDeterminaTuResultado`
+  mismo — sin botón "Continuar", con el texto honesto de cierre, "Volver" funcional.
+
+### Explícitamente fuera de este cierre
+
+No se mezcló con este Slice, y permanece sin staging en el working tree:
+- El Motor de caminos RAIS (`generarCaminosRAIS.js`, la expansión de
+  `ExploraTuProyeccion.jsx`, `determinarBaseCotizacion.js`, `formulaRAIS.js`,
+  `data/assumptions/`).
+- `tienePrimeraLecturaValor.js` y su integración en `App.jsx` — analizado y confirmado
+  como mejora independiente, pero con revisión y aprobación propias, todavía pendientes.
+- El rollout transversal de `useRestaurarFocoAlMontar` a las demás pantallas (incluida su
+  adopción parcial en `QueDeterminaTuResultado.jsx`, deliberadamente excluida de este
+  Slice).
+- La validación de `BaseCotizacion.jsx` para valor bajo el piso legal.
+- El cambio de `Objetivo.jsx` (deshabilitar "Comparar caminos que ya conozco." y "Validar
+  una estrategia que ya tengo.") y su CSS asociado (`.option:has(input:disabled)` en
+  `App.css`) — analizado y confirmado como decisión independiente, no necesaria para la
+  coherencia de este Slice; queda para su propia Slice.
+- `docs/producto/oportunidades-futuras.md` y los dos `.docx` sin trackear.
+
+### Verificación técnica
+
+Verificado de forma aislada (worktree temporal sobre un commit "dangling" construido desde
+el árbol del índice staged, nunca referenciado por ninguna rama, ya eliminado tras la
+verificación) — no contra el working tree completo:
+- 17 archivos de tests, **221/221 en verde**.
+- `npm run lint` — sin errores.
+- `npm run build` — build de producción exitoso.
+
+### Revisión manual
+
+Confirmada con Atlas: los tres recorridos (RAIS, RPM, sin capacidad posterior) se
+comportan exactamente como se documenta arriba. Sin defectos visuales o narrativos
+bloqueantes.
+
+### Commit
+
+Este documento forma parte del commit de cierre de este Slice; el identificador
+definitivo queda registrado en el historial Git.
+
+---
+
 ## Slices pendientes de Sprint 3
 
 Por definir a medida que el sprint avance.

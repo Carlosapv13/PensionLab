@@ -3318,6 +3318,111 @@ identificador definitivo queda registrado en el historial Git.
 
 ---
 
+## Hito — MVP público para Oscar
+
+**Estado:** ✅ Desplegado y validado manualmente. Hito de cierre transversal —
+no es un Slice de implementación nuevo, sino la consolidación y publicación
+del trabajo ya cerrado en los Slices anteriores de este documento.
+
+### Candidato formal del hito
+
+Commit `9c1ca99` (`feat: adoptar useRestaurarFocoAlMontar como estándar en
+las pantallas restantes`), cabeza de la rama `sprint-3-mvp-headless` en el
+momento de este cierre. Incluye, en orden, los cuatro commits de cierre que
+componen este candidato:
+
+- `c94292f` — cerrar honestamente el terminal RPM sin historia estructurada.
+- `2d17770` — mostrar honestamente los objetivos sin capacidad todavía.
+- `8ce9bcb` — omitir PrimeraLectura cuando ninguna evidencia aporta valor.
+- `9c1ca99` — adoptar `useRestaurarFocoAlMontar` como estándar en las
+  pantallas restantes.
+
+### Verificación técnica previa a la publicación
+
+Todas las verificaciones se ejecutaron sobre un worktree aislado, fijado
+exactamente en `9c1ca99` — nunca sobre el working tree local, que en ese
+momento (y todavía hoy) contenía residuos ajenos a este candidato:
+
+- Suite completa: **322/322 tests en verde**.
+- `npm run lint`: sin errores.
+- `npm run build`: build de producción exitoso.
+- Auditoría de seguridad sobre el contenido real de `dist/` (el mismo
+  artefacto publicado): sin secretos, credenciales, datos personales, rutas
+  locales, source maps, ni archivos indebidos (`.env`, `.git`, `.docx`,
+  `.jsx`, tests) — conclusión **APTO PARA PUBLICAR**. Confirmado también que
+  el Panel de Desarrollo y los fixtures de `src/dev/` están ausentes del
+  bundle publicado.
+
+### Despliegue
+
+Publicado manualmente en Vercel a partir del contenido ya compilado de
+`dist/` (build local, no integración Git↔Vercel — la rama
+`sprint-3-mvp-headless` no tiene remoto asociado y no se hizo push en
+ningún momento de este proceso).
+
+**URL pública:** https://pensionlab.vercel.app
+
+### Validación manual del recorrido público
+
+Recorrido de principio a fin, desde la URL pública, para un caso RPM:
+funcionó correctamente hasta la pantalla terminal "Lectura económica RPM con
+tu historia hasta hoy", incluido el cierre honesto ya implementado en
+`c94292f` para el caso sin historia estructurada — el caso real que
+encuentra cualquier persona pública, dado que la captura de historia
+laboral estructurada no existe todavía en producción (ver limitaciones).
+
+### Alcance soportado por este MVP
+
+- **RAIS** — comparación real de caminos (base vs. alternativo) para el
+  perfil soportado actualmente: independiente, cotización en Colombia y sin
+  traslados de régimen previos. Fuera de ese perfil, esta versión no debe
+  interpretarse como una simulación completa.
+- **RPM** — expediente y contexto explicados en detalle (semanas, edad,
+  indicios de transición); la lectura económica propiamente dicha
+  (`ExploraTuProyeccionRPM`) está implementada y probada, pero cierra
+  honestamente reconociendo que la app no tiene aún cómo cargar la historia
+  estructurada que esa lectura necesita.
+- **Objetivo** — dos de las cuatro opciones están habilitadas (ambas
+  conducen al mismo recorrido); las otras dos son visibles pero
+  explícitamente marcadas como no disponibles todavía.
+
+### Limitaciones conocidas de este MVP
+
+- Sin persistencia: el estado vive únicamente en memoria del navegador; se
+  pierde al refrescar o cerrar la pestaña.
+- Sin Motor de Decisión (Comparador de Estrategias, Brújula Pensional): el
+  recorrido no compara caminos entre sí más allá de lo que RAIS ya ofrece,
+  ni orienta hacia una estrategia.
+- RAIS: sin Garantía de Pensión Mínima, sin tablas de mortalidad reales, sin
+  bono pensional, sin verificación de viabilidad legal de retiro a la edad
+  elegida — documentado en detalle en
+  `src/domain/formulas/trazabilidad-formula-RAIS.md`.
+- Captura de historia laboral estructurada para RPM: no existe todavía una
+  pantalla real de producción.
+
+### Constancia: residuos del working tree deliberadamente excluidos
+
+Los siguientes cambios existían en el working tree al momento de este
+cierre y **no forman parte** del candidato `9c1ca99` ni de lo publicado en
+Vercel — quedan fuera a propósito, pendientes de su propia revisión futura:
+
+- `docs/producto/oportunidades-futuras.md` (entradas 1-3, no comiteadas).
+- `src/pages/InformacionPensionalEsencial.jsx` (ajuste de `className`
+  pendiente de decisión, excluido del rollout de foco).
+- `src/pages/RevisionDeclaracionTemporal.jsx` (integración de la capacidad
+  de reconocimiento, ya revertida una vez anteriormente — ver `1d86621`).
+- `src/domain/reconocimiento/` (no comiteado; sin efecto en producción,
+  código inalcanzable desde `App.jsx`).
+- Los dos `.docx` de la Biblioteca de Conocimiento (`PL-240`, `PL-230`),
+  sin tracking, sin relación con el código publicado.
+
+### Commit
+
+Este documento forma parte del commit de cierre de este hito; el
+identificador definitivo queda registrado en el historial Git.
+
+---
+
 ## Slices pendientes de Sprint 3
 
 Por definir a medida que el sprint avance.

@@ -165,3 +165,27 @@ Las acciones difíciles de revertir o visibles fuera del entorno local (commits,
 tags, `git push`, cambios a datos ya validados) se ejecutan solo tras confirmación
 explícita, mostrando primero el resultado exacto de la operación (diff, log,
 mensaje de commit propuesto) antes de ejecutarla.
+
+## Registro obligatorio de decisiones (vigente desde 2026-08-18)
+
+Adoptada al formalizar el Entregable 2 (Sprint 4,
+`docs/tecnico/arquitectura/entregable-2-pensionlab-responde-explora-y-explica.md`),
+tras un ciclo de revisión cruzada Carlos-Atlas-Claude sobre la arquitectura de un
+motor de caminos RPM: la sección "Revisión cruzada entre asistentes de IA" (arriba)
+ya establecía que "solo el conocimiento que sobrevivía a ese proceso completo se
+documentaba como parte del proyecto", pero nunca lo había fijado como regla
+explícita y vinculante para el caso concreto de una decisión ya aprobada en
+conversación que todavía no se tradujo a un documento del repositorio.
+
+**Ninguna decisión importante surgida de una conversación Carlos-Atlas-Claude
+—incluida una ya aprobada explícitamente por Carlos— se considera arquitectura o
+alcance permanente de PensionLab hasta quedar registrada en documentación
+versionada del repositorio.** Una conversación de chat, por rigurosa que haya sido
+su revisión cruzada, no es memoria institucional del proyecto: lo es únicamente el
+documento que esa conversación produce y que queda comiteado.
+
+Esto no reemplaza el patrón ya vigente (proponer → documentar → aprobar →
+implementar, arriba) — lo hace explícito para un caso que ese patrón no cubría con
+la misma claridad: mientras una decisión aprobada no se traduzca a documentación
+versionada, permanece provisional y no puede citarse como precedente ni usarse como
+base para otra decisión posterior.

@@ -15,6 +15,7 @@ import IndiciosRegimenTransicion from './pages/IndiciosRegimenTransicion.jsx'
 import BaseCotizacion from './pages/BaseCotizacion.jsx'
 import QueDeterminaTuResultado from './pages/QueDeterminaTuResultado.jsx'
 import ExploraTuProyeccion from './pages/ExploraTuProyeccion.jsx'
+import HistoriaCotizacionRPM from './pages/HistoriaCotizacionRPM.jsx'
 import ExploraTuProyeccionRPM from './pages/ExploraTuProyeccionRPM.jsx'
 import { tienePrimeraLecturaValor } from './domain/tienePrimeraLecturaValor.js'
 
@@ -59,9 +60,9 @@ function App() {
   // (no a IBC, no a seguridad social total — ver generarCaminosRAIS.js).
   const [restriccionCostoPensionalAdicionalMaximoMensual, setRestriccionCostoPensionalAdicionalMaximoMensual] =
     useState('')
-  // Slice "Primera lectura económica RPM desde historia estructurada": historia de
-  // cotización estructurada (PeriodoCotizacion[]) — en este Slice solo se puebla vía el
-  // panel de desarrollo, nunca por una pantalla real de captura (fuera de alcance).
+  // Historia de cotización estructurada (PeriodoCotizacion[]). Introducida en Sprint 3
+  // (poblada solo vía panel de desarrollo); S4-001 (Entregable 2, Sprint 4) agrega su
+  // captura real desde la UI pública — ver HistoriaCotizacionRPM.jsx.
   const [historiaCotizacion, setHistoriaCotizacion] = useState([])
 
   function actualizarRegimenActual(valor) {
@@ -439,7 +440,7 @@ function App() {
           regimenActual={regimenActual}
           onVolver={() => setVista('baseCotizacion')}
           onContinuar={() =>
-            setVista(regimenActual === 'RPM' ? 'exploraTuProyeccionRPM' : 'exploraTuProyeccion')
+            setVista(regimenActual === 'RPM' ? 'historiaCotizacionRPM' : 'exploraTuProyeccion')
           }
         />
       )}
@@ -470,10 +471,27 @@ function App() {
         />
       )}
 
+      {vista === 'historiaCotizacionRPM' && (
+        <HistoriaCotizacionRPM
+          historiaCotizacion={historiaCotizacion}
+          onCambiarHistoriaCotizacion={setHistoriaCotizacion}
+          regimenActual={regimenActual}
+          nivelConocimientoSemanas={nivelConocimientoSemanas}
+          semanasCotizadas={semanasCotizadas}
+          trasladoRegimen={trasladoRegimen}
+          onVolver={() => setVista('queDeterminaResultado')}
+          onContinuar={() => setVista('exploraTuProyeccionRPM')}
+        />
+      )}
+
       {vista === 'exploraTuProyeccionRPM' && (
         <ExploraTuProyeccionRPM
           historiaCotizacion={historiaCotizacion}
-          onVolver={() => setVista('queDeterminaResultado')}
+          regimenActual={regimenActual}
+          nivelConocimientoSemanas={nivelConocimientoSemanas}
+          semanasCotizadas={semanasCotizadas}
+          trasladoRegimen={trasladoRegimen}
+          onVolver={() => setVista('historiaCotizacionRPM')}
         />
       )}
       </AppShell>

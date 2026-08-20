@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { seleccionarPeriodosIBL } from './seleccionarPeriodosIBL.js'
+import { seleccionarPeriodosIBL, diasCalendarioEnRango, calcularVentana } from './seleccionarPeriodosIBL.js'
 
 const FECHA_CALCULO = '2026-01-01' // ventana esperada: 2016-01-01 a 2025-12-31
 
@@ -137,5 +137,54 @@ describe('seleccionarPeriodosIBL — no evaluable', () => {
     const resultado = seleccionarPeriodosIBL({ historiaCotizacion: historia, fechaCalculo: FECHA_CALCULO })
 
     expect(resultado.evaluable).toBe(true)
+  })
+})
+
+// Cobertura directa agregada en S4-001 (captura de historia RPM estructurada real):
+// diasCalendarioEnRango gana un segundo consumidor real fuera de este archivo
+// (src/pages/HistoriaCotizacionRPM.helpers.js) y pasa a exportarse — mismo
+// comportamiento ya usado indirectamente arriba, ahora probado de forma directa.
+describe('diasCalendarioEnRango', () => {
+  it('un solo día calendario cuenta como 1 (inclusive en ambos extremos)', () => {
+    expect(diasCalendarioEnRango('2023-05-10', '2023-05-10')).toBe(1)
+  })
+
+  it('un mes completo de 31 días', () => {
+    expect(diasCalendarioEnRango('2023-01-01', '2023-01-31')).toBe(31)
+  })
+
+  it('respeta año bisiesto (2024, febrero de 29 días)', () => {
+    expect(diasCalendarioEnRango('2024-01-01', '2024-12-31')).toBe(366)
+  })
+
+  it('respeta año no bisiesto (2023)', () => {
+    expect(diasCalendarioEnRango('2023-01-01', '2023-12-31')).toBe(365)
+  })
+
+  it('un rango que cruza varios años cuenta los días calendario totales', () => {
+    expect(diasCalendarioEnRango('2023-12-30', '2024-01-02')).toBe(4) // 30, 31, 1, 2
+  })
+})
+
+// Cobertura directa agregada en la revisión de S4-001 (Entregable 2): calcularVentana gana un
+// segundo consumidor real fuera de este archivo (src/pages/HistoriaCotizacionRPM.jsx) y pasa a
+// exportarse — mismo comportamiento ya usado indirectamente arriba, ahora probado de forma directa.
+describe('calcularVentana', () => {
+  it('devuelve los 10 años calendario completos inmediatamente anteriores al año de fechaCalculo', () => {
+    expect(calcularVentana('2026-01-01')).toEqual({
+      desde: '2016-01-01',
+      hasta: '2025-12-31',
+      anioInicio: 2016,
+      anioFin: 2025,
+    })
+  })
+
+  it('funciona igual sin importar el mes/día exacto de fechaCalculo dentro del año', () => {
+    expect(calcularVentana('2026-08-19')).toEqual({
+      desde: '2016-01-01',
+      hasta: '2025-12-31',
+      anioInicio: 2016,
+      anioFin: 2025,
+    })
   })
 })

@@ -184,3 +184,64 @@ diseño para Sprint 4, no como trabajo pendiente de esta implementación.
 - [PIB de Colombia creció 2,6% en 2025, según el Dane — LaFM](https://www.lafm.com.co/economia/crecimiento-economico-colombia-dane-390680)
 - [Economía colombiana creció 2,6% en 2025 — Minhacienda](https://www.minhacienda.gov.co/w/econom%C3%ADa-colombiana-creci%C3%B3-2-6-en-2025-impulsada-por-comercio-y-servicios)
 - [Seguridad social y pensiones en Colombia 2026 — Buk](https://www.buk.co/blog/seguridad-social-y-pensiones-en-2025)
+
+---
+
+# Traslado de régimen (RAIS→RPM) e IBL — investigación S4-001 (Entregable 2, Sprint 4)
+
+Investigación realizada por búsqueda web y cotejo directo de fuentes oficiales
+primarias (fecha de consulta: 2026-08-19), a raíz de un hallazgo de revisión manual de
+S4-001: Carlos (primer caso real de validación del Entregable 2) se trasladó
+recientemente de RAIS a RPM y la pantalla de captura no podía explicarle qué historia
+introducir. Alcance explícitamente **acotado**, no exhaustivo — mismo criterio ya usado
+en la sección "Régimen de transición" de este archivo. No cubre la validez jurídica del
+traslado en sí (doble asesoría, nulidad) — solo el tratamiento de la historia de
+cotización para efectos del IBL.
+
+## Matriz
+
+| Campo | Regla | Texto normativo (resumen) | Fuente oficial | Artículo/parágrafo | Fecha histórica de evaluación | Vigencia | Alcance usado por este Slice | Aspectos expresamente NO evaluados | Estado de validación |
+|---|---|---|---|---|---|---|---|---|---|
+| *(no se carga — solo referencia)* `ventanaIBLAnclaFechaReconocimiento` | Ancla temporal de la ventana de 10 años del IBL | "el promedio de los salarios o rentas sobre los cuales ha cotizado el afiliado durante los diez (10) años anteriores al reconocimiento de la pensión, o en todo el tiempo si éste fuere inferior" | Función Pública — Gestor Normativo (texto literal cotejado) | Art. 21, inciso 1, Ley 100 de 1993 | No aplica (es la fecha misma) | Vigente desde 1993, sin cambio conocido en este punto | `calcularPensionRPM.js` usa `fecha = hoy` en su lugar, ya declarado como `LIMITACION_NO_ES_PROYECCION_FUTURA` — decisión de producto ya tomada, no una lectura de esta norma | Proyección a la fecha real de reconocimiento — exigiría IPC/SMLV futuro, ya excluido por decisión del proyecto | Verificado en fuente oficial (texto literal); la fecha usada por el código es una simplificación declarada, no una interpretación de esta norma |
+| *(no se carga — referencia)* `iblAlternativaVidaLaboralUmbral` | Umbral de semanas para optar por el promedio de toda la vida laboral | "el trabajador podrá optar por este sistema, siempre y cuando haya cotizado 1250 semanas como mínimo" | Función Pública — Gestor Normativo (texto literal cotejado) | Art. 21, inciso 2, Ley 100 de 1993 | No aplica | Vigente desde 1993 | `obtenerSemanasHabilitanAlternativaIBL` ya resuelve un valor equivalente en `data/legal` — esta fila documenta su respaldo literal, no agrega un campo nuevo | Si el umbral de 1250 de este artículo y el de la Sentencia C-197/2023 (registrada arriba, sección "Régimen de transición", sobre el requisito de *pensión*, no de esta alternativa del IBL) son el mismo umbral o dos umbrales distintos — no cotejado en esta sesión | Verificado en fuente oficial (texto literal); relación con C-197/2023 pendiente de cotejo cruzado |
+| *(no se carga — solo texto de limitación)* | Ausencia de mecanismo legal para huecos de cotización | El Art. 21 no contiene ningún mecanismo de relleno ni reducción porcentual para períodos sin cotización dentro de los 10 años | Función Pública — Gestor Normativo (verificado por ausencia — artículo leído íntegro) | Art. 21, Ley 100 de 1993 (texto completo revisado) | No aplica | Vigente desde 1993 | `seleccionarPeriodosIBL.js` ya rechaza evaluar historias con huecos en la ventana en vez de inventar un relleno — este hallazgo confirma que esa decisión es jurídicamente prudente, no solo conservadora de ingeniería | Si existe una regla de relleno en una fuente distinta al Art. 21 (reglamento, jurisprudencia) — no investigado | Verificado en fuente oficial (ausencia confirmada en el texto literal del artículo; no se investigaron fuentes reglamentarias adicionales) |
+| *(no se carga — solo texto de limitación)* | Reconocimiento del tiempo cotizado en RAIS al volver a RPM | "el tiempo cotizado en el Régimen de Ahorro Individual le será computado al del Régimen de Prima Media" | Colpensiones — Normativa (Decreto 3800 de 2003, texto literal cotejado) | Art. 3, Decreto 3800 de 2003 | No aplica | Vigente desde 2003, sin cambio conocido | Confirma que las semanas de un traslado RAIS→RPM sí tienen respaldo normativo para reconocerse — ninguna función del dominio las descarta hoy, pero tampoco documentaba explícitamente este respaldo hasta ahora | Si "tiempo cotizado" reconocido equivale a "IBC histórico utilizable para el IBL" — el propio decreto no lo dice (ver fila siguiente) | Verificado en fuente oficial (texto literal del artículo 3) |
+| *(no se carga — cuestión pendiente, sin fundamento normativo suficiente)* | Tratamiento del IBC histórico cotizado en RAIS dentro del promedio del IBL en RPM | Ninguna fuente encontrada (Art. 21; Art. 36; Decreto 3800/2003, Art. 3 y 4) resuelve si el IBC —no solo el tiempo— cotizado en RAIS debe incorporarse al promedio de los 10 años o de toda la vida laboral | — (ausencia confirmada en las fuentes ya revisadas) | — | — | — | **Ninguno — PensionLab no incluye ni excluye esta historia mediante una regla propia**; `historiaCotizacion` se trata igual sin distinguir régimen de origen, sin que eso sea una afirmación normativa | Todo el mecanismo de integración del IBC histórico de un traslado — requiere investigación adicional (reglamento específico, jurisprudencia, o consulta directa a Colpensiones) antes de poder resolverse | **Cuestión pendiente — no demostrable con las fuentes consultadas hasta ahora** |
+
+## Cuestión pendiente, no resuelta (relevante para S4-001 y S4-002)
+
+A diferencia de la sección "Régimen de transición" de este archivo (donde lo diferido es
+una capacidad todavía no construida), aquí lo pendiente es un **vacío normativo real**,
+no solo de implementación: la fuente más específica encontrada sobre el mecanismo de
+traslado (Decreto 3800 de 2003) reconoce expresamente el **tiempo** cotizado en RAIS
+(Art. 3), pero ni ese decreto ni el Art. 21 de la Ley 100 dicen si el **valor económico**
+(IBC) de esa historia debe entrar al promedio del IBL en RPM, o si el traslado se resuelve
+únicamente por la vía del capital (bono pensional / traslado de saldos, Art. 4 del mismo
+decreto), dejando el IBL a cargo exclusivamente de la historia cotizada ya en RPM.
+
+**Consecuencia para el producto, ya aprobada por Carlos/Atlas:** mientras esta pregunta
+no tenga fundamento normativo suficiente, PensionLab no debe incluir ni excluir la
+historia previa a un traslado mediante una regla inventada. Esto no excluye del
+recorrido a un usuario trasladado — Carlos es precisamente uno de los casos reales de
+validación del Entregable 2 —, pero sí limita lo que PensionLab puede afirmar sobre el
+resultado en esos casos, y esa limitación debe quedar visible, nunca en silencio (ver
+`docs/tecnico/arquitectura/entregable-2-pensionlab-responde-explora-y-explica.md`,
+bloqueo §8.9).
+
+Existe además un indicio, no verificado a fondo en esta sesión, de que el propio
+mecanismo de traslado de recursos del RAIS al RPM administrado por Colpensiones **sigue
+sin estar completamente reglamentado**: el Ministerio de Trabajo tiene, a la fecha de
+esta consulta, un proyecto de decreto en trámite específicamente sobre ese traslado de
+recursos (ver fuentes). No se investigó su contenido ni su estado de avance — se registra
+solo como indicio de que esta pregunta puede seguir sin resolverse por vía reglamentaria
+durante un tiempo.
+
+## Fuentes consultadas (traslado de régimen e IBL)
+
+- [Ley 100 de 1993, Art. 21 — Función Pública, Gestor Normativo](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=5248)
+- [Decreto 3800 de 2003 — Colpensiones, Normativa](https://normativa.colpensiones.gov.co/colpens/docs/decreto_3800_2003.htm)
+- [Decreto 3800 de 2003 — SUIN-Juriscol](https://www.suin-juriscol.gov.co/viewDocument.asp?id=1537201)
+- [¿Qué se requiere para trasladarse de régimen? — Colpensiones](https://www.colpensiones.gov.co/publicaciones/123/que-se-requiere-para-trasladarse-de-regimen/)
+- [Consultar y entender la Historia Laboral — Colpensiones](https://www.colpensiones.gov.co/pensiones/publicaciones/127/consultar-y-entender-la-historia-laboral/)
+- [Traslado — Preguntas frecuentes, Colpensiones](https://www.colpensiones.gov.co/preguntas-frecuentes/276/traslado/)
+- [Ministerio de Trabajo publica proyecto de decreto sobre traslado de recursos del RAIS al RPM — Colpensiones](https://www.colpensiones.gov.co/publicaciones/5149/ministerio-de-trabajo-publica-proyecto-de-decreto-que-reglamenta-el-traslado-de-recuros-del-rais-al-rpm-administrado-por-colpensiones/) (indicio de reglamentación en trámite, contenido no investigado)

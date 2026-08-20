@@ -20,6 +20,7 @@
 
 import { useRef } from 'react'
 import { calcularPensionRPM } from '../domain/pensionEngine/calcularPensionRPM.js'
+import { evaluarIndicioVidaLaboral } from '../domain/evidenciaIndicioVidaLaboral.js'
 import { useRestaurarFocoAlMontar } from '../hooks/useRestaurarFocoAlMontar.js'
 import { formatearPesos } from '../format/formatearDinero.js'
 
@@ -57,8 +58,17 @@ const TEXTO_NO_ES_PROYECCION =
   'edad futura, y no es la pensión que recibirías al pensionarte — es un punto de ' +
   'partida, no una proyección.'
 
+// Ampliado en la revisión final de S4-001: la cifra de IBL sorprendió en la prueba manual
+// porque no se explicaba que los IBC históricos se actualizan por IPC antes de promediarse —
+// un IBC nominal constante en el tiempo produce un IBL mayor que ese mismo valor, por la
+// inflación acumulada (ver formulaIBL.js/trazabilidad-formula-IBL.md). Solo se explica aquí en
+// lenguaje llano; el cálculo en sí no cambia.
 function textoIBL(ibl) {
-  const definicion = 'El IBL es el ingreso promedio que la fórmula del RPM usa como base de cálculo. '
+  const definicion =
+    'El IBL es el ingreso promedio que la fórmula del RPM usa como base de cálculo. Antes de ' +
+    'promediarlos, cada valor histórico se actualiza según la inflación acumulada hasta hoy (IPC) ' +
+    '— por eso el IBL no necesariamente coincide con el promedio simple de las cifras que ' +
+    'introdujiste. '
   if (ibl.esOpcionLegal) {
     return (
       definicion +
@@ -85,14 +95,42 @@ function textoComparacionVidaLaboral(ibl) {
   )
 }
 
+const TEXTO_ADVERTENCIA_TRASLADO =
+  'Como te trasladaste de régimen: todavía no podemos confirmar cómo debe tratarse tu historia ' +
+  'previa al traslado en este cálculo. La tratamos igual que el resto de tu historia, sin que eso ' +
+  'sea una afirmación de que así debe calcularse legalmente en tu caso.'
+
+const TEXTO_INDICIO_PENDIENTE_DE_HISTORIA =
+  'Nos dijiste antes que tienes semanas suficientes para explorar la alternativa de toda tu vida ' +
+  'laboral, pero tu historia registrada hasta ahora todavía no alcanza para calcularla. Vuelve a ' +
+  'la captura y agrega más períodos para poder confirmarlo.'
+
+const TEXTO_DATOS_LEGALES_INSUFICIENTES =
+  'Tu historia registrada ya alcanza las semanas necesarias para la alternativa de toda tu vida ' +
+  'laboral, pero todavía no pudimos calcularla: nos falta información de precios (IPC) para ' +
+  'algunos de los años más antiguos de tu historia. Seguimos usando el resultado de los últimos ' +
+  '10 años mientras tanto.'
+
 /**
  * @param {Object} props
  * @param {Array<{fechaDesde: string, fechaHasta: (string|null), ibc: number, diasCotizados: number}>} props.historiaCotizacion
+ * @param {('RPM'|'RAIS'|'desconocido'|null)} props.regimenActual
+ * @param {('conocido'|'aproximado'|'desconocido'|null)} props.nivelConocimientoSemanas
+ * @param {string} props.semanasCotizadas
+ * @param {string | null} props.trasladoRegimen
  * @param {() => void} props.onVolver
  */
-function ExploraTuProyeccionRPM({ historiaCotizacion, onVolver }) {
+function ExploraTuProyeccionRPM({
+  historiaCotizacion,
+  regimenActual,
+  nivelConocimientoSemanas,
+  semanasCotizadas,
+  trasladoRegimen,
+  onVolver,
+}) {
   const sinHistoria = !historiaCotizacion || historiaCotizacion.length === 0
   const resultado = sinHistoria ? null : calcularPensionRPM({ historiaCotizacion })
+  const indicioVidaLaboral = evaluarIndicioVidaLaboral({ regimenActual, nivelConocimientoSemanas, semanasCotizadas })
 
   const formRef = useRef(null)
   useRestaurarFocoAlMontar(formRef)
@@ -129,7 +167,20 @@ function ExploraTuProyeccionRPM({ historiaCotizacion, onVolver }) {
             {resultado.ibl.vidaLaboral && (
               <p className="insight__message">{textoComparacionVidaLaboral(resultado.ibl)}</p>
             )}
+            {resultado.ibl.razonVidaLaboralNoEvaluada === 'SEMANAS_OBSERVADAS_INSUFICIENTES' &&
+              indicioVidaLaboral.estado === 'indicio_probable' && (
+                <p className="insight__message">{TEXTO_INDICIO_PENDIENTE_DE_HISTORIA}</p>
+              )}
+            {resultado.ibl.razonVidaLaboralNoEvaluada === 'DATOS_LEGALES_INSUFICIENTES' && (
+              <p className="insight__message">{TEXTO_DATOS_LEGALES_INSUFICIENTES}</p>
+            )}
           </div>
+
+          {trasladoRegimen === 'si' && (
+            <div className="field__warning">
+              <p>{TEXTO_ADVERTENCIA_TRASLADO}</p>
+            </div>
+          )}
 
           <div className="insight">
             <p className="insight__label">Semanas observadas</p>

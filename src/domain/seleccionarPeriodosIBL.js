@@ -27,7 +27,11 @@
 
 const MS_POR_DIA = 24 * 60 * 60 * 1000
 
-function diasCalendarioEnRango(fechaDesde, fechaHasta) {
+// Exportada a partir de S4-001 (captura de historia RPM estructurada real):
+// segundo consumidor real fuera de este archivo (src/pages/HistoriaCotizacionRPM.helpers.js),
+// para no reimplementar aritmética de fechas (bisiestos incluidos) en la capa de UI.
+// Comportamiento sin cambios — solo visibilidad.
+export function diasCalendarioEnRango(fechaDesde, fechaHasta) {
   const ms = new Date(fechaHasta).getTime() - new Date(fechaDesde).getTime()
   return Math.round(ms / MS_POR_DIA) + 1
 }
@@ -46,8 +50,18 @@ function seSuperponen(a, b) {
  * Ventana de evaluabilidad: los 10 años calendario completos inmediatamente anteriores al
  * año de fechaCalculo (ej. fechaCalculo en 2026 → ventana 2016-01-01 a 2025-12-31). Mismo
  * criterio de "años calendario completos" usado en la investigación normativa del IBL.
+ *
+ * Exportada a partir de S4-001 (revisión, Entregable 2): segundo consumidor real fuera de
+ * este archivo (src/pages/HistoriaCotizacionRPM.jsx), para mostrar el rango exacto que la UI
+ * necesita en vez de que la persona lo adivine. Esta ventana está anclada a `fechaCalculo`
+ * (hoy, en el uso actual) — NO es la ventana de 10 años que el Art. 21 de la Ley 100 de 1993
+ * ancla a la fecha de reconocimiento de la pensión; ver
+ * `docs/tecnico/arquitectura/entregable-2-pensionlab-responde-explora-y-explica.md` §7.1 y
+ * `src/data/legal/trazabilidad-normativa.md` ("Traslado de régimen (RAIS→RPM) e IBL"). Quien
+ * consuma esta función debe mantener esa distinción visible, nunca presentarla como la
+ * ventana jurídicamente definitiva. Comportamiento sin cambios — solo visibilidad.
  */
-function calcularVentana(fechaCalculo) {
+export function calcularVentana(fechaCalculo) {
   const anioCalculo = new Date(fechaCalculo).getUTCFullYear()
   const anioFin = anioCalculo - 1
   const anioInicio = anioFin - 9

@@ -43,6 +43,7 @@ describe('calcularPensionRPM — Caso 1: evaluable, sin alternativa (< 1250 sema
     expect(resultado.razonNoEvaluable).toBeNull()
     expect(resultado.ibl.ordinario.valor).toBeGreaterThan(0)
     expect(resultado.ibl.vidaLaboral).toBeNull() // 10 años ≈ 522 semanas, muy por debajo de 1250
+    expect(resultado.ibl.razonVidaLaboralNoEvaluada).toBe('SEMANAS_OBSERVADAS_INSUFICIENTES')
     expect(resultado.ibl.esOpcionLegal).toBe(false)
     expect(resultado.ibl.aplicable).toBe(resultado.ibl.ordinario.valor)
     expect(resultado.semanasObservadas).toBeGreaterThan(0)
@@ -122,6 +123,29 @@ describe('calcularPensionRPM — Caso 5: no evaluable', () => {
     const resultado = calcularPensionRPM({ historiaCotizacion: historia, fecha: FECHA_CALCULO })
     expect(resultado.estado).toBe('no_evaluable')
     expect(resultado.razonNoEvaluable).toBe('COTIZACION_PARCIAL_EN_VENTANA_IBL_NO_SOPORTADA')
+  })
+})
+
+// historiaDiezAniosCompleta() ya cubre 2016-2025 (~522 semanas). Para probar la ruta de vida
+// laboral con datos reales hace falta declarar años adicionales anteriores, sin solaparse con
+// esa ventana — 2000-2015 agrega ~16 años más, total ~26 años (~1356 semanas), por encima del
+// umbral de 1250 y con margen suficiente para no depender de un cálculo exacto al límite.
+function historiaVeintiseisAnios() {
+  const periodos = []
+  for (let anio = 2000; anio <= 2015; anio++) periodos.push(periodoAnioCompleto(anio, 900000 + anio))
+  return [...periodos, ...historiaDiezAniosCompleta()]
+}
+
+describe('calcularPensionRPM — Caso 6b: vida laboral con historia real que excede la cobertura de IPC', () => {
+  it('no lanza excepción — declara DATOS_LEGALES_INSUFICIENTES en vez de propagar el error de IPC faltante', () => {
+    const resultado = calcularPensionRPM({ historiaCotizacion: historiaVeintiseisAnios(), fecha: FECHA_CALCULO })
+
+    expect(resultado.estado).toBe('calculado')
+    expect(resultado.semanasObservadas).toBeGreaterThan(1250) // supera el umbral con datos reales
+    expect(resultado.ibl.vidaLaboral).toBeNull()
+    expect(resultado.ibl.razonVidaLaboralNoEvaluada).toBe('DATOS_LEGALES_INSUFICIENTES')
+    expect(resultado.ibl.esOpcionLegal).toBe(false)
+    expect(resultado.ibl.aplicable).toBe(resultado.ibl.ordinario.valor) // sigue usando el ordinario, sí evaluado
   })
 })
 

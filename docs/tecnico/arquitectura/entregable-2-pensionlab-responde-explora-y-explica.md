@@ -12,6 +12,8 @@ contraparte `.docx` ni vocación atemporal — ver §1).
 | Versión | Fecha | Autor | Descripción del cambio |
 |---|---|---|---|
 | 0.1 | 2026-08-18 | Carlos Peraza (con asistencia de Claude, Anthropic, y revisión cruzada de Atlas — ChatGPT, OpenAI) | Versión inicial. Registra formalmente el Entregable 2, abre Sprint 4, fija los 7 Slices aprobados (S4-001 a S4-007) y los bloqueos técnicos/normativos identificados durante su análisis. |
+| 0.2 | 2026-08-19 | Carlos Peraza (con asistencia de Claude, Anthropic, y revisión cruzada de Atlas — ChatGPT, OpenAI) | Incorpora el hallazgo de la revisión manual de S4-001 (Carlos, caso real trasladado de RAIS a RPM): bloqueo §8.9 (historia previa a un traslado de régimen, con investigación normativa acotada) y bloqueo §8.10 (`semanasObservadas` vs. semanas ya declaradas en el expediente); nota de UX en §7.1 sobre la ventana de 10 años (fecha de reconocimiento vs. hoy); decisiones pendientes 6 y 7 en §14. S4-001 permanece sin cerrar. |
+| 0.3 | 2026-08-19 | Carlos Peraza (con asistencia de Claude, Anthropic, y revisión cruzada de Atlas — ChatGPT, OpenAI) | Agrega a §7.1 la referencia técnica al estándar permanente de captura de fechas (`CampoFechaDiaMesAnio.jsx`, regla de experiencia registrada en `PL-240` §5) — implementado en la revisión final de S4-001. |
 
 ---
 
@@ -187,6 +189,26 @@ La captura debe:
   rellena con un supuesto (ver bloqueo §8.7).
 - Revalidar en capas (Principio 11): la UI valida para dar mensajes usables, el dominio
   vuelve a validar sin asumir que la UI lo hizo.
+- **Nunca presentar "los últimos 10 años" como si fueran los años jurídicamente
+  utilizados para la pensión futura de la persona.** Hallazgo confirmado por
+  investigación normativa (ver bloqueo §8.9 y `src/data/legal/trazabilidad-normativa.md`,
+  sección "Traslado de régimen (RAIS→RPM) e IBL"): el Art. 21 de la Ley 100 de 1993
+  ancla esa ventana a la **fecha de reconocimiento de la pensión** — una fecha futura,
+  hoy desconocida. El motor actual (`calcularPensionRPM.js`) la ancla a **hoy**, por una
+  limitación ya declarada (`LIMITACION_NO_ES_PROYECCION_FUTURA`), nunca porque sea la
+  misma ventana que finalmente aplicará. Cualquier texto de captura debe distinguir
+  explícitamente "los últimos 10 años calculados desde hoy, para esta lectura histórica"
+  de "los 10 años que contarán el día que te reconozcan la pensión" — nunca presentarlos
+  como si fueran lo mismo.
+- **Captura de fecha mediante el estándar permanente del proyecto.** Cada fecha
+  (`fechaDesde`, `fechaHasta`) se captura con `src/components/CampoFechaDiaMesAnio.jsx` —
+  la implementación compartida de la regla de experiencia "Toda fecha usa el mismo patrón
+  de captura" (`PL-240` §5, agregada en la revisión final de S4-001). El componente
+  resuelve exclusivamente captura e interacción (tres campos día/mes/año, buffer de
+  escritura del mes, aviso de día inválido); las reglas de negocio de cada fecha —fecha
+  futura, orden `fechaDesde`/`fechaHasta`— permanecen en `HistoriaCotizacionRPM.helpers.js`,
+  fuera del componente, mismo criterio ya aplicado en `DatosIniciales.jsx` (edad, fecha
+  futura), primer consumidor y origen del patrón.
 
 ### 7.2 Generación de caminos
 
@@ -345,7 +367,40 @@ supuestos:
    reservado desde Sprint 2 y nunca poblado hasta ahora), nunca presentarse con la
    solidez de la lectura histórica ya implementada.
 
-Ninguno de estos ocho puntos se resuelve en este documento. Se registran para que
+9. **Tratamiento de la historia previa a un traslado de régimen (RAIS→RPM) — sin
+   fundamento normativo suficiente para el IBC histórico.** Hallazgo de la revisión
+   manual de S4-001 (Carlos, primer caso real de validación, se trasladó recientemente
+   de RAIS a RPM), confirmado por investigación normativa acotada (ver
+   `src/data/legal/trazabilidad-normativa.md`, sección "Traslado de régimen (RAIS→RPM) e
+   IBL"). Con fuente oficial literal: **el tiempo cotizado en RAIS sí tiene respaldo
+   normativo para computarse en RPM** (Decreto 3800 de 2003, Art. 3: "el tiempo cotizado
+   en el Régimen de Ahorro Individual le será computado al del Régimen de Prima Media").
+   Pero **ninguna fuente consultada — ni el Art. 21 de la Ley 100 de 1993, ni el propio
+   Decreto 3800/2003 — resuelve cómo debe tratarse el IBC histórico** (los valores
+   económicos cotizados, no solo el tiempo) dentro del promedio de los 10 años o de toda
+   la vida laboral. Mientras no exista ese fundamento, **PensionLab no debe incluir ni
+   excluir esa historia mediante una regla inventada** — ni sumarla sin más, ni
+   descartarla. Esta incertidumbre **no excluye del recorrido a un usuario con
+   traslado** (decisión explícita Carlos/Atlas: excluirlo vaciaría de sentido el
+   Entregable 2), pero **limita lo que PensionLab puede afirmar** sobre el resultado en
+   esos casos — debe declararse como limitación visible, nunca resolverse en silencio.
+10. **Confusión entre "historia capturada" y "semanas reales reconocidas" del afiliado
+    (`semanasObservadas`).** `calcularPensionRPM.js` deriva `semanasObservadas`
+    exclusivamente de `historiaCotizacion` — la porción de la historia que el usuario ya
+    alcanzó a introducir en la pantalla de captura —, nunca de
+    `semanasCotizadas`/`nivelConocimientoSemanas`, ya declarados antes en el mismo
+    expediente (`InformacionPensionalEsencial.jsx`). El Art. 21, inciso 2, Ley 100 de
+    1993, es incondicional: quien cotizó ≥1250 semanas reales tiene derecho a que se
+    calcule también la alternativa de vida laboral y se le aplique la más favorable — no
+    dice "quien declaró 1250 semanas en un formulario". Si el usuario introduce solo una
+    parte de su historia (ej. los últimos 10 años), `semanasObservadas` puede quedar muy
+    por debajo de su total real, y el motor **nunca intentará la comparación de vida
+    laboral, en silencio** — aunque el usuario ya haya declarado en otra pantalla del
+    mismo expediente una cifra de semanas suficiente. Cómo debe interactuar ese dato ya
+    declarado con la historia estructurada es una decisión de arquitectura todavía
+    pendiente (§14), no una corrección de código ya autorizada.
+
+Ninguno de estos diez puntos se resuelve en este documento. Se registran para que
 ningún Slice los redescubra desde cero ni los resuelva implícitamente en código.
 
 ---
@@ -455,3 +510,12 @@ identificó durante el análisis de este Entregable y **no se resuelve en este d
    Motor de Decisión; este Entregable no la resuelve por su cuenta.
 5. **Relación entre este documento y un futuro `docs/gestion/cierre-sprint-4.md`** — se
    crea cuando cierre el primer Slice (S4-001), no en este commit.
+6. **Si y cómo tratar el IBC histórico previo a un traslado de régimen (RAIS→RPM)
+   dentro del IBL** (bloqueo §8.9) — bloqueada mientras no exista fundamento normativo
+   suficiente. No se resuelve inventando una regla; requiere investigación normativa
+   adicional (reglamento específico, jurisprudencia, o consulta directa a Colpensiones)
+   antes de cualquier cambio de dominio.
+7. **Cómo debe interactuar `semanasCotizadas`/`nivelConocimientoSemanas` (ya declarados
+   en el expediente) con `historiaCotizacion`/`semanasObservadas` (derivados de la
+   historia estructurada)** (bloqueo §8.10) — analizado conceptualmente durante la
+   revisión de S4-001, sin cambio de motor todavía autorizado.

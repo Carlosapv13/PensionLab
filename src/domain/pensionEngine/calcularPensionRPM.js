@@ -91,6 +91,7 @@ function construirTablaIPC(anios) {
  *     vidaLaboral: { valor: number, detalle: Array<Object> } | null,
  *     aplicable: number,
  *     esOpcionLegal: boolean,
+ *     razonVidaLaboralNoEvaluada: ('SEMANAS_OBSERVADAS_INSUFICIENTES'|'DATOS_LEGALES_INSUFICIENTES'|null),
  *   } | null,
  *   totalDiasCotizados: number | null,
  *   semanasObservadas: number | null,
@@ -122,17 +123,39 @@ export function calcularPensionRPM({ historiaCotizacion = [], fecha = hoyISO() }
   // superior de antemano — solo se calcula cuando la condición de habilitación se cumple,
   // y se compara numéricamente contra el ordinario más abajo (decisión ya cerrada: ninguna
   // heurística decide cuál será mayor).
+  //
+  // Hallazgo de la revisión de S4-001 (Entregable 2): periodosVidaLaboral puede incluir años
+  // muy anteriores a los de la ventana ordinaria (toda la vida laboral declarada, sin límite
+  // de 10 años) — si alguno de esos años no tiene IPC cargado en ipc-historico.json,
+  // construirTablaIPC/calcularPromedioIBL lanzan una excepción. Antes de este cambio, esa
+  // excepción no se capturaba: con ≥1250 semanas (~24 años) es el caso esperable, no una
+  // rareza — cualquier historia real que alcance el umbral y toque un año fuera de la tabla
+  // (2015-2025 hoy) habría roto la pantalla en vez de declarar honestamente la limitación.
   let iblVidaLaboral = null
+  let vidaLaboralNoEvaluadaPorDatosLegalesFaltantes = false
   if (semanasObservadas >= umbralAlternativa.valor) {
-    const tablaIPCVidaLaboral = construirTablaIPC(
-      aniosRequeridosParaIPC(seleccion.periodosVidaLaboral, anioReferenciaIPC)
-    )
-    iblVidaLaboral = calcularPromedioIBL({
-      periodos: seleccion.periodosVidaLaboral,
-      tablaIPC: tablaIPCVidaLaboral,
-      anioReferenciaIPC,
-    })
+    try {
+      const tablaIPCVidaLaboral = construirTablaIPC(
+        aniosRequeridosParaIPC(seleccion.periodosVidaLaboral, anioReferenciaIPC)
+      )
+      iblVidaLaboral = calcularPromedioIBL({
+        periodos: seleccion.periodosVidaLaboral,
+        tablaIPC: tablaIPCVidaLaboral,
+        anioReferenciaIPC,
+      })
+    } catch {
+      vidaLaboralNoEvaluadaPorDatosLegalesFaltantes = true
+    }
   }
+
+  // Razón estructurada expuesta explícitamente — la UI nunca debe inferir el motivo a partir
+  // de que ibl.vidaLaboral sea null (decisión Carlos/Atlas, revisión de S4-001).
+  const razonVidaLaboralNoEvaluada =
+    iblVidaLaboral !== null
+      ? null
+      : vidaLaboralNoEvaluadaPorDatosLegalesFaltantes
+        ? 'DATOS_LEGALES_INSUFICIENTES'
+        : 'SEMANAS_OBSERVADAS_INSUFICIENTES'
 
   const esOpcionLegal = iblVidaLaboral !== null && iblVidaLaboral.promedio > iblOrdinario.promedio
   const iblAplicable = esOpcionLegal ? iblVidaLaboral.promedio : iblOrdinario.promedio
@@ -152,6 +175,7 @@ export function calcularPensionRPM({ historiaCotizacion = [], fecha = hoyISO() }
       vidaLaboral: iblVidaLaboral ? { valor: iblVidaLaboral.promedio, detalle: iblVidaLaboral.detalle } : null,
       aplicable: iblAplicable,
       esOpcionLegal,
+      razonVidaLaboralNoEvaluada,
     },
     totalDiasCotizados: seleccion.totalDiasCotizados,
     semanasObservadas,

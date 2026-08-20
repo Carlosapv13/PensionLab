@@ -39,9 +39,10 @@ export const VALORES_POR_DEFECTO = {
   saldoAcumuladoDeclarado: '',
   objetivoPensionMensual: '',
   restriccionCostoPensionalAdicionalMaximoMensual: '',
-  // Slice "Primera lectura económica RPM desde historia estructurada": historia de
-  // cotización estructurada (PeriodoCotizacion[]) — en este Slice solo se puebla vía
-  // fixtures de desarrollo, nunca por una pantalla real de captura (fuera de alcance).
+  // Historia de cotización estructurada (PeriodoCotizacion[]). Desde S4-001
+  // (Entregable 2, Sprint 4) también se puebla por la pantalla real de captura
+  // (HistoriaCotizacionRPM.jsx) — este archivo sigue permitiendo poblarla también vía
+  // fixtures, para pruebas manuales rápidas.
   historiaCotizacion: [],
 }
 
@@ -66,6 +67,7 @@ export const VISTAS_CONOCIDAS = [
   'baseCotizacion',
   'queDeterminaResultado',
   'exploraTuProyeccion',
+  'historiaCotizacionRPM',
   'exploraTuProyeccionRPM',
   'declaracionLibre',
   'revisionDeclaracion',

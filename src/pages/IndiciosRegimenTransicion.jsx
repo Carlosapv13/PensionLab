@@ -8,11 +8,12 @@
 // data/legal/trazabilidad-normativa.md para el alcance y la investigación
 // normativa completa).
 //
-// Además de leer esa evidencia, esta pantalla captura un único dato nuevo —el
-// detalle de dirección del traslado— solo cuando `trasladoRegimen === 'si'`
-// (capturado en HistoriaPensional.jsx, Slice S3-009, que permanece cerrado y sin
-// tocar). El detalle nunca es input de la evidencia: solo matiza qué limitación se
-// muestra.
+// Además de leer esa evidencia, esta pantalla captura dos datos nuevos —el
+// detalle de dirección del traslado, y desde el Slice S4-001A la fecha en que
+// se hizo efectivo— solo cuando `trasladoRegimen === 'si'` (capturado en
+// HistoriaPensional.jsx, Slice S3-009, que permanece cerrado y sin tocar).
+// Ninguno de los dos es input de la evidencia: solo matizan qué limitación se
+// muestra y qué queda registrado en el expediente.
 //
 // Ubicación en el recorrido: se mantiene dentro del flujo principal por decisión
 // explícita (Principio 9 — un único caso real no basta para diseñar algo nuevo),
@@ -20,10 +21,24 @@
 // "Panel de Hallazgos del Expediente Pensional" (ver expediente-pensional.md,
 // Bloque 5 — Resultados, Decisión 14). Se diseñará solo cuando exista una segunda
 // evidencia real que produzca la misma tensión de ubicación en el recorrido lineal.
+//
+// S4-001A (Slice complementario a S4-001, previo a S4-002): fechaTrasladoRegimen +
+// certezaFechaTraslado se capturan y se guardan en el expediente — no se usan
+// todavía en ningún cálculo, no se asume que equivalgan a la fecha de primera
+// cotización bajo el régimen actual, y no se infiere de ellas ningún derecho,
+// elegibilidad ni consecuencia económica. El detalle técnico/normativo completo
+// (bloqueo §8.9, investigación normativa pendiente) vive en
+// `docs/tecnico/arquitectura/entregable-2-pensionlab-responde-explora-y-explica.md`
+// y en `src/data/legal/trazabilidad-normativa.md` — nunca en esta pantalla, que
+// solo explica, en lenguaje breve, para qué sirve el dato hoy.
 
 import { useRef } from 'react'
 import { evaluarIndiciosTransicion } from '../domain/evidenciaIndiciosTransicion.js'
 import { useRestaurarFocoAlMontar } from '../hooks/useRestaurarFocoAlMontar.js'
+import CampoFechaDiaMesAnio from '../components/CampoFechaDiaMesAnio.jsx'
+import { esFechaDiaMesAnioReal } from '../format/fechaDiaMesAnio.js'
+
+const HOY = new Date().toISOString().slice(0, 10)
 
 const TEXTOS_NO_EVALUABLE = {
   sexo_no_valido: 'Todavía no podemos hacer esta lectura con la información que tenemos.',
@@ -42,6 +57,30 @@ const OPCIONES_DETALLE_TRASLADO = [
     ayuda: "No pasa nada si no recuerdas la dirección exacta: elegir 'No estoy seguro' es suficiente para continuar.",
   },
 ]
+
+const OPCIONES_CERTEZA_FECHA_TRASLADO = [
+  { valor: 'conocido', texto: 'La conozco' },
+  { valor: 'aproximado', texto: 'Tengo una fecha aproximada' },
+  { valor: 'desconocido', texto: 'No la conozco' },
+]
+
+const TEXTO_EXPLICACION_FECHA_TRASLADO =
+  'Esta fecha nos ayuda a ubicar correctamente tu cambio de régimen dentro de tu historia pensional.'
+
+const TEXTO_HONESTIDAD_FECHA_TRASLADO =
+  'Por ahora PensionLab la guarda como parte de tu expediente, pero no la utiliza para modificar ningún ' +
+  'cálculo. Tampoco asumimos que sea exactamente la fecha en que comenzaste a cotizar en tu régimen actual.'
+
+// Solo valida que la fecha sea real y no futura — un traslado no puede haber ocurrido
+// todavía. Ninguna otra regla de negocio (Principio 11: esta validación es de interfaz,
+// no la barrera que protege el dominio, que hoy ni siquiera consume este dato).
+function mensajeErrorFechaTraslado(fecha) {
+  if (!fecha || !esFechaDiaMesAnioReal(fecha)) return null
+  if (fecha > HOY) {
+    return 'La fecha de traslado que ingresaste está en el futuro. Verifica ese dato antes de continuar.'
+  }
+  return null
+}
 
 function textoIndicios(resultado) {
   const { estado, edadA1994 } = resultado
@@ -88,6 +127,10 @@ function limitacionTraslado(trasladoRegimen) {
  * @param {string | null} props.trasladoRegimen
  * @param {string | null} props.detalleTraslado
  * @param {(valor: string) => void} props.onCambiarDetalleTraslado
+ * @param {('conocido'|'aproximado'|'desconocido'|null)} props.certezaFechaTraslado
+ * @param {(valor: string) => void} props.onCambiarCertezaFechaTraslado
+ * @param {string} props.fechaTrasladoRegimen
+ * @param {(fecha: string) => void} props.onCambiarFechaTrasladoRegimen
  * @param {() => void} props.onVolver
  * @param {() => void} props.onContinuar
  */
@@ -97,6 +140,10 @@ function IndiciosRegimenTransicion({
   trasladoRegimen,
   detalleTraslado,
   onCambiarDetalleTraslado,
+  certezaFechaTraslado,
+  onCambiarCertezaFechaTraslado,
+  fechaTrasladoRegimen,
+  onCambiarFechaTrasladoRegimen,
   onVolver,
   onContinuar,
 }) {
@@ -118,6 +165,13 @@ function IndiciosRegimenTransicion({
   )
 
   const faltaDetalleTraslado = trasladoRegimen === 'si' && !detalleTraslado
+
+  const requiereFechaTraslado =
+    trasladoRegimen === 'si' && (certezaFechaTraslado === 'conocido' || certezaFechaTraslado === 'aproximado')
+  const faltaCertezaFechaTraslado = trasladoRegimen === 'si' && !certezaFechaTraslado
+  const errorFechaTraslado = requiereFechaTraslado ? mensajeErrorFechaTraslado(fechaTrasladoRegimen) : null
+  const fechaTrasladoIncompleta = requiereFechaTraslado && !esFechaDiaMesAnioReal(fechaTrasladoRegimen)
+  const bloqueaPorFechaTraslado = faltaCertezaFechaTraslado || fechaTrasladoIncompleta || Boolean(errorFechaTraslado)
 
   const formRef = useRef(null)
   useRestaurarFocoAlMontar(formRef)
@@ -165,6 +219,45 @@ function IndiciosRegimenTransicion({
         </fieldset>
       )}
 
+      {trasladoRegimen === 'si' && (
+        <fieldset className="options options--secundario">
+          <legend>¿Recuerdas cuándo se hizo efectivo tu traslado?</legend>
+
+          {OPCIONES_CERTEZA_FECHA_TRASLADO.map(({ valor, texto }) => (
+            <label key={valor} className="option">
+              <input
+                type="radio"
+                name="certezaFechaTraslado"
+                value={valor}
+                checked={certezaFechaTraslado === valor}
+                onChange={() => onCambiarCertezaFechaTraslado(valor)}
+              />
+              <span>{texto}</span>
+            </label>
+          ))}
+
+          {requiereFechaTraslado && (
+            <>
+              <CampoFechaDiaMesAnio
+                valor={fechaTrasladoRegimen}
+                onCambiar={onCambiarFechaTrasladoRegimen}
+                etiquetaDia="Día del traslado"
+                etiquetaMes="Mes del traslado"
+                etiquetaAnio="Año del traslado"
+              />
+              {errorFechaTraslado && (
+                <div className="field__warning">
+                  <p>{errorFechaTraslado}</p>
+                </div>
+              )}
+            </>
+          )}
+
+          <p className="option__hint">{TEXTO_EXPLICACION_FECHA_TRASLADO}</p>
+          <p className="option__hint">{TEXTO_HONESTIDAD_FECHA_TRASLADO}</p>
+        </fieldset>
+      )}
+
       <div className="insight">
         <p className="insight__label">Lo que esto nos dice</p>
 
@@ -200,7 +293,7 @@ function IndiciosRegimenTransicion({
         <button type="button" className="btn btn-secondary" onClick={onVolver}>
           Volver
         </button>
-        <button type="submit" className="btn btn-primary" disabled={faltaDetalleTraslado}>
+        <button type="submit" className="btn btn-primary" disabled={faltaDetalleTraslado || bloqueaPorFechaTraslado}>
           Continuar
         </button>
       </div>

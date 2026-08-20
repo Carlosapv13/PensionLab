@@ -181,13 +181,131 @@ componente, remontado por cada período agregado — sin resincronización impl�
 - **Decisión obligatoria previa a S4-002** (Entregable 2 §14.1): convención económica
   de proyección RPM — cómo tratar la ventana de 10 años del IBL cuando queda parcial o
   totalmente en el futuro. No se inventa en este cierre.
-- **Slice pequeño propio, antes de S4-002**: `fechaTrasladoRegimen` +
-  `certezaFechaTraslado` en el expediente (análisis ya aprobado por Carlos/Atlas) —
-  tercer consumidor de `CampoFechaDiaMesAnio.jsx` ya anticipado; ese es el momento
-  natural para evaluar si además conviene un `key`/reset más genérico en el componente
-  (no se generaliza por anticipación ahora).
-- **Documentar formalmente**, en ese mismo Slice pequeño, la relación entre
-  `fechaTrasladoRegimen` y la extensión aditiva ya reservada desde Sprint 2 en
-  `UserProfile.laboralInfo.traslados` (`docs/tecnico/arquitectura/expediente-pensional.md`).
+- ~~Slice pequeño propio, antes de S4-002: `fechaTrasladoRegimen` +
+  `certezaFechaTraslado` en el expediente~~ — resuelto en el Slice S4-001A, abajo.
 - Continuar con S4-002 (`calcularProyeccionRPM.js` — camino base con horizonte futuro)
-  solo después de resolver ambos puntos anteriores.
+  solo después de resolver la decisión obligatoria de convención económica (arriba).
+
+---
+
+## Slice S4-001A — Fecha de traslado de régimen
+
+**Estado:** ✅ Cerrado y aprobado — commit de cierre de este mismo Slice en
+`sprint-3-mvp-headless` (el identificador definitivo queda registrado en el historial
+Git, ya que este documento forma parte de ese mismo commit).
+
+### Objetivo
+
+Incorporar al expediente la fecha del traslado de régimen y su nivel de certeza, sin
+usar todavía ese dato para modificar ningún cálculo pensional — Slice complementario a
+S4-001, previo a S4-002, aprobado a partir del análisis de "dónde insertar la
+captura" ya realizado.
+
+### Alcance aprobado
+
+- `fechaTrasladoRegimen` (ISO) + `certezaFechaTraslado`
+  (`'conocido' | 'aproximado' | 'desconocido'`), captura únicamente cuando
+  `trasladoRegimen === 'si'`.
+- Uso obligatorio de `CampoFechaDiaMesAnio.jsx` — tercer consumidor real del estándar
+  permanente de captura de fechas (`PL-240` §5), tras `DatosIniciales.jsx` y
+  `HistoriaCotizacionRPM.jsx`.
+- `detalleTraslado` permanece exactamente como estaba — sin tocar.
+- `PeriodoCotizacion` sin modificar. Ningún motor RPM ni fórmula tocados.
+- La pantalla nunca asume que la fecha efectiva del traslado equivale a la fecha de
+  primera cotización bajo el régimen actual, ni infiere de ella derechos, elegibilidad
+  o consecuencias económicas — declarado explícitamente en el propio texto visible
+  ("Por ahora PensionLab la guarda como parte de tu expediente, pero no la utiliza
+  para modificar ningún cálculo...").
+- Precisión de UX explícitamente pedida: la razón visible para pedir el dato no se
+  presenta como una necesidad técnica futura del proyecto — se explica en lenguaje
+  breve ("Esta fecha nos ayuda a ubicar correctamente tu cambio de régimen dentro de
+  tu historia pensional"); el detalle técnico/normativo completo (bloqueo §8.9 del
+  Entregable 2, investigación normativa pendiente) permanece exclusivamente en
+  documentación, nunca en la conversación principal.
+
+### Archivos modificados
+
+- `src/pages/IndiciosRegimenTransicion.jsx` — nuevo bloque de captura (certeza +
+  `CampoFechaDiaMesAnio` condicional), inmediatamente después del bloque ya existente
+  de `detalleTraslado` — misma pantalla, mismo gate, sin nueva vista de navegación
+  (PL-240 §5, "cuándo agrupar": misma naturaleza que `detalleTraslado`).
+- `src/App.jsx` — dos estados nuevos (`certezaFechaTraslado`, `fechaTrasladoRegimen`);
+  `actualizarTrasladoRegimen` extendida para invalidar ambos en cascada, mismo
+  criterio ya usado para `detalleTraslado`; nueva `actualizarCertezaFechaTraslado`
+  (mismo patrón que `actualizarCertezaBaseCotizacion`/`actualizarCertezaSaldoAcumulado`);
+  cableado a `IndiciosRegimenTransicion` y al Panel de Desarrollo.
+- `src/dev/estadoApp.js` — los dos campos nuevos agregados a `VALORES_POR_DEFECTO`.
+- `src/dev/fixtures.js` — nuevo fixture exclusivo de desarrollo
+  (`rpm-trasladada-indicios-transicion`), caso ficticio con `trasladoRegimen: 'si'` y
+  `vistaSugerida: 'indiciosTransicion'`, para agilizar la revisión manual de este Slice
+  y de futuros Slices sin recorrer todas las pantallas previas — confirmado ausente del
+  bundle de producción (mismo mecanismo de dead-code-elimination ya usado por los
+  fixtures existentes).
+
+### Validaciones
+
+- Certeza obligatoria (`trasladoRegimen === 'si'` exige una respuesta entre las tres
+  opciones) — "No la conozco" nunca bloquea.
+- Fecha (solo si certeza es conocido/aproximado): real (`esFechaDiaMesAnioReal`,
+  reutilizada sin cambios) y no futura — mensaje específico, mismo criterio de
+  "Explicar todo bloqueo" ya vigente.
+- Cambiar `trasladoRegimen` a una opción distinta de `'si'` invalida `fechaTrasladoRegimen`
+  y `certezaFechaTraslado` en cascada.
+- Cambiar `certezaFechaTraslado` a `'desconocido'` (o a cualquier valor distinto de
+  conocido/aproximado) elimina cualquier fecha ya introducida.
+
+### Verificación
+
+- `npm run lint` — sin errores, en cada ronda del Slice.
+- `npm test` — **398/398** en verde (395 del cierre de S4-001 + 3 nuevas, generadas
+  automáticamente por `src/dev/aplicarFixture.test.js`, que valida dinámicamente cada
+  entrada de `FIXTURES` — ninguna función pura nueva propia de S4-001A: se reutilizan
+  `CampoFechaDiaMesAnio.jsx` y `esFechaDiaMesAnioReal` sin modificarlos; la validación
+  nueva es inline, mismo tratamiento que `mensajeErrorFecha` en `DatosIniciales.jsx`).
+- `npm run build` — build de producción exitoso en cada ronda; el bundle final quedó
+  con hash idéntico al de antes de agregar el fixture de desarrollo
+  (`index-BguWsDgl.js`, mismo tamaño exacto), y se confirmó por `grep` directo sobre
+  `dist/assets/*.js` que ni el id/nombre del fixture ni ningún identificador de
+  `src/dev/` aparecen en el bundle de producción.
+- Diff revisado explícitamente: 4 archivos de código tocados
+  (`IndiciosRegimenTransicion.jsx`, `App.jsx`, `estadoApp.js`, `fixtures.js`) + 1
+  archivo documental (este mismo `cierre-sprint-4.md`) — ningún archivo de `domain/`
+  ni `PeriodoCotizacion` tocado, confirmando que el alcance aprobado se respetó sin
+  ampliaciones.
+
+### Revisión manual
+
+Ubicación, copy, captura de fecha (día/mes/año, comportamiento idéntico al estándar
+ya validado en S4-001) y comportamiento general confirmados directamente por Carlos y
+Atlas, usando el fixture de desarrollo agregado para esta revisión.
+
+Los cuatro casos funcionales restantes del checklist —fecha futura, "No la conozco",
+limpieza de una fecha ya introducida al cambiar la certeza, e invalidación en cascada
+al cambiar `trasladoRegimen`— se verificaron por **trazabilidad exacta del código**
+implementado (`IndiciosRegimenTransicion.jsx` líneas 169-174,
+`actualizarCertezaFechaTraslado`/`actualizarTrasladoRegimen` en `App.jsx`), no por un
+clic real adicional en navegador: esta sesión no contó con automatización de
+navegador disponible. Los cuatro casos resultan correctos según esa traza, sin
+ninguna discrepancia encontrada entre el comportamiento esperado y el implementado.
+Con esa combinación (revisión visual real + trazabilidad explícita de los cuatro
+comportamientos funcionales restantes + suite completa/lint/build en verde +
+confirmación de que el fixture de desarrollo no llega al bundle de producción),
+Carlos y Atlas autorizaron el cierre y el commit de este Slice.
+
+### Decisiones tomadas en este Slice
+
+1. La captura vive en `IndiciosRegimenTransicion.jsx`, no en una pantalla nueva —
+   mismo criterio de agrupación ya usado para `detalleTraslado`.
+2. No se agregó validación de coherencia entre la fecha de traslado y otros datos del
+   expediente (ej. posterior a la fecha de nacimiento) — sin evidencia de que haga
+   falta todavía (Principio 9); queda como posible mejora futura, no resuelta aquí.
+3. `fechaTrasladoRegimen`/`certezaFechaTraslado` materializan, por primera vez con
+   código real, la extensión `traslados` que `expediente-pensional.md` ya reservó en
+   `UserProfile.laboralInfo` desde Sprint 2 — todavía como estado plano, `UserProfile`
+   sigue sin instanciar.
+
+### Pendiente para el siguiente Slice
+
+- **Decisión obligatoria previa a S4-002** (Entregable 2 §14.1, sin cambios): convención
+  económica de proyección RPM.
+- Continuar con S4-002 (`calcularProyeccionRPM.js`) solo después de resolverla.

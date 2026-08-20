@@ -45,6 +45,12 @@ function App() {
   const [semanasConfirmadasPara, setSemanasConfirmadasPara] = useState(null)
   const [trasladoRegimen, setTrasladoRegimen] = useState(null)
   const [detalleTraslado, setDetalleTraslado] = useState(null)
+  // Slice S4-001A (complementario a S4-001, previo a S4-002): fecha en que se hizo
+  // efectivo el traslado de régimen, con el mismo patrón de certeza ya usado en el
+  // resto del proyecto. Se captura y se guarda en el expediente — todavía no la
+  // consume ningún cálculo (ver IndiciosRegimenTransicion.jsx).
+  const [certezaFechaTraslado, setCertezaFechaTraslado] = useState(null)
+  const [fechaTrasladoRegimen, setFechaTrasladoRegimen] = useState('')
   const [certezaBaseCotizacion, setCertezaBaseCotizacion] = useState(null)
   const [valorBaseCotizacionDeclarado, setValorBaseCotizacionDeclarado] = useState('')
   const [salarioParaEstimarBase, setSalarioParaEstimarBase] = useState('')
@@ -77,14 +83,26 @@ function App() {
   }
 
   function actualizarTrasladoRegimen(valor) {
-    // detalleTraslado (IndiciosRegimenTransicion) depende semánticamente de trasladoRegimen:
-    // solo tiene sentido cuando la respuesta es 'si'. Cualquier cambio que la
-    // aleje de 'si' invalida un detalle ya dado — mismo criterio ya aplicado a
-    // trasladoRegimen respecto de regimenActual.
+    // detalleTraslado y la fecha de traslado (IndiciosRegimenTransicion) dependen
+    // semánticamente de trasladoRegimen: solo tienen sentido cuando la respuesta es
+    // 'si'. Cualquier cambio que la aleje de 'si' invalida lo ya dado — mismo
+    // criterio ya aplicado a trasladoRegimen respecto de regimenActual.
     if (valor !== 'si') {
       setDetalleTraslado(null)
+      setCertezaFechaTraslado(null)
+      setFechaTrasladoRegimen('')
     }
     setTrasladoRegimen(valor)
+  }
+
+  function actualizarCertezaFechaTraslado(valor) {
+    // fechaTrasladoRegimen depende semánticamente de certezaFechaTraslado: solo
+    // tiene sentido con 'conocido'/'aproximado' — mismo criterio ya usado en
+    // actualizarCertezaBaseCotizacion/actualizarCertezaSaldoAcumulado.
+    if (valor !== 'conocido' && valor !== 'aproximado') {
+      setFechaTrasladoRegimen('')
+    }
+    setCertezaFechaTraslado(valor)
   }
 
   function actualizarAnioInicioCotizacion(valor) {
@@ -213,6 +231,8 @@ function App() {
     semanasConfirmadasPara,
     trasladoRegimen,
     detalleTraslado,
+    certezaFechaTraslado,
+    fechaTrasladoRegimen,
     certezaBaseCotizacion,
     valorBaseCotizacionDeclarado,
     salarioParaEstimarBase,
@@ -242,6 +262,8 @@ function App() {
     semanasConfirmadasPara: setSemanasConfirmadasPara,
     trasladoRegimen: setTrasladoRegimen,
     detalleTraslado: setDetalleTraslado,
+    certezaFechaTraslado: setCertezaFechaTraslado,
+    fechaTrasladoRegimen: setFechaTrasladoRegimen,
     certezaBaseCotizacion: setCertezaBaseCotizacion,
     valorBaseCotizacionDeclarado: setValorBaseCotizacionDeclarado,
     salarioParaEstimarBase: setSalarioParaEstimarBase,
@@ -285,6 +307,7 @@ function App() {
             lugarCotizacion: actualizarLugarCotizacion,
             certezaBaseCotizacion: actualizarCertezaBaseCotizacion,
             certezaSaldoAcumulado: actualizarCertezaSaldoAcumulado,
+            certezaFechaTraslado: actualizarCertezaFechaTraslado,
           })}
           vistaActual={vista}
           onIrAVista={setVista}
@@ -415,6 +438,10 @@ function App() {
           trasladoRegimen={trasladoRegimen}
           detalleTraslado={detalleTraslado}
           onCambiarDetalleTraslado={setDetalleTraslado}
+          certezaFechaTraslado={certezaFechaTraslado}
+          onCambiarCertezaFechaTraslado={actualizarCertezaFechaTraslado}
+          fechaTrasladoRegimen={fechaTrasladoRegimen}
+          onCambiarFechaTrasladoRegimen={setFechaTrasladoRegimen}
           onVolver={() => setVista(vistaSegunValorDePrimeraLectura('primeraLectura', 'historiaPensional'))}
           onContinuar={() => setVista('baseCotizacion')}
         />

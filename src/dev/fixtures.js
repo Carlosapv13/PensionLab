@@ -127,4 +127,39 @@ export const FIXTURES = [
       ],
     },
   },
+  {
+    id: 'rpm-trasladada-indicios-transicion',
+    nombre: 'RPM — trasladado de RAIS — hasta Indicios de régimen de transición (ficticio, S4-001A)',
+    // Caso ficticio, representativo de la clase de validación del Entregable 2 —
+    // no es el caso personal de Carlos. Reutilizable para revisión manual de
+    // S4-001A y, más adelante, de S4-002/S4-003: certezaBaseCotizacion ya
+    // resuelta ('conocido') y semanasCotizadas altas (~1500) para poder ejercitar
+    // el indicio de vida laboral (evidenciaIndicioVidaLaboral.js) sin tener que
+    // recapturar todo el expediente cada vez. tipoCotizante: 'independiente' —
+    // no introduce ninguna restricción adicional para RPM (ni
+    // seleccionarPeriodosIBL.js ni calcularPensionRPM.js filtran por él).
+    //
+    // detalleTraslado, certezaFechaTraslado y fechaTrasladoRegimen deliberadamente
+    // ausentes de `datos` — aplicarFixture los deja en su valor por defecto
+    // (null/''), exactamente lo que S4-001A necesita probar desde "Posibles
+    // indicios de régimen de transición".
+    vistaSugerida: 'indiciosTransicion',
+    datos: {
+      objetivoSeleccionado: 'Descubrir mis opciones pensionales.',
+      lugarResidencia: 'Colombia',
+      cotizaActualmente: 'si',
+      sexo: 'Hombre',
+      fechaNacimiento: '1974-05-14',
+      regimenActual: 'RPM',
+      trasladoRegimen: 'si',
+      tipoCotizante: 'independiente',
+      lugarCotizacion: 'colombia',
+      nivelConocimientoSemanas: 'aproximado',
+      semanasCotizadas: '1500',
+      anioInicioCotizacion: '1996',
+      certezaBaseCotizacion: 'conocido',
+      valorBaseCotizacionDeclarado: '3200000',
+      infoEsencialCompletada: true,
+    },
+  },
 ]

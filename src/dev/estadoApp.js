@@ -30,6 +30,11 @@ export const VALORES_POR_DEFECTO = {
   semanasConfirmadasPara: null,
   trasladoRegimen: null,
   detalleTraslado: null,
+  // Slice S4-001A: fecha en que se hizo efectivo el traslado de régimen, con el
+  // mismo patrón de certeza ya usado en el resto del proyecto — se captura y se
+  // guarda en el expediente, todavía no la consume ningún cálculo.
+  certezaFechaTraslado: null,
+  fechaTrasladoRegimen: '',
   certezaBaseCotizacion: null,
   valorBaseCotizacionDeclarado: '',
   salarioParaEstimarBase: '',

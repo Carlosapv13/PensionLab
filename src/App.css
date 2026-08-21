@@ -606,6 +606,24 @@
   font-weight: 600;
 }
 
+/* S4-004: jerarquía visual moderada para las dos cifras que la comparación existe para
+   resaltar (esfuerzo adicional, pensión proyectada) — un paso por encima del valor base
+   (16px, normal), por debajo del título del camino en peso semántico. */
+.camino-celda__valor--enfasis {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+/* S4-004: refuerzo del hecho objetivo "alcanza tu objetivo" (distanciaObjetivo.cumple ya
+   calculado por dominio) — reutiliza el mismo tono de acento que .camino-columna--alineado
+   ya usa para el camino más alineado, pero es una señal distinta y puede aplicar a un
+   camino que no sea el más alineado (ej. cuando varios caminos cumplen). No es una
+   recomendación nueva: solo resalta un dato que el texto ya afirmaba en texto plano. */
+.camino-celda__valor--cumple {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 .camino-celda__nota {
   margin: 0;
   font-size: 13px;

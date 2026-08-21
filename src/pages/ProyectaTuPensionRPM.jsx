@@ -28,6 +28,13 @@ import { useRestaurarFocoAlMontar } from '../hooks/useRestaurarFocoAlMontar.js'
 import { useCampoMonetario } from '../hooks/useCampoMonetario.js'
 import { formatearPesos } from '../format/formatearDinero.js'
 import CampoMonetario from '../components/CampoMonetario.jsx'
+import {
+  textoEsfuerzoAdicional,
+  textoIBCFuturo,
+  textoDistancia,
+  calcularLimitacionesComunes,
+  limitacionesEspecificas,
+} from './ProyectaTuPensionRPM.helpers.js'
 
 const EDAD_MAXIMA_FUNCIONAL = 100
 
@@ -67,24 +74,6 @@ function validarEdadJubilacionDeseada(edadTexto, edadActual) {
     }
   }
   return { edadValida: edadNumero, mensajeError: null }
-}
-
-function textoEsfuerzoAdicional(escenario) {
-  if (escenario.tipo === 'base') return 'Sin cambios respecto a hoy.'
-  if (escenario.esfuerzo.costoPensionalAdicionalMensual <= 0) return 'Sin cambios respecto a hoy.'
-  return `${formatearPesos(escenario.esfuerzo.costoPensionalAdicionalMensual)} adicionales al mes.`
-}
-
-function textoIBCFuturo(escenario) {
-  const { ibcActual, ibcPropuesto } = escenario.esfuerzo
-  if (ibcPropuesto === ibcActual) return `${formatearPesos(ibcActual)} (sin cambios).`
-  return `${formatearPesos(ibcActual)} → ${formatearPesos(ibcPropuesto)}.`
-}
-
-function textoDistancia(escenario) {
-  const { cumple, delta } = escenario.distanciaObjetivo
-  if (cumple) return 'Alcanza tu objetivo.'
-  return `No alcanza tu objetivo — le faltarían ${formatearPesos(delta)} al mes.`
 }
 
 /**
@@ -156,6 +145,13 @@ function ProyectaTuPensionRPM({
           fecha,
         })
       : null
+
+  // S4-004: separa, una sola vez, las limitaciones presentes en TODOS los caminos viables
+  // (comunes — se muestran una vez, debajo de la comparación) de las que solo aparecen en
+  // algunos (específicas — se quedan junto a su camino). Mismo patrón ya usado por
+  // ExploraTuProyeccion.jsx (RAIS). Los datos en sí no cambian, solo dónde se renderizan.
+  const escenariosViables = resultado ? resultado.escenarios.filter((e) => e.estado === 'viable') : []
+  const limitacionesComunes = calcularLimitacionesComunes(escenariosViables)
 
   const campoObjetivo = useCampoMonetario(objetivoPensionMensual, onCambiarObjetivoPensionMensual)
   const campoRestriccion = useCampoMonetario(
@@ -259,6 +255,7 @@ function ProyectaTuPensionRPM({
           >
             {resultado.escenarios.map((escenario, index) => {
               const esMasAlineado = resultado.orientacion.caminoMasAlineadoId === escenario.id
+              const notasEspecificas = limitacionesEspecificas(escenario, limitacionesComunes)
 
               return (
                 <div
@@ -277,7 +274,9 @@ function ProyectaTuPensionRPM({
                     <>
                       <div className="camino-celda camino-celda--esfuerzo">
                         <span className="camino-celda__etiqueta">Aporte pensional adicional mensual</span>
-                        <span className="camino-celda__valor">{textoEsfuerzoAdicional(escenario)}</span>
+                        <span className="camino-celda__valor camino-celda__valor--enfasis">
+                          {textoEsfuerzoAdicional(escenario)}
+                        </span>
                       </div>
                       <div className="camino-celda camino-celda--base">
                         <span className="camino-celda__etiqueta">IBC futuro del escenario</span>
@@ -285,15 +284,21 @@ function ProyectaTuPensionRPM({
                       </div>
                       <div className="camino-celda camino-celda--proyeccion">
                         <span className="camino-celda__etiqueta">Pensión proyectada mensual (pesos de hoy)</span>
-                        <span className="camino-celda__valor">{formatearPesos(escenario.resultado.valor)}</span>
+                        <span className="camino-celda__valor camino-celda__valor--enfasis">
+                          {formatearPesos(escenario.resultado.valor)}
+                        </span>
                       </div>
                       <div className="camino-celda camino-celda--objetivo">
                         <span className="camino-celda__etiqueta">Frente a tu objetivo</span>
-                        <span className="camino-celda__valor">{textoDistancia(escenario)}</span>
+                        <span
+                          className={`camino-celda__valor${escenario.distanciaObjetivo.cumple ? ' camino-celda__valor--cumple' : ''}`}
+                        >
+                          {textoDistancia(escenario)}
+                        </span>
                       </div>
-                      {escenario.limitaciones.length > 0 && (
+                      {notasEspecificas.length > 0 && (
                         <div className="camino-celda camino-celda--notas">
-                          {escenario.limitaciones.map((l) => (
+                          {notasEspecificas.map((l) => (
                             <p className="camino-celda__nota" key={l.codigo}>
                               {l.mensaje}
                             </p>
@@ -306,6 +311,19 @@ function ProyectaTuPensionRPM({
               )
             })}
           </div>
+
+          {limitacionesComunes.length > 0 && (
+            <div className="comparacion-caminos__supuestos">
+              <p className="screen__subtitle screen__subtitle--secundario comparacion-caminos__supuestos-titulo">
+                Supuestos y limitaciones de esta proyección
+              </p>
+              <ul className="comparacion-caminos__supuestos-lista">
+                {limitacionesComunes.map((l) => (
+                  <li key={l.codigo}>{l.mensaje}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {resultado.orientacion.caminoMasAlineadoId === null && (
             <p className="screen__subtitle">{resultado.orientacion.razon}</p>

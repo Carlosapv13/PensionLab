@@ -537,3 +537,85 @@ por días calendario (el original, con solo períodos completos, no podía disti
 - Traslado de régimen (`trasladoRegimen`/`fechaTrasladoRegimen`) sigue sin efecto
   económico — bloqueo §8.9 sin cambios.
 - `formulaIBL.js`, `formulaRPM.js` y la convención de 3.650 días permanecen intactos.
+
+---
+
+## Slice S4-004 — Comparación visual esfuerzo ↔ resultado (2 caminos)
+
+**Estado:** ✅ Implementado, validado visualmente por el usuario y aprobado — pendiente de
+commit de cierre.
+
+### Objetivo
+
+Presentar los dos caminos ya calculados por S4-003 (`generarCaminosRPM.js`: base +
+alternativo) en una comparación visual que permita a una persona, sin explicación previa,
+identificar cuál camino exige más esfuerzo y cuál se acerca más a la meta. Slice
+exclusivamente de UI: "la UI visualiza; no recalcula" — ningún archivo de `domain/` se
+modificó.
+
+### Diagnóstico previo a implementar
+
+La mayor parte de los criterios de aceptación ya estaban satisfechos incidentalmente por la
+pantalla que dejó S4-003 (`ProyectaTuPensionRPM.jsx`, grid `comparacion-caminos` heredado de
+RAIS). La brecha real no era de contenido sino de infraestructura de pruebas: el proyecto no
+tiene precedente de testear componentes (sin `@testing-library/react`, `jsdom` ni
+`happy-dom` en `package.json` — solo `vitest`). Se resolvió replicando exactamente el
+precedente ya usado por RAIS: extraer la lógica pura de presentación a un archivo
+`.helpers.js` hermano de la pantalla (`ExploraTuProyeccion.helpers.js` →
+`ProyectaTuPensionRPM.helpers.js`), testeable con Vitest normal, sin montar el componente ni
+agregar infraestructura nueva.
+
+### Ronda 1 — extracción de funciones de presentación
+
+Nuevo archivo `src/pages/ProyectaTuPensionRPM.helpers.js`: `textoEsfuerzoAdicional`,
+`textoIBCFuturo`, `textoDistancia` — cada una recibe un `escenario` ya construido por
+`generarCaminosRPM.js` y solo decide qué texto mostrar (formato/comparaciones de
+igualdad-signo, nunca aritmética de dominio). 11 tests en
+`ProyectaTuPensionRPM.helpers.test.js`, incluyendo casos límite (costo cero/negativo en el
+camino base, para confirmar que ni se lee).
+
+### Ronda 2 — ajuste de jerarquía visual y deduplicación de limitaciones
+
+Revisión visual manual del usuario detectó una brecha menor. Ajustes, todos sin tocar
+textos, cálculos, dominio, selección de `caminoMasAlineadoId` ni contratos:
+
+1. Mayor jerarquía visual del valor de "Aporte pensional adicional mensual" y de "Pensión
+   proyectada mensual" — nueva clase `.camino-celda__valor--enfasis` (`font-size: 20px`,
+   `font-weight: 600`), sin modificar reglas CSS existentes.
+2. Refuerzo visual de "Alcanza tu objetivo" en el camino que cumple, sin convertirlo en una
+   recomendación nueva — nueva clase `.camino-celda__valor--cumple` (`color: var(--accent)`,
+   `font-weight: 600`), aplicada solo cuando `escenario.distanciaObjetivo.cumple === true`
+   (dato de dominio ya existente, no una decisión nueva de la UI).
+3. Deduplicación de limitaciones idénticas repetidas en ambas columnas: `calcularLimitacionesComunes`
+   y `limitacionesEspecificas`, duplicadas a propósito de `ExploraTuProyeccion.helpers.js`
+   (mismo criterio de duplicación ya usado entre `generarCaminosRAIS.js`/
+   `generarCaminosRPM.js`, Principio 9). Agrupan **exclusivamente por `codigo`**, nunca
+   reinterpretan `mensaje` — restricción explícita del usuario: si eliminar la duplicación
+   hubiera requerido lógica que alterara o interpretara el contrato de dominio, debía
+   reportarse y conservarse la duplicación en su lugar; no fue necesario, la agrupación por
+   `codigo` fue suficiente. Las comunes se muestran una única vez debajo del grid
+   (reutilizando las clases `.comparacion-caminos__supuestos*` ya existentes de RAIS, sin
+   CSS nuevo); las específicas de cada camino permanecen dentro de su columna. 8 tests
+   nuevos cubren: sin escenarios viables, un solo escenario viable, limitaciones realmente
+   comunes a ambos, una limitación presente en un solo camino (no se considera común), y el
+   caso real completo (base + alternativo comparten tres, el alternativo conserva la suya).
+
+### Tests y verificación
+
+- `npm test` — **487/487** en verde (30 archivos).
+- `npm run lint` — sin errores.
+- `npm run build` — build de producción exitoso.
+- Validación visual manual del usuario (sin automatización de navegador disponible en esta
+  sesión): confirmada, los cuatro criterios de aceptación del Slice quedan satisfechos.
+
+### Fuera de alcance de este Slice
+
+- `calcularProyeccionRPM.js`, `generarCaminosRPM.js` y el resto de `domain/pensionEngine/`
+  permanecen intactos — ningún valor, cálculo ni contrato cambió.
+- Gráficos y cualquier infraestructura de testing de componentes (RTL/jsdom) — deliberadamente
+  fuera, no había brecha funcional que los requiriera.
+- **Hallazgo de proceso, no de este Slice:** `docs/gestion/cierre-sprint-4.md` no tenía
+  entrada de cierre para S4-003 (commit `dc113de215ad575db545543d29ae368f95c36950`) antes de
+  esta edición — descubierto al preparar el cierre de S4-004. No se corrige aquí porque
+  hacerlo agregaría al inventario de este commit contenido que no pertenece exclusivamente a
+  S4-004; queda reportado para que el usuario decida cómo cerrarlo.

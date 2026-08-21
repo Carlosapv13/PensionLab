@@ -607,3 +607,18 @@ identificó durante el análisis de este Entregable y **no se resuelve en este d
    futura obligaría a reabrir esta decisión). El Slice correctivo que la implementa
    reemplaza `calcularVentana()` como definición de la ventana ordinaria del IBL; **sigue
    bloqueando S4-002** hasta que ese Slice cierre.
+9. **Hacer explícito el horizonte temporal de los caminos RPM en la UI** — decisión de
+   producto aprobada (2026-08-21), **todavía sin implementar, no forma parte de ningún
+   cierre hasta ahora**. Antes de considerar terminada la experiencia RPM del MVP, la UI
+   debe comunicar que el IBC propuesto/esfuerzo mensual de cada camino (`generarCaminosRPM.js`)
+   se supone mantenido desde una fecha de inicio hasta la edad/fecha de reconocimiento
+   seleccionada — incluyendo la duración aproximada del horizonte, cuando sea posible
+   calcularla. **No cambia ninguna fórmula**: el motor ya usa este supuesto temporal
+   (`escenarioIbcFuturo` proyectado hasta `fechaReconocimiento`, ver S4-002 en
+   `trazabilidad-formula-RPM.md`); esta decisión únicamente hace visible en pantalla un
+   supuesto que hoy es implícito. Separada y expresamente **fuera de esta decisión**:
+   explorar IBC × tiempo × pensión como espacio de exploración donde el horizonte mismo
+   se vuelva una variable estratégica (no solo un dato fijo de fondo) — eso queda como
+   evolución futura, sin diseño ni compromiso todavía. No asignada a ningún Slice de la
+   tabla de la sección 10 — a decidir cuándo se planifique el cierre de la experiencia
+   RPM del MVP.

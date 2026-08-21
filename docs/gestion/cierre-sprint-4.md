@@ -540,6 +540,94 @@ por días calendario (el original, con solo períodos completos, no podía disti
 
 ---
 
+## Slice S4-003 — Objetivo/restricción RPM y búsqueda determinista del IBC necesario
+
+**Estado:** ✅ Cerrado y aprobado — commit `dc113de215ad575db545543d29ae368f95c36950`.
+
+### Objetivo
+
+Dado un objetivo de pensión mensual y una restricción opcional de aporte adicional,
+generar el camino base (continuidad del IBC actual, ya construido por S4-002) y, cuando
+no lo alcanza, un camino alternativo mediante bisección determinista sobre
+`escenarioIbcFuturo.valor` — desbloqueado por la validación de monotonicidad (§8.5 del
+Entregable 2) cerrada como parte de este mismo Slice.
+
+### Monotonicidad (§8.5) — desbloqueo previo a la bisección
+
+Derivación analítica (`pensión(IBL)` es una parábola con vértice muy por encima del tope
+legal alcanzable) más verificación empírica exhaustiva
+(`monotonicidadProyeccionRPM.test.js`, barridos de hasta 5.000 puntos, sin
+contraejemplo) confirmaron: la proyección es estrictamente creciente en
+`[ibcActual, topeAplicado)` y constante en `[topeAplicado, ∞)`. Documentado en
+`src/domain/formulas/trazabilidad-formula-RPM.md` y en el Entregable 2 §8.5 (que pasó de
+"aún no demostrada" a resuelta). Habilita acotar la bisección exclusivamente a
+`[ibcAplicableSimulacion, topeAplicado]`, sin buscar fuera de ese rango.
+
+### `generarCaminosRPM.js`
+
+Nuevo archivo en `domain/pensionEngine/`, que reutiliza `calcularProyeccionRPM.js` como
+caja negra — `formulaIBL.js`, `formulaRPM.js` y `calcularProyeccionRPM.js` permanecen
+intactos. Criterio de convergencia de la bisección: iteraciones calculadas del rango real
+(`Math.ceil(log2(rango))`), precisión sub-peso, redondeo final hacia arriba (nunca deja un
+resultado por debajo del objetivo que fue a buscar), con reevaluación final mediante
+`calcularProyeccionRPM`. `costoAcumuladoHastaJubilacion` queda deliberadamente fuera de
+`esfuerzo` — la "Regla 5 del Entregable" citada en el propio Entregable 2 §7.2 no está
+definida en ningún documento del proyecto; no se inventa su contenido ni se asigna a
+ningún Slice futuro como obligación (decisión Carlos/Atlas, 2026-08-20).
+
+### Hallazgos de la auditoría adversarial post-implementación
+
+Dos hallazgos encontrados y corregidos antes del cierre:
+
+1. **La proyección no verificaba elegibilidad legal RPM** (edad y semanas mínimas, Art.
+   33 Ley 100). Corregido resolviendo ambos requisitos a `fechaReconocimiento`
+   (`calcularFechaPorEdad`), nunca a fecha de cálculo — mismo criterio ya establecido en
+   S4-002 para los parámetros legales congelados. Edad mínima vía `obtenerEdadPension`;
+   semanas mínimas vía `obtenerSemanasMinimas` (incluido el cronograma vigente de la
+   Sentencia C-197/2023 para mujeres), comparadas contra `semanasCotizadas.total` del
+   camino base (historia observada + horizonte futuro completo) — una sola verificación
+   basta, porque `semanasCotizadas.total` no depende de `escenarioIbcFuturo.valor`. Cuando
+   no se cumple alguno de los dos requisitos, no se calcula ni se muestra ninguna cifra de
+   pensión: `resultadoVacio()` devuelve `EDAD_JUBILACION_INFERIOR_A_EDAD_MINIMA_LEGAL` o
+   `SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM`, cada uno con `detalleElegibilidad`
+   estructurado (valores mínimo/elegido y la diferencia exacta) para que la UI nunca tenga
+   que inferir el motivo.
+2. **Restricción de costo propia del usuario confundida con objetivo inalcanzable.**
+   Cuando la restricción de aporte adicional máximo —no el objetivo en sí— es la causa
+   comprobada de no alcanzar la meta, el camino alternativo lo declara explícitamente
+   (`RESTRICCION_COSTO_LIMITA_RESULTADO`) en vez de presentarse como un objetivo
+   genéricamente inalcanzable.
+
+### UI — `ProyectaTuPensionRPM.jsx`
+
+Nueva pantalla (objetivo, restricción de costo y edad de jubilación deseada, capturables;
+reutiliza `CampoMonetario`), enlazada en `App.jsx` como vista `proyectaTuPensionRPM` entre
+`exploraTuProyeccionRPM` (que conserva intacto su alcance de lectura histórica, solo gana
+un botón de navegación) y la comparación visual de S4-004. Sin estado nuevo en `App.jsx`:
+reutiliza `edadJubilacionDeseada`, `objetivoPensionMensual`,
+`restriccionCostoPensionalAdicionalMaximoMensual` y `sexo` ya existentes — este último
+incorporado a los campos mínimos de la vista (`CAMPOS_MINIMOS_POR_VISTA`) a raíz de la
+auditoría de elegibilidad, por ser indispensable para resolver edad/semanas mínimas
+legales. Nuevo fixture de desarrollo `rpm-empleado-proyecta-tu-pension`, con un objetivo
+deliberadamente por encima de lo que el camino base alcanza, para ejercitar la bisección
+con datos reales en la revisión manual.
+
+### Tests y verificación
+
+- `npm test` — **468/468** en verde, incluyendo 23 tests nuevos en
+  `generarCaminosRPM.test.js` (bisección, convergencia, casos límite en clamps/tope,
+  elegibilidad, restricción de costo) y 6 en `monotonicidadProyeccionRPM.test.js`.
+- `npm run lint` — sin errores.
+- `npm run build` — build de producción exitoso.
+- Verificación visual manual aprobada (fixture `rpm-empleado-proyecta-tu-pension`).
+
+### Fuera de alcance de este Slice
+
+- S4-002 y los motores/fórmulas ya cerrados permanecen sin modificar.
+- Comparación visual de los dos caminos generados aquí — S4-004.
+
+---
+
 ## Slice S4-004 — Comparación visual esfuerzo ↔ resultado (2 caminos)
 
 **Estado:** ✅ Implementado, validado visualmente por el usuario y aprobado — pendiente de
@@ -614,8 +702,7 @@ textos, cálculos, dominio, selección de `caminoMasAlineadoId` ni contratos:
   permanecen intactos — ningún valor, cálculo ni contrato cambió.
 - Gráficos y cualquier infraestructura de testing de componentes (RTL/jsdom) — deliberadamente
   fuera, no había brecha funcional que los requiriera.
-- **Hallazgo de proceso, no de este Slice:** `docs/gestion/cierre-sprint-4.md` no tenía
-  entrada de cierre para S4-003 (commit `dc113de215ad575db545543d29ae368f95c36950`) antes de
-  esta edición — descubierto al preparar el cierre de S4-004. No se corrige aquí porque
-  hacerlo agregaría al inventario de este commit contenido que no pertenece exclusivamente a
-  S4-004; queda reportado para que el usuario decida cómo cerrarlo.
+- **Nota de proceso:** la trazabilidad documental de S4-003 (commit
+  `dc113de215ad575db545543d29ae368f95c36950`), ausente al momento de este cierre de S4-004,
+  se incorporó retroactivamente en una edición documental posterior — sin modificar código
+  ni reabrir el Slice.

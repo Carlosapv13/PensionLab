@@ -51,6 +51,7 @@ function resultadoVacio(codigo, razon, detalleElegibilidad = null) {
     orientacion: { caminoMasAlineadoId: null, codigo, razon },
     detalleElegibilidad,
     barrido: null,
+    horizonte: null,
   }
 }
 
@@ -410,6 +411,7 @@ function biseccionarEscenarioIbcFuturo({ construirInput, ibcActual, topeAplicado
  *     }>,
  *     puntoObjetivo: { escenarioIbcFuturo: Object, esfuerzo: Object, resultado: Object } | null,
  *   } | null,
+ *   horizonte: { fechaInicio: string, fechaFin: string, diasCotizados: number } | null,
  * }}
  */
 export function generarCaminosRPM({
@@ -620,5 +622,14 @@ export function generarCaminosRPM({
     alternativo,
   })
 
-  return { escenarios, orientacion: calcularOrientacion(escenarios), detalleElegibilidad: null, barrido }
+  // Horizonte temporal (§14 punto 9 del Entregable 2) — un único campo top-level, no uno
+  // por camino: fecha/fechaNacimiento/edadJubilacionDeseada son idénticos en cada llamada
+  // interna a calcularProyeccionRPM dentro de esta función (camino base, bisección del
+  // alternativo, y cada punto del barrido reutilizan escenarioBaseInput, solo varía
+  // escenarioIbcFuturo.valor) — el horizonte es, por construcción, el mismo en todos.
+  // resultadoBase.horizonteFuturo ya está calculado (S4-002) — se reexpone tal cual, sin
+  // recalcular ni derivar nada nuevo.
+  const horizonte = resultadoBase.horizonteFuturo
+
+  return { escenarios, orientacion: calcularOrientacion(escenarios), detalleElegibilidad: null, barrido, horizonte }
 }

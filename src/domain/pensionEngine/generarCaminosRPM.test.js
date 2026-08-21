@@ -580,3 +580,95 @@ describe('generarCaminosRPM — barrido esfuerzo↔resultado (S4-005)', () => {
     ).toBeNull()
   })
 })
+
+describe('generarCaminosRPM — horizonte (§14 punto 9 del Entregable 2)', () => {
+  it('null en todos los casos donde el camino base no es evaluable — mismo criterio que barrido', () => {
+    expect(generarCaminosRPM({ ...PERFIL_BASE, regimenActual: 'RAIS' }).horizonte).toBeNull()
+    expect(generarCaminosRPM({ ...PERFIL_BASE, sexo: null }).horizonte).toBeNull()
+  })
+
+  it('coincide exactamente con horizonteFuturo del camino base — reexpuesto, no recalculado', () => {
+    const proyeccionBase = calcularProyeccionRPM({
+      historiaCotizacion: PERFIL_BASE.historiaCotizacion,
+      fechaNacimiento: PERFIL_BASE.fechaNacimiento,
+      edadJubilacionDeseada: PERFIL_BASE.edadJubilacionDeseada,
+      escenarioIbcFuturo: { valor: PERFIL_BASE.ibcAplicableSimulacion, origen: 'continuidad_ibc_actual' },
+      fecha: FECHA_CALCULO,
+    })
+
+    const r = generarCaminosRPM(PERFIL_BASE)
+
+    expect(r.horizonte).toEqual(proyeccionBase.horizonteFuturo)
+  })
+
+  it('un único campo top-level, no uno por camino — nunca aparece dentro de cada escenario', () => {
+    const r = generarCaminosRPM(PERFIL_BASE)
+    expect(r.escenarios.every((e) => !('horizonte' in e) && !('horizonteFuturo' in e))).toBe(true)
+  })
+
+  it('base y alternativo comparten exactamente el mismo horizonte cuando hay ambos caminos', () => {
+    const base = calcularProyeccionRPM({
+      historiaCotizacion: PERFIL_BASE.historiaCotizacion,
+      fechaNacimiento: PERFIL_BASE.fechaNacimiento,
+      edadJubilacionDeseada: PERFIL_BASE.edadJubilacionDeseada,
+      escenarioIbcFuturo: { valor: PERFIL_BASE.ibcAplicableSimulacion, origen: 'continuidad_ibc_actual' },
+      fecha: FECHA_CALCULO,
+    })
+    const objetivoValorMensual = base.pensionMensualProyectada * 1.5 // alcanzable → produce el alternativo
+
+    const r = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual })
+
+    expect(r.escenarios).toHaveLength(2)
+    expect(r.escenarios[1].estado).toBe('viable')
+    // El horizonte top-level es el único lugar donde vive esta información — se verifica
+    // recalculando independientemente la proyección del alternativo (con el IBC que
+    // efectivamente encontró) y confirmando que su horizonteFuturo es idéntico al top-level,
+    // nunca uno distinto por camino.
+    const proyeccionAlternativo = calcularProyeccionRPM({
+      historiaCotizacion: PERFIL_BASE.historiaCotizacion,
+      fechaNacimiento: PERFIL_BASE.fechaNacimiento,
+      edadJubilacionDeseada: PERFIL_BASE.edadJubilacionDeseada,
+      escenarioIbcFuturo: {
+        valor: r.escenarios[1].entradas.escenarioIbcFuturo.valorAplicado,
+        origen: r.escenarios[1].entradas.escenarioIbcFuturo.origen,
+      },
+      fecha: FECHA_CALCULO,
+    })
+    expect(proyeccionAlternativo.horizonteFuturo).toEqual(r.horizonte)
+  })
+
+  it('horizonte también cubre el rango del barrido — mismo fecha/fechaNacimiento/edadJubilacionDeseada en cada punto', () => {
+    const r = generarCaminosRPM(PERFIL_BASE)
+    expect(r.barrido.estado).toBe('calculado')
+    const primerPunto = calcularProyeccionRPM({
+      historiaCotizacion: PERFIL_BASE.historiaCotizacion,
+      fechaNacimiento: PERFIL_BASE.fechaNacimiento,
+      edadJubilacionDeseada: PERFIL_BASE.edadJubilacionDeseada,
+      escenarioIbcFuturo: {
+        valor: r.barrido.puntos[0].escenarioIbcFuturo.valorAplicado,
+        origen: r.barrido.puntos[0].escenarioIbcFuturo.origen,
+      },
+      fecha: FECHA_CALCULO,
+    })
+    expect(primerPunto.horizonteFuturo).toEqual(r.horizonte)
+  })
+
+  it('fixture real rpm-empleado-proyecta-tu-pension: horizonte exacto 2026-08-22 → 2043-02-11, 6.018 días, idéntico en escenario base y alternativo', () => {
+    const historiaFixture = [
+      { fechaDesde: '2016-01-01', fechaHasta: '2019-06-30', ibc: 2100000, diasCotizados: 1277 },
+      { fechaDesde: '2020-01-01', fechaHasta: '2026-08-10', ibc: 2900000, diasCotizados: 2414 },
+    ]
+    const r = generarCaminosRPM({
+      regimenActual: 'RPM',
+      sexo: 'Hombre',
+      historiaCotizacion: historiaFixture,
+      fechaNacimiento: '1978-02-11',
+      edadJubilacionDeseada: 65,
+      ibcAplicableSimulacion: 2900000,
+      objetivoValorMensual: 3500000,
+      fecha: '2026-08-21',
+    })
+
+    expect(r.horizonte).toEqual({ fechaInicio: '2026-08-22', fechaFin: '2043-02-11', diasCotizados: 6018 })
+  })
+})

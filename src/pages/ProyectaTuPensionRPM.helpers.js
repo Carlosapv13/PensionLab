@@ -11,6 +11,8 @@
 // para darles forma.
 
 import { formatearPesos } from '../format/formatearDinero.js'
+import { formatearFechaCorta } from '../format/formatearFechaCorta.js'
+import { formatearDuracionCalendario } from '../format/formatearDuracionCalendario.js'
 
 /**
  * @param {Object} escenario
@@ -51,6 +53,22 @@ export function textoDistancia(escenario) {
 // empareja el mismo codigo con el mismo mensaje, así que agrupar por codigo nunca mezcla
 // dos textos distintos bajo un mismo grupo). Con un solo escenario viable, todas sus
 // limitaciones cuentan como comunes (no hay nada de qué distinguirlas).
+
+// Hace explícito el horizonte temporal de los caminos (§14 punto 9 del Entregable 2,
+// decisión Carlos/Atlas 2026-08-21) — compone dos funciones de formato puras
+// (formatearFechaCorta, formatearDuracionCalendario) sobre `resultado.horizonte`, ya
+// calculado por generarCaminosRPM.js. Nunca instancia `new Date()` ni el reloj del
+// navegador: fechaInicio/fechaFin vienen exclusivamente de dominio.
+//
+// @param {{fechaInicio: string, fechaFin: string, diasCotizados: number}} horizonte
+// @param {number} edadJubilacionDeseada
+// @returns {string}
+export function textoHorizonte(horizonte, edadJubilacionDeseada) {
+  const inicio = formatearFechaCorta(horizonte.fechaInicio)
+  const fin = formatearFechaCorta(horizonte.fechaFin)
+  const duracion = formatearDuracionCalendario(horizonte.fechaInicio, horizonte.fechaFin)
+  return `${inicio} → ${fin} · ${duracion} · hasta los ${edadJubilacionDeseada} años`
+}
 
 /**
  * @param {Array<Object>} escenariosViables

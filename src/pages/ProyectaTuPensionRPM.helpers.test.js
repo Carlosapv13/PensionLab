@@ -13,6 +13,7 @@ import {
   textoEsfuerzoAdicional,
   textoIBCFuturo,
   textoDistancia,
+  textoHorizonte,
   calcularLimitacionesComunes,
   limitacionesEspecificas,
 } from './ProyectaTuPensionRPM.helpers.js'
@@ -81,6 +82,27 @@ describe('textoDistancia', () => {
     const b = { distanciaObjetivo: { cumple: false, delta: 999000 } }
     expect(textoDistancia(a)).toBe('No alcanza tu objetivo — le faltarían $50.000 al mes.')
     expect(textoDistancia(b)).toBe('No alcanza tu objetivo — le faltarían $999.000 al mes.')
+  })
+})
+
+describe('textoHorizonte', () => {
+  it('fixture real rpm-empleado-proyecta-tu-pension: fechas cortas + duración calendario + edad, en el orden y separadores acordados', () => {
+    const horizonte = { fechaInicio: '2026-08-22', fechaFin: '2043-02-11', diasCotizados: 6018 }
+    expect(textoHorizonte(horizonte, 65)).toBe('22 ago 2026 → 11 feb 2043 · 16 años y 5 meses · hasta los 65 años')
+  })
+
+  it('nunca lee diasCotizados para la duración mostrada — solo fechaInicio/fechaFin (regresión contra reintroducir dias/365.25)', () => {
+    // Mismo rango exacto que el fixture, pero con un diasCotizados deliberadamente
+    // incorrecto: si la función lo usara, el texto cambiaría; como no lo usa, no cambia.
+    const horizonteConDiasIncorrectos = { fechaInicio: '2026-08-22', fechaFin: '2043-02-11', diasCotizados: 999999 }
+    expect(textoHorizonte(horizonteConDiasIncorrectos, 65)).toBe(
+      '22 ago 2026 → 11 feb 2043 · 16 años y 5 meses · hasta los 65 años'
+    )
+  })
+
+  it('horizonte corto (menos de 1 mes) — sigue componiendo el texto sin romperse', () => {
+    const horizonte = { fechaInicio: '2026-08-22', fechaFin: '2026-08-22', diasCotizados: 1 }
+    expect(textoHorizonte(horizonte, 62)).toBe('22 ago 2026 → 22 ago 2026 · menos de 1 mes · hasta los 62 años')
   })
 })
 

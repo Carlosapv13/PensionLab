@@ -523,3 +523,58 @@ describe('calcularProyeccionRPM — trazabilidad y limitaciones', () => {
     expect(resultado.ibl.ordinario.valor).toBe(2000000)
   })
 })
+
+describe('calcularProyeccionRPM — horizonteFuturo (§14 punto 9 del Entregable 2)', () => {
+  it('null en todo resultado no_evaluable', () => {
+    const resultado = calcularProyeccionRPM({
+      historiaCotizacion: [],
+      fechaNacimiento: '1964-01-01',
+      edadJubilacionDeseada: null, // EDAD_JUBILACION_NO_DECLARADA
+      escenarioIbcFuturo: escenarioContinuidad(2000000),
+      fecha: FECHA_CALCULO,
+    })
+    expect(resultado.estado).toBe('no_evaluable')
+    expect(resultado.horizonteFuturo).toBeNull()
+  })
+
+  it('fechaInicio = un día después de fecha, fechaFin = fechaReconocimiento, diasCotizados coincide con diasCalendarioEnRango — sin recalcular nada, mismos valores que ya usa periodoFuturo internamente', () => {
+    const resultado = calcularProyeccionRPM({
+      historiaCotizacion: historiaDiezAniosCompleta(),
+      fechaNacimiento: '1964-01-01',
+      edadJubilacionDeseada: 72, // fechaReconocimiento = 2036-01-01, horizonte > 3650 días
+      escenarioIbcFuturo: escenarioContinuidad(2000000),
+      fecha: FECHA_CALCULO,
+    })
+
+    expect(resultado.estado).toBe('calculado')
+    expect(resultado.horizonteFuturo.fechaInicio).toBe('2026-01-02') // diaSiguiente(FECHA_CALCULO)
+    expect(resultado.horizonteFuturo.fechaFin).toBe(resultado.fechaReconocimiento)
+    expect(resultado.horizonteFuturo.diasCotizados).toBe(
+      diasCalendarioEnRango(resultado.horizonteFuturo.fechaInicio, resultado.horizonteFuturo.fechaFin)
+    )
+    // Nunca confundir con composicionVentanaOrdinaria.diasFuturos — esa cifra está acotada a
+    // la ventana ordinaria de 3.650 días, no representa el horizonte completo cuando lo excede.
+    expect(resultado.horizonteFuturo.diasCotizados).toBeGreaterThan(resultado.composicionVentanaOrdinaria.diasFuturos)
+  })
+
+  it('fixture real rpm-empleado-proyecta-tu-pension: horizonte exacto 2026-08-22 → 2043-02-11, 6.018 días', () => {
+    const historiaFixture = [
+      { fechaDesde: '2016-01-01', fechaHasta: '2019-06-30', ibc: 2100000, diasCotizados: 1277 },
+      { fechaDesde: '2020-01-01', fechaHasta: '2026-08-10', ibc: 2900000, diasCotizados: 2414 },
+    ]
+    const resultado = calcularProyeccionRPM({
+      historiaCotizacion: historiaFixture,
+      fechaNacimiento: '1978-02-11',
+      edadJubilacionDeseada: 65,
+      escenarioIbcFuturo: escenarioContinuidad(2900000),
+      fecha: '2026-08-21',
+    })
+
+    expect(resultado.estado).toBe('calculado')
+    expect(resultado.horizonteFuturo).toEqual({
+      fechaInicio: '2026-08-22',
+      fechaFin: '2043-02-11',
+      diasCotizados: 6018,
+    })
+  })
+})

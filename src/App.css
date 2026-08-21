@@ -528,6 +528,37 @@
   color: var(--text);
 }
 
+/* Horizonte temporal de la proyección (§14 punto 9 del Entregable 2) — un único bloque
+   antes de la comparación de caminos y el gráfico, nunca repetido por tarjeta: base,
+   alternativo y el barrido comparten siempre el mismo horizonte (generarCaminosRPM.js). */
+.horizonte-proyeccion {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.horizonte-proyeccion__titulo {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.horizonte-proyeccion__resumen {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text-h);
+}
+
+.horizonte-proyeccion__nota {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
 .comparacion-caminos {
   display: grid;
   grid-template-columns: repeat(var(--comparacion-caminos-columnas), minmax(220px, 1fr));

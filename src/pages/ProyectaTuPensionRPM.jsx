@@ -33,6 +33,7 @@ import {
   textoEsfuerzoAdicional,
   textoIBCFuturo,
   textoDistancia,
+  textoHorizonte,
   calcularLimitacionesComunes,
   limitacionesEspecificas,
 } from './ProyectaTuPensionRPM.helpers.js'
@@ -245,9 +246,18 @@ function ProyectaTuPensionRPM({
             escenario de ingreso futuro evaluado.
           </p>
 
+          {resultado.horizonte && (
+            <div className="horizonte-proyeccion">
+              <p className="horizonte-proyeccion__titulo">Horizonte de esta proyección</p>
+              <p className="horizonte-proyeccion__resumen">{textoHorizonte(resultado.horizonte, edadValida)}</p>
+              <p className="horizonte-proyeccion__nota">
+                Los caminos comparados suponen mantener el IBC indicado durante este período.
+              </p>
+            </div>
+          )}
+
           <p className="comparacion-caminos__contexto">
-            Comparación proyectada hasta los {edadValida} años · Objetivo: {formatearPesos(objetivoValorMensual)} al
-            mes, en pesos de hoy.
+            Objetivo: {formatearPesos(objetivoValorMensual)} al mes, en pesos de hoy.
           </p>
 
           <div

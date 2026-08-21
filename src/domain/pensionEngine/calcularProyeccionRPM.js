@@ -77,6 +77,7 @@ function noEvaluable(razonNoEvaluable, trazabilidadVentana, datosFaltantes) {
     razonNoEvaluable,
     fechaBaseMonetaria: null,
     fechaReconocimiento: null,
+    horizonteFuturo: null,
     escenarioIbcFuturo: null,
     ibl: null,
     composicionVentanaOrdinaria: null,
@@ -179,6 +180,7 @@ function promediarConFuturo({ periodosObservados, diasFuturos, valorAplicado, an
  *   razonNoEvaluable: ('EDAD_JUBILACION_NO_DECLARADA'|'FECHA_NACIMIENTO_NO_VALIDA'|'IBC_FUTURO_NO_VALIDO'|'HISTORIA_CON_PERIODO_POSTERIOR_A_FECHA_CALCULO'|'EDAD_JUBILACION_NO_POSTERIOR_A_HOY'|'HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA'|'COTIZACION_PARCIAL_EN_LIMITE_VENTANA_IBL_NO_SOPORTADA'|'PERIODOS_SUPERPUESTOS_NO_SOPORTADOS'|'INCONSISTENCIA_DIAS_COTIZADOS_INVALIDOS'|'COBERTURA_IPC_INSUFICIENTE_PARA_IBL_ORDINARIO'|null),
  *   fechaBaseMonetaria: string | null,
  *   fechaReconocimiento: string | null,
+ *   horizonteFuturo: {fechaInicio: string, fechaFin: string, diasCotizados: number} | null,
  *   escenarioIbcFuturo: {valorDeclarado: number, valorAplicado: number, origen: string, topeAplicado: number} | null,
  *   ibl: Object | null,
  *   composicionVentanaOrdinaria: {diasObservados: number, diasFuturos: number, fraccionFutura: number} | null,
@@ -311,6 +313,16 @@ export function calcularProyeccionRPM({
     razonNoEvaluable: null,
     fechaBaseMonetaria: fecha,
     fechaReconocimiento,
+    // Horizonte temporal explícito (§14 punto 9 del Entregable 2) — reexpone, sin ningún
+    // cálculo nuevo, las mismas fechaDesde/fechaHasta/diasCotizados de periodoFuturo
+    // (arriba) que ya se usan internamente para construir el período sintético. Antes se
+    // descartaban al salir de esta función; ahora también forman parte del contrato
+    // público, para que la UI pueda mostrar "desde/hasta/duración" sin recalcular fechas.
+    horizonteFuturo: {
+      fechaInicio: periodoFuturo.fechaDesde,
+      fechaFin: periodoFuturo.fechaHasta,
+      diasCotizados: periodoFuturo.diasCotizados,
+    },
     escenarioIbcFuturo: {
       valorDeclarado,
       valorAplicado,

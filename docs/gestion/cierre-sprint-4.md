@@ -706,3 +706,194 @@ textos, cálculos, dominio, selección de `caminoMasAlineadoId` ni contratos:
   `dc113de215ad575db545543d29ae368f95c36950`), ausente al momento de este cierre de S4-004,
   se incorporó retroactivamente en una edición documental posterior — sin modificar código
   ni reabrir el Slice.
+
+---
+
+## Slice S4-005 — Barrido de caminos intermedios (rejilla determinista + gráfico)
+
+**Estado:** ✅ Cerrado y aprobado — pendiente de commit de cierre.
+
+### Objetivo
+
+Extender la comparación de dos caminos ya cerrada en S4-004 con una rejilla determinista
+de puntos intermedios entre la situación actual y un extremo superior — y presentarla
+como una curva esfuerzo↔resultado (`GraficoEsfuerzoResultado.jsx`, SVG nativo, sin
+librerías) que permita a una persona ver de un vistazo qué gana por cada esfuerzo
+adicional, no solo comparar dos puntos aislados. Extiende una capacidad ya demostrada
+(`generarCaminosRPM.js`), no introduce cálculo pensional nuevo: cada punto de la rejilla
+se evalúa con `calcularProyeccionRPM` como caja negra, exactamente igual que el camino
+base y el alternativo de S4-003.
+
+### Primera versión del rango — hallazgo y rediseño (tercera iteración, previa a esta
+sesión de cierre)
+
+La primera versión extendía el barrido incondicionalmente hasta `topeEfectivo` (el tope
+legal de IBC, o la restricción de costo declarada, lo que sea más estricto). Verificado
+empíricamente con datos reales: cuando el objetivo era alcanzable con un esfuerzo mucho
+menor al tope legal (un caso real llegaba al objetivo al 6% del rango hasta el tope), el
+tramo hasta el tope legal aplastaba visualmente la zona relevante para la decisión del
+usuario, respondiendo una pregunta ("¿cuánto más da subir hasta el máximo legal?") que
+nadie hizo. Rediseño de producto aprobado (Carlos/Atlas, 2026-08-21): el rango depende de
+si el objetivo es alcanzable — ver los cuatro casos completos en
+`trazabilidad-formula-RPM.md`, sección "Barrido esfuerzo↔resultado (S4-005)", y el
+resumen en `entregable-2-pensionlab-responde-explora-y-explica.md` §7.3/§7.4/§10. En
+síntesis: si el objetivo es alcanzable, el rango se extiende hasta
+`objetivoValorMensual × 1.25` (`MULTIPLICADOR_REFERENCIA_SUPERIOR`, margen de exploración
+de producto — nunca una segunda meta), acotado siempre por `topeEfectivo`; si no es
+alcanzable, el rango llega hasta `topeEfectivo` directamente, porque ahí sí es la
+pregunta relevante ("¿hasta dónde podrías llegar como máximo?"). Esa versión fue
+verificada con la revisión visual del fixture `rpm-empleado-proyecta-tu-pension`
+(objetivo $3.500.000, techo ≈$4.375.000) antes de iniciar esta sesión de cierre.
+
+### Diagnóstico de esta sesión — regla del margen visual auditada contra 5 casos reales
+
+Antes de cerrar, se auditó explícitamente que la regla de producto "el margen visual
+nunca puede superar el máximo realmente explorable" (`límite visual efectivo =
+min(objetivo + margen, máximo explorable)`) estuviera correctamente implementada, sobre
+5 casos: objetivo moderado alcanzable, objetivo alto cercano al máximo real, objetivo
+superior al máximo alcanzable, objetivo ya alcanzado con la situación actual, y el
+fixture de desarrollo con IBC ya en el tope legal. Los cinco confirmaron el
+comportamiento aprobado, con valores de dominio verificados directamente (sin UI, motor
+invocado desde `node`): el caso "objetivo alto cercano al máximo" reprodujo casi al peso
+el ejemplo conceptual del propio criterio de aceptación ($21.505.681 de objetivo, techo
+real $24.731.533 — nunca extendido a `objetivo × 1.25` = $26,9M). El diagnóstico también
+confirmó, leyendo el código: el gráfico solo escala a píxeles resultados ya calculados
+por dominio (`GraficoEsfuerzoResultado.helpers.js` — cero llamadas a
+`calcularProyeccionRPM`), y no existen puntos "ocultos" que el dominio calcule de más y
+la UI filtre — el límite del rango se decide en `generarCaminosRPM.js` *antes* de
+calcular los 5 puntos, así que nunca se generan de más.
+
+### Hallazgo del diagnóstico y corrección — el eje Y también se estiraba para un
+objetivo inalcanzable (cuarta iteración)
+
+El diagnóstico encontró un caso límite no cubierto por el rediseño anterior: aunque el
+eje X (rango de esfuerzo/IBC explorado) ya respetaba la regla del margen, el eje Y
+(pensión proyectada) metía el objetivo declarado al dominio de escalado
+**incondicionalmente**, incluso cuando `barrido.puntoObjetivo` era `null` (objetivo no
+alcanzado dentro de lo explorado). Con un objetivo muy por encima de lo alcanzable, esto
+estiraba el eje Y hasta ese valor inalcanzable, comprimiendo visualmente la curva
+realmente explorable en la fracción inferior del gráfico — la misma familia de problema
+que ya se había corregido para el eje X, sin resolver en el eje Y. Corregido, aprobado
+explícitamente por Carlos antes de implementar:
+
+- Nueva función pura `calcularDominioYConObjetivo(puntos, puntoObjetivo,
+  objetivoValorMensual)` en `GraficoEsfuerzoResultado.helpers.js`: el objetivo entra al
+  dominio Y (y se dibuja su línea/rombo) **solo si `puntoObjetivo !== null`** — misma
+  señal que ya usaba `mostrarNotaRestriccion`. Si no, el dominio Y se construye
+  exclusivamente con los resultados reales del barrido.
+- Cuando el objetivo no fue alcanzado, ya no se dibuja la línea horizontal "Tu objetivo"
+  ni su rombo — se reemplaza por un mensaje textual fuera del SVG, en lenguaje de
+  proyección/escenario (nunca de recomendación ni de pensión garantizada): "Tu objetivo
+  de $X está por encima del máximo proyectado que este escenario permite alcanzar: $Y",
+  con X/Y siempre valores ya calculados por dominio (el objetivo declarado y el
+  `resultado.valor` del extremo real del barrido).
+- Verificado explícitamente con un objetivo absurdamente alto (fixture de $900.000.000):
+  ya no aplasta la curva — ese caso en particular cae en `estado: 'sin_margen'` (IBC
+  actual ya en el tope legal) y ni siquiera llega a dibujar SVG, pero el mismo mecanismo
+  se probó también con un objetivo alto sobre un barrido `'calculado'` real (caso C del
+  diagnóstico, techo real $24.731.533 contra un objetivo de $37.097.300).
+- Un objetivo `mostrarNotaRestriccion` (ya existente) y el nuevo
+  `mostrarNotaObjetivoFueraDeAlcance` son mutuamente excluyentes por construcción (uno
+  exige `puntoObjetivo !== null`, el otro exige lo contrario) — nunca compiten por
+  mostrarse a la vez.
+- `domain/` no se tocó — la corrección completa vive en `GraficoEsfuerzoResultado.jsx`/
+  `.helpers.js`, siguiendo el mismo principio "la UI visualiza, no recalcula" ya
+  establecido en S4-004.
+
+### Hallazgo menor de la auditoría adversarial (no corregido, documentado)
+
+Una auditoría adversarial independiente (fork sin contexto compartido de la
+implementación) sobre la corrección del eje Y no encontró bugs de lógica, pero señaló una
+ambigüedad de redacción: cuando el corte del rango es por la restricción de costo que la
+propia persona declaró (`posicion: 'limite_restriccion'` con `puntoObjetivo === null` —
+el objetivo ni siquiera se alcanzó, distinto del caso donde sí se alcanza pero el margen
+del 125% se corta), el mensaje nuevo dice igual "el máximo que este escenario permite
+alcanzar", sin distinguir que ese techo es la propia restricción declarada por el usuario
+(remontable si la sube), no un tope legal infranqueable. La columna de comparación de
+caminos, en la misma pantalla, sí distingue esa causa explícitamente
+(`RESTRICCION_COSTO_LIMITA_RESULTADO`), así que la pantalla completa no es deshonesta —
+pero el texto propio del gráfico no la distingue. Queda registrado como posible ajuste
+futuro, no bloqueante para este cierre; no se corrigió sin aprobación explícita adicional.
+
+### Archivos creados
+
+- `src/components/GraficoEsfuerzoResultado.jsx` — componente presentacional puro (sin
+  estado React, sin hover/tooltip/interacción — deliberadamente simple para este Slice).
+- `src/components/GraficoEsfuerzoResultado.helpers.js` — funciones puras de
+  escalado/dominio, testeables con Vitest sin montar el componente (mismo precedente que
+  `ProyectaTuPensionRPM.helpers.js` de S4-004).
+- `src/components/GraficoEsfuerzoResultado.helpers.test.js`.
+
+### Archivos modificados
+
+- `src/domain/pensionEngine/generarCaminosRPM.js` — `construirBarridoEsfuerzoResultado`
+  y funciones de apoyo (`construirRejillaUniforme`, `construirPuntoBarrido`,
+  `puntoDesdeEscenario`); `topeAplicado`/`topeEfectivo` elevados a variables compartidas
+  entre el barrido y el camino alternativo de S4-003 (mismo valor, ahora calculado una
+  sola vez). `calcularProyeccionRPM.js`, `formulaIBL.js` y `formulaRPM.js` permanecen
+  intactos.
+- `src/domain/pensionEngine/generarCaminosRPM.test.js` — nuevo bloque `'generarCaminosRPM
+  — barrido esfuerzo↔resultado (S4-005)'`, cubriendo los 4 casos del rango condicional,
+  sus 3 subvariantes del caso "objetivo alcanzable", determinismo, extremos exactos sin
+  redondeo y `sin_margen`.
+- `src/pages/ProyectaTuPensionRPM.jsx` — cablea `GraficoEsfuerzoResultado` debajo del
+  grid de comparación de caminos ya existente.
+- `src/App.css` — estilos de `.grafico-esfuerzo-resultado*`, sin tocar reglas existentes.
+- `src/dev/fixtures.js` — nuevo fixture de desarrollo
+  `rpm-empleado-proyecta-tu-pension-sin-margen-barrido` (IBC actual ya en el tope legal,
+  objetivo deliberadamente absurdo) para revisar visualmente `estado: 'sin_margen'` sin
+  construir el caso a mano.
+- `src/domain/formulas/trazabilidad-formula-RPM.md` — nueva sección "Barrido
+  esfuerzo↔resultado (S4-005)", contrato completo de `barrido` en el bloque de
+  entrada/salida de `generarCaminosRPM`.
+- `docs/tecnico/arquitectura/entregable-2-pensionlab-responde-explora-y-explica.md` —
+  §7.3/§7.4 corregidos (el rango condicional reemplaza "incondicionalmente hasta el tope
+  legal"; los cuatro roles aspiracionales de §7.4 se distinguen explícitamente de la
+  `posicion` real de 5 valores que S4-005 sí implementó; "retornos decrecientes cerca del
+  tope legal" corregido a "aproximadamente lineal, R²≈0,999", verificado empíricamente),
+  tabla del Entregable 2 actualizada.
+
+### Tests y verificación
+
+- `npm test` — **523/523** en verde (31 archivos; 56 específicos de
+  `GraficoEsfuerzoResultado.helpers.test.js` + `generarCaminosRPM.test.js`, incluidos 6
+  nuevos para `calcularDominioYConObjetivo` de la corrección del eje Y).
+- `npm run lint` — sin errores.
+- `npm run build` — build de producción exitoso.
+- Revisión visual manual aprobada por Carlos en dos rondas: (1) rediseño del rango
+  (tercera iteración, fixture `rpm-empleado-proyecta-tu-pension`, objetivo $3.500.000);
+  (2) corrección del eje Y (cuarta iteración, mismo fixture con objetivo elevado
+  manualmente a $37.000.000 en el campo de la pantalla) — confirmado explícitamente por
+  Carlos: "el caso de objetivo de $3.500.000 se ve bien y el caso de objetivo inalcanzable
+  de $37.000.000 también: la gráfica termina en el máximo realmente explorable, no
+  fabrica el punto de objetivo y explica correctamente que el máximo proyectado es
+  $24.731.533".
+- Auditoría adversarial (fork independiente) sobre la corrección del eje Y: sin bugs de
+  lógica confirmados; un hallazgo menor de redacción documentado arriba, no corregido.
+
+### Decisiones tomadas en este Slice
+
+1. El rango del barrido depende de si el objetivo es alcanzable — nunca incondicional
+   hasta el tope legal (rediseño de producto, tercera iteración).
+2. `MULTIPLICADOR_REFERENCIA_SUPERIOR = 1.25` es una convención de producto explícita y
+   revisable, no una constante legal ni una segunda meta del usuario — mismo tratamiento
+   que la convención de 3.650 días del selector de ventana del IBL.
+3. El objetivo declarado solo entra al dominio visual (eje X ya lo hacía; eje Y desde
+   esta sesión) cuando el barrido realmente lo alcanzó — un objetivo inalcanzable nunca
+   estira ningún eje a costa de comprimir la curva real, en ninguna dimensión del
+   gráfico.
+4. Cuando el objetivo no se alcanza dentro de lo explorado, el gráfico lo comunica con un
+   mensaje textual explícito basado en valores ya calculados, nunca con un dominio visual
+   distorsionado ni con un punto de objetivo fabricado.
+
+### Fuera de alcance de este Slice
+
+- `calcularProyeccionRPM.js` y el resto de `domain/pensionEngine/` (fuera de
+  `generarCaminosRPM.js`) permanecen intactos.
+- La ambigüedad de redacción del mensaje en el caso `limite_restriccion` +
+  `puntoObjetivo === null` (ver "Hallazgo menor de la auditoría adversarial" arriba)
+  queda documentada, no resuelta.
+- Interacción (hover/tooltip) sobre el gráfico — deliberadamente fuera, decisión
+  Carlos/Atlas de mantenerlo simple para este Slice.
+- Explicación en lenguaje natural de por qué cada punto del barrido produce el resultado
+  que produce — capacidad de S4-007 (Explicación IA), no de este Slice.

@@ -274,8 +274,17 @@ algebraica** (ver bloqueo §8.1).
   acotada entre el IBC actual y el tope legal, evaluando repetidamente la función de
   proyección de un camino. Determinista, testeable, sin aprendizaje automático.
 - **Relación esfuerzo-resultado (Regla 5 del Entregable):** barrido determinista de N
-  candidatos de IBC entre el actual y el tope legal — no un optimizador continuo, una
-  rejilla evaluada una vez cada punto.
+  candidatos de IBC — no un optimizador continuo, una rejilla evaluada una vez cada punto.
+  **Corrección (2026-08-21, tercera iteración de diseño de S4-005):** el rango de la
+  rejilla NO es incondicionalmente "entre el actual y el tope legal" — verificado
+  empíricamente que eso aplastaba visualmente la zona relevante para la decisión cuando el
+  objetivo era alcanzable con un esfuerzo mucho menor. Cuando el objetivo es alcanzable, el
+  rango se extiende hasta aproximadamente 125% del objetivo declarado (margen de
+  exploración de producto, nunca una segunda meta), respetando siempre el tope legal y
+  cualquier restricción de costo declarada; el rango solo llega hasta el tope legal cuando
+  el objetivo no es alcanzable (ahí sí es la pregunta relevante: "¿hasta dónde podrías
+  llegar como máximo?"). Contrato completo en `trazabilidad-formula-RPM.md`, sección
+  "Barrido esfuerzo↔resultado (S4-005)".
 - **Dominancia/Pareto:** con un único lever de decisión (IBC), todos los resultados se
   mueven monótonamente juntos — no hay todavía una frontera de Pareto real que
   descubrir. Se vuelve valioso solo cuando el horizonte (edad de jubilación) también sea
@@ -290,16 +299,38 @@ obtiene y qué esfuerzo exige cada alternativa — no es un añadido opcional de
 es un criterio de aceptación (§12, Prueba visual).
 
 Cada camino (§7.2) ya trae todos los campos que cualquier representación visual necesita
-— la UI solo mapea, nunca deriva. El generador de caminos debe, además, marcar
-explícitamente roles (`actual` / `cumple objetivo` / `menor esfuerzo` / `más cercano sin
-cumplir`), igual que `calcularOrientacion` ya hace hoy en `generarCaminosRAIS.js` — la UI
-colorea según esos roles ya calculados, nunca decide ella misma cuál es "el mejor".
+— la UI solo mapea, nunca deriva.
+
+**Corrección (2026-08-21, verificado contra el código real al diseñar S4-005):** el
+párrafo original de esta sección afirmaba que el generador de caminos debía marcar
+explícitamente cuatro roles (`actual` / `cumple objetivo` / `menor esfuerzo` / `más
+cercano sin cumplir`), "igual que `calcularOrientacion` ya hace hoy en
+`generarCaminosRAIS.js`". Esa comparación era **incorrecta**: ni `generarCaminosRAIS.js`
+ni `generarCaminosRPM.js` implementan esos cuatro roles — ninguno de los dos regímenes lo
+hace hoy, en ningún Slice. `calcularOrientacion()` (duplicada a propósito entre ambos
+archivos) únicamente resuelve un único `caminoMasAlineadoId` (con `codigo`/`razon`), nunca
+un rol por escenario. Los cuatro roles descritos aquí siguen siendo **aspiracionales, no
+un contrato ya construido** — quedan como posible trabajo futuro, no asumidos por ningún
+Slice existente.
+
+S4-005 (barrido de caminos intermedios, ver §10) adoptó, para su propio alcance, una
+distinción mucho más pequeña y suficiente para lo que necesita: `posicion: 'actual' |
+'intermedio' | 'referencia_superior' | 'limite_restriccion' | 'extremo_superior'` por
+punto del barrido, más un marcador aparte (`puntoObjetivo`, nunca uno de los 5 puntos de
+la rejilla) para el objetivo declarado — deliberadamente **no** una implementación del
+contrato de cuatro roles descrito arriba, ni un intento de completarlo.
 
 Sobre la forma visual: dado que el resultado es una curva de compromiso continua sobre
-una única variable de decisión (esfuerzo↑ → resultado↑, con retornos decrecientes cerca
-del tope legal), un scatter/línea conectada comunica mejor la forma de la curva que
-barras, pensadas para categorías discretas. Esta recomendación se confirma formalmente
-al diseñar el Slice correspondiente (§10), no se cierra aquí.
+una única variable de decisión, un scatter/línea conectada comunica mejor su forma que
+barras, pensadas para categorías discretas. **La frase "con retornos decrecientes cerca
+del tope legal" de este párrafo original también resultó ser una suposición no verificada
+— ver la corrección de §7.3 (Regla 5): la curva real, verificada empíricamente, es
+aproximadamente lineal (R²≈0,999), sin un tramo de rendimientos decrecientes identificable
+con claridad.** **Resuelto en S4-005:** línea/scatter con SVG nativo, sin librerías, con
+escala siempre lineal (nunca logarítmica ni truncada, para no fabricar visualmente una
+curvatura que los datos no sostienen) — una capa adicional, independiente de la comparación
+tabular de
+S4-003/S4-004, que no se extendió a más columnas.
 
 ### 7.5 Regla: gráfico = qué ocurre / IA = por qué importa / trazabilidad = cómo se calculó
 
@@ -476,7 +507,7 @@ ningún Slice los redescubra desde cero ni los resuelva implícitamente en códi
 | **S4-002** | `calcularProyeccionRPM.js` — camino base con horizonte futuro | Requiere resolver primero la convención económica RPM (§14.1) antes de generar alternativas | S4-001 + decisión obligatoria §14.1 | `domain/pensionEngine/` (nuevo archivo) | Casos numéricos de referencia nuevos, incl. horizonte >10 años y <10 años | Pensión proyectada verificable a mano, con limitaciones declaradas (sin IPC/SMLV futuro inventado) | 30% |
 | **S4-003** | Objetivo/restricción RPM capturables + búsqueda determinista del IBC necesario (camino base + alternativo) | La búsqueda solo evalúa la función de S4-002 repetidamente | S4-002 + validación de monotonicidad (§8.5) — **resuelta (2026-08-20)**, sin bloqueos pendientes para iniciar | `domain/pensionEngine/generarCaminosRPM.js`, UI (reusa `CampoMonetario`) | Tests de bisección (convergencia, casos límite en clamps/tope) + tests análogos a `generarCaminosRAIS.test.js` | Con un objetivo declarado, el sistema entrega camino base + alternativo viable (o explica honestamente por qué no es alcanzable) | 45% |
 | **S4-004** | Comparación visual esfuerzo↔resultado (2 caminos) | Requiere caminos reales ya calculados; la UI solo visualiza, no recalcula | S4-003 | UI únicamente | Prueba visual manual + test de que el componente no transforma los datos recibidos | Una persona sin explicación previa identifica cuál camino exige más esfuerzo y cuál se acerca más a la meta | 60% |
-| **S4-005** | Barrido de caminos intermedios (rejilla determinista) | Extiende densidad de datos sobre una capacidad ya demostrada, no cálculo nuevo | S4-003, S4-004 | Pequeña extensión de `generarCaminosRPM.js` | Determinismo/reproducibilidad del barrido | El gráfico muestra ≥4-5 puntos y una persona señala visualmente dónde el esfuerzo deja de rendir proporcionalmente | 72% |
+| **S4-005** | Barrido de caminos intermedios (rejilla determinista) | Extiende densidad de datos sobre una capacidad ya demostrada, no cálculo nuevo | S4-003, S4-004 | Extensión de `generarCaminosRPM.js` (rango condicional, ver `trazabilidad-formula-RPM.md`) + `GraficoEsfuerzoResultado.jsx` (SVG nativo, nuevo) | Determinismo/reproducibilidad del barrido, incl. los 4 casos del rango condicional | **Corregido (2026-08-21, tercera iteración — el original, "señala dónde el esfuerzo deja de rendir proporcionalmente", no estaba respaldado por la fórmula real, verificado empíricamente: la curva resultó casi lineal, R²≈0,999, sin un punto de quiebre identificable).** Cuando el objetivo es alcanzable: una persona ve el punto exacto donde se alcanza ("Tu objetivo") dentro de un rango que se extiende un poco más allá (~125%), sin que el tope legal domine la escala. Cuando no es alcanzable: el rango llega hasta el máximo legal o hasta el límite de la restricción declarada, explicado como tal. | 72% |
 | **S4-006** | Inquietud libre → interpretación IA → confirmación → expediente | Deliberadamente al final del núcleo determinista (Regla 1, §6): nada que interpretar hacia hasta que el motor exista y sea confiable | S4-003 (el formulario que la IA pre-llena) + decisión pendiente §14.3 (servicio de IA) | Capa nueva fuera de `domain/` + pantalla de confirmación | Casos de interpretación incorrecta corregidos por el usuario → mismo resultado final que captura manual | Alex escribe su inquietud, confirma, y llega a la misma comparación visual sin guía de Carlos — Prueba Alex | 85% |
 | **S4-007** | Explicación IA de cada camino sobre datos ya producidos | Máxima dependencia de todo lo anterior; menor riesgo técnico | S4-004/S4-005 (+ S4-006 idealmente) | Capa de presentación/IA únicamente | Test de consistencia: ninguna cifra del texto difiere de lo ya calculado | Ninguna cifra mencionada por la IA contradice o inventa un número — Pruebas Carlos y Alex completas de punta a punta | 100% |
 

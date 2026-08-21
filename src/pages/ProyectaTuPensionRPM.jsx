@@ -28,6 +28,7 @@ import { useRestaurarFocoAlMontar } from '../hooks/useRestaurarFocoAlMontar.js'
 import { useCampoMonetario } from '../hooks/useCampoMonetario.js'
 import { formatearPesos } from '../format/formatearDinero.js'
 import CampoMonetario from '../components/CampoMonetario.jsx'
+import GraficoEsfuerzoResultado from '../components/GraficoEsfuerzoResultado.jsx'
 import {
   textoEsfuerzoAdicional,
   textoIBCFuturo,
@@ -311,6 +312,8 @@ function ProyectaTuPensionRPM({
               )
             })}
           </div>
+
+          <GraficoEsfuerzoResultado barrido={resultado.barrido} objetivoValorMensual={objetivoValorMensual} />
 
           {limitacionesComunes.length > 0 && (
             <div className="comparacion-caminos__supuestos">

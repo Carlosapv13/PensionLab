@@ -659,6 +659,101 @@
   line-height: 1.4;
 }
 
+/* Gráfico esfuerzo↔resultado — S4-005. Capa adicional, independiente de la comparación
+   de caminos de arriba (S4-003/S4-004): SVG nativo, sin librería, sin interacción. */
+.grafico-esfuerzo-resultado {
+  width: 100%;
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.grafico-esfuerzo-resultado__titulo {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.grafico-esfuerzo-resultado__svg {
+  width: 100%;
+  height: auto;
+}
+
+.grafico-esfuerzo-resultado__mensaje-sin-margen {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.grafico-esfuerzo-resultado__eje {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.grafico-esfuerzo-resultado__marca {
+  font-size: 11px;
+  fill: var(--text);
+}
+
+.grafico-esfuerzo-resultado__titulo-eje {
+  font-size: 11px;
+  fill: var(--text);
+}
+
+.grafico-esfuerzo-resultado__objetivo {
+  stroke: var(--text);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+
+.grafico-esfuerzo-resultado__objetivo-etiqueta {
+  font-size: 11px;
+  fill: var(--text);
+}
+
+.grafico-esfuerzo-resultado__linea {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.grafico-esfuerzo-resultado__punto {
+  fill: var(--accent);
+}
+
+.grafico-esfuerzo-resultado__punto--extremo_superior,
+.grafico-esfuerzo-resultado__punto--referencia_superior,
+.grafico-esfuerzo-resultado__punto--limite_restriccion {
+  stroke: var(--bg);
+  stroke-width: 2;
+}
+
+.grafico-esfuerzo-resultado__punto-etiqueta {
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--text-h);
+}
+
+.grafico-esfuerzo-resultado__punto-etiqueta--objetivo {
+  fill: var(--accent);
+}
+
+/* Marcador del objetivo — rombo, no un color nuevo (regla de una sola serie): se
+   distingue de los 5 puntos de la rejilla por forma, no por tinte. */
+.grafico-esfuerzo-resultado__punto-objetivo {
+  fill: var(--bg);
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
+.grafico-esfuerzo-resultado__nota {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
 .legal-detail summary {
   cursor: pointer;
   font-size: 14px;

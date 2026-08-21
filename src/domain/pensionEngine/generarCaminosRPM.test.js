@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { generarCaminosRPM } from './generarCaminosRPM.js'
 import { calcularProyeccionRPM } from './calcularProyeccionRPM.js'
+import { obtenerTasaCotizacion } from '../../data/legal/index.js'
 
 const FECHA_CALCULO = '2026-01-01'
 const SMLV_2026 = 1750905
@@ -325,5 +326,257 @@ describe('generarCaminosRPM — restricción de costo pensional adicional', () =
       restriccionCostoPensionalAdicionalMaximoMensual: 900000000, // deliberadamente no vinculante
     })
     expect(rRestriccionAmplia.escenarios[1].limitaciones.map((l) => l.codigo)).not.toContain('RESTRICCION_COSTO_LIMITA_RESULTADO')
+  })
+})
+
+describe('generarCaminosRPM — barrido esfuerzo↔resultado (S4-005)', () => {
+  // Mecánica compartida por los 4 casos (verificada aquí una sola vez, sobre el caso
+  // "objetivo no alcanzable" — el mecanismo de construirRejillaUniforme es el mismo en
+  // cualquier caso, solo cambia dónde cae limiteSuperior).
+  it('5 puntos, extremos exactos (sin redondear), intermedios enteros no decrecientes, ninguno excede topeEfectivo (caso: objetivo no alcanzable)', () => {
+    const r = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual: 900000000 }) // sin restricción, inalcanzable
+
+    expect(r.barrido.estado).toBe('calculado')
+    expect(r.barrido.puntos).toHaveLength(5)
+    expect(r.barrido.puntoObjetivo).toBeNull() // nunca se alcanzó nada que marcar
+
+    const paso = (TOPE_IBC_2026 - PERFIL_BASE.ibcAplicableSimulacion) / 4
+    const esperados = [0, 1, 2, 3].map((i) => Math.floor(PERFIL_BASE.ibcAplicableSimulacion + i * paso))
+    esperados[0] = PERFIL_BASE.ibcAplicableSimulacion // índice 0: exacto, no floor
+
+    r.barrido.puntos.forEach((punto, indice) => {
+      expect(punto.indice).toBe(indice)
+      if (indice < 4) {
+        expect(punto.escenarioIbcFuturo.valorAplicado).toBe(esperados[indice])
+      }
+    })
+
+    expect(r.barrido.puntos[0].posicion).toBe('actual')
+    expect(r.barrido.puntos[0].escenarioIbcFuturo.valorAplicado).toBe(PERFIL_BASE.ibcAplicableSimulacion)
+    expect(r.barrido.puntos[1].posicion).toBe('intermedio')
+    expect(r.barrido.puntos[2].posicion).toBe('intermedio')
+    expect(r.barrido.puntos[3].posicion).toBe('intermedio')
+    expect(r.barrido.puntos[4].posicion).toBe('extremo_superior')
+    expect(r.barrido.puntos[4].escenarioIbcFuturo.valorAplicado).toBe(TOPE_IBC_2026)
+
+    expect(r.barrido.puntos.slice(1, 4).every((p) => Number.isInteger(p.escenarioIbcFuturo.valorAplicado))).toBe(true)
+
+    for (let i = 1; i < r.barrido.puntos.length; i++) {
+      expect(r.barrido.puntos[i].escenarioIbcFuturo.valorAplicado).toBeGreaterThanOrEqual(
+        r.barrido.puntos[i - 1].escenarioIbcFuturo.valorAplicado
+      )
+      expect(r.barrido.puntos[i].resultado.valor).toBeGreaterThanOrEqual(r.barrido.puntos[i - 1].resultado.valor)
+      expect(r.barrido.puntos[i].escenarioIbcFuturo.valorAplicado).toBeLessThanOrEqual(TOPE_IBC_2026)
+    }
+  })
+
+  it('cada punto de la rejilla se evalúa con calcularProyeccionRPM (caja negra) con origen barrido_esfuerzo_resultado, sin capeo (valorDeclarado === valorAplicado)', () => {
+    const r = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual: 900000000 })
+    r.barrido.puntos.forEach((punto) => {
+      expect(punto.escenarioIbcFuturo.origen).toBe('barrido_esfuerzo_resultado')
+      expect(punto.escenarioIbcFuturo.valorDeclarado).toBe(punto.escenarioIbcFuturo.valorAplicado)
+    })
+  })
+
+  describe('Caso: objetivo ya alcanzado con continuidad', () => {
+    it("estado 'objetivo_ya_alcanzado', sin puntos — ninguna curva de aumentos innecesarios", () => {
+      const r = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual: 100000 })
+      expect(r.escenarios).toHaveLength(1) // sin alternativo — mismo comportamiento de siempre
+      expect(r.barrido.estado).toBe('objetivo_ya_alcanzado')
+      expect(r.barrido.codigo).toBe('OBJETIVO_YA_ALCANZADO')
+      expect(r.barrido.razon).toBeTruthy()
+      expect(r.barrido.puntos).toEqual([])
+      expect(r.barrido.puntoObjetivo).toBeNull()
+    })
+  })
+
+  describe('Caso: objetivo no alcanzable (ni en el tope legal)', () => {
+    it("extremo 'extremo_superior' en topeAplicado, sin puntoObjetivo", () => {
+      const r = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual: 900000000 })
+      expect(r.escenarios[1].estado).toBe('descartado') // confirma que estamos en el caso correcto
+      expect(r.barrido.estado).toBe('calculado')
+      expect(r.barrido.puntos[4].posicion).toBe('extremo_superior')
+      expect(r.barrido.puntos[4].escenarioIbcFuturo.valorAplicado).toBe(TOPE_IBC_2026)
+      expect(r.barrido.puntoObjetivo).toBeNull()
+    })
+
+    it('sin_margen — IBC actual ya en el tope legal, distinguido con SIN_MARGEN_TOPE_LEGAL', () => {
+      const r = generarCaminosRPM({
+        ...PERFIL_BASE,
+        ibcAplicableSimulacion: TOPE_IBC_2026,
+        objetivoValorMensual: 900000000,
+      })
+      expect(r.barrido.estado).toBe('sin_margen')
+      expect(r.barrido.codigo).toBe('SIN_MARGEN_TOPE_LEGAL')
+      expect(r.barrido.razon).toBeTruthy()
+      expect(r.barrido.puntos).toEqual([])
+      expect(r.barrido.puntoObjetivo).toBeNull()
+    })
+  })
+
+  describe('Caso: restricción de costo corta antes de alcanzar el objetivo mismo', () => {
+    it("extremo 'limite_restriccion' — límite matemático EXACTO (con decimales, sin redondear), reutiliza el IBC ya encontrado por el alternativo de S4-003", () => {
+      const tasaCotizacionFraccion = obtenerTasaCotizacion(PERFIL_BASE.fecha).valor / 100
+      const restriccion = 1234 // NO múltiplo exacto de la tasa (16%), para forzar decimales reales
+      const topeEfectivoEsperado = PERFIL_BASE.ibcAplicableSimulacion + restriccion / tasaCotizacionFraccion
+      expect(Number.isInteger(topeEfectivoEsperado)).toBe(false)
+
+      const r = generarCaminosRPM({
+        ...PERFIL_BASE,
+        objetivoValorMensual: 2500000,
+        restriccionCostoPensionalAdicionalMaximoMensual: restriccion,
+      })
+
+      expect(r.escenarios[1].estado).toBe('viable')
+      expect(r.escenarios[1].distanciaObjetivo.cumple).toBe(false) // confirma que estamos en el caso correcto
+
+      expect(r.barrido.estado).toBe('calculado')
+      const ultimo = r.barrido.puntos[4]
+      expect(ultimo.posicion).toBe('limite_restriccion')
+      expect(ultimo.escenarioIbcFuturo.valorAplicado).toBe(topeEfectivoEsperado)
+      expect(ultimo.escenarioIbcFuturo.valorAplicado).toBe(r.escenarios[1].esfuerzo.ibcPropuesto) // mismo límite, reutilizado
+      expect(Number.isInteger(ultimo.escenarioIbcFuturo.valorAplicado)).toBe(false)
+      expect(r.barrido.puntos.slice(1, 4).every((p) => Number.isInteger(p.escenarioIbcFuturo.valorAplicado))).toBe(true)
+      expect(r.barrido.puntoObjetivo).toBeNull() // nunca se alcanzó el objetivo
+    })
+
+    it('sin_margen — restricción de costo declarada en $0, distinguido con SIN_MARGEN_RESTRICCION_COSTO (no es el tope legal el que limita)', () => {
+      const r = generarCaminosRPM({
+        ...PERFIL_BASE,
+        restriccionCostoPensionalAdicionalMaximoMensual: 0,
+      })
+      expect(r.barrido.estado).toBe('sin_margen')
+      expect(r.barrido.codigo).toBe('SIN_MARGEN_RESTRICCION_COSTO')
+      expect(r.barrido.puntos).toEqual([])
+      expect(r.barrido.puntoObjetivo).toBeNull()
+    })
+  })
+
+  describe('Caso: objetivo alcanzable — el rango se extiende hasta ~125% del objetivo', () => {
+    it("margen del 125% alcanzable dentro del tope legal → extremo 'referencia_superior', puntoObjetivo bit-idéntico al alternativo de S4-003", () => {
+      const base = calcularProyeccionRPM({
+        historiaCotizacion: PERFIL_BASE.historiaCotizacion,
+        fechaNacimiento: PERFIL_BASE.fechaNacimiento,
+        edadJubilacionDeseada: PERFIL_BASE.edadJubilacionDeseada,
+        escenarioIbcFuturo: { valor: PERFIL_BASE.ibcAplicableSimulacion, origen: 'continuidad_ibc_actual' },
+        fecha: FECHA_CALCULO,
+      })
+      const objetivoValorMensual = base.pensionMensualProyectada * 1.5 // holgadamente alcanzable, y su ×1.25 también
+
+      const r = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual })
+
+      expect(r.escenarios[1].estado).toBe('viable')
+      expect(r.escenarios[1].distanciaObjetivo.cumple).toBe(true) // confirma que estamos en el caso correcto
+
+      expect(r.barrido.estado).toBe('calculado')
+      const ultimo = r.barrido.puntos[4]
+      expect(ultimo.posicion).toBe('referencia_superior')
+      // El extremo alcanza (o supera) el margen de 1.25× — nunca una segunda meta, solo
+      // el punto de referencia hasta donde se extendió la exploración.
+      expect(ultimo.resultado.valor).toBeGreaterThanOrEqual(objetivoValorMensual * 1.25)
+
+      // puntoObjetivo es exactamente el alternativo ya calculado por S4-003 — bit a bit,
+      // nunca una segunda evaluación.
+      expect(r.barrido.puntoObjetivo).not.toBeNull()
+      expect(r.barrido.puntoObjetivo.escenarioIbcFuturo).toEqual(r.escenarios[1].entradas.escenarioIbcFuturo)
+      expect(r.barrido.puntoObjetivo.esfuerzo).toEqual(r.escenarios[1].esfuerzo)
+      expect(r.barrido.puntoObjetivo.resultado).toEqual(r.escenarios[1].resultado)
+      expect(r.barrido.puntoObjetivo.escenarioIbcFuturo.origen).toBe('busqueda_objetivo_rpm')
+
+      // El objetivo cae dentro del rango explorado, nunca más allá del extremo.
+      expect(r.barrido.puntoObjetivo.escenarioIbcFuturo.valorAplicado).toBeLessThanOrEqual(
+        ultimo.escenarioIbcFuturo.valorAplicado
+      )
+    })
+
+    it("margen del 125% excede el tope legal (sin restricción declarada) → extremo 'extremo_superior' en topeAplicado, objetivo igual alcanzado y marcado", () => {
+      // Calibrado numéricamente: pensión en el tope legal ≈ $7.864.086 — un objetivo entre
+      // eso y eso/1.25 es alcanzable, pero su ×1.25 no cabe ni en el tope legal.
+      const objetivoValorMensual = 7149169
+      const r = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual })
+
+      expect(r.escenarios[1].estado).toBe('viable')
+      expect(r.escenarios[1].distanciaObjetivo.cumple).toBe(true) // confirma que estamos en el caso correcto
+      expect(objetivoValorMensual * 1.25).toBeGreaterThan(
+        calcularProyeccionRPM({
+          historiaCotizacion: PERFIL_BASE.historiaCotizacion,
+          fechaNacimiento: PERFIL_BASE.fechaNacimiento,
+          edadJubilacionDeseada: PERFIL_BASE.edadJubilacionDeseada,
+          escenarioIbcFuturo: { valor: TOPE_IBC_2026, origen: 'diagnostico' },
+          fecha: FECHA_CALCULO,
+        }).pensionMensualProyectada
+      ) // confirma que el ×1.25 realmente no cabe en el tope legal
+
+      expect(r.barrido.estado).toBe('calculado')
+      const ultimo = r.barrido.puntos[4]
+      expect(ultimo.posicion).toBe('extremo_superior')
+      expect(ultimo.escenarioIbcFuturo.valorAplicado).toBe(TOPE_IBC_2026)
+      expect(r.barrido.puntoObjetivo).not.toBeNull()
+      expect(r.barrido.puntoObjetivo.resultado.valor).toBeGreaterThanOrEqual(objetivoValorMensual)
+    })
+
+    it("una restricción de costo permite alcanzar el objetivo pero corta antes del margen del 125% → extremo 'limite_restriccion', objetivo igual alcanzado y marcado", () => {
+      // Calibrado numéricamente: objetivo alcanzable con IBC ≈ $4.213.375; su ×1.25
+      // necesitaría IBC ≈ $6.611.197. La restricción elegida (a mitad de camino entre
+      // ambos IBC) deja alcanzar el objetivo pero no el margen del 125%.
+      const objetivoValorMensual = 1534606
+      const restriccion = 545966
+
+      const r = generarCaminosRPM({
+        ...PERFIL_BASE,
+        objetivoValorMensual,
+        restriccionCostoPensionalAdicionalMaximoMensual: restriccion,
+      })
+
+      expect(r.escenarios[1].estado).toBe('viable')
+      expect(r.escenarios[1].distanciaObjetivo.cumple).toBe(true) // confirma que estamos en el caso correcto
+      expect(r.escenarios[1].limitaciones.map((l) => l.codigo)).not.toContain('RESTRICCION_COSTO_LIMITA_RESULTADO') // el objetivo SÍ se alcanzó, esta limitación no aplica aquí
+
+      const tasaCotizacionFraccion = obtenerTasaCotizacion(PERFIL_BASE.fecha).valor / 100
+      const topeEfectivoEsperado = PERFIL_BASE.ibcAplicableSimulacion + restriccion / tasaCotizacionFraccion
+
+      expect(r.barrido.estado).toBe('calculado')
+      const ultimo = r.barrido.puntos[4]
+      expect(ultimo.posicion).toBe('limite_restriccion')
+      expect(ultimo.escenarioIbcFuturo.valorAplicado).toBe(topeEfectivoEsperado)
+      expect(r.barrido.puntoObjetivo).not.toBeNull()
+      expect(r.barrido.puntoObjetivo.resultado.valor).toBeGreaterThanOrEqual(objetivoValorMensual)
+      // El objetivo se alcanzó con un IBC bastante menor al límite de la restricción —
+      // confirma que el 125% (que sí lo hubiera necesitado) es lo que quedó fuera.
+      expect(r.barrido.puntoObjetivo.escenarioIbcFuturo.valorAplicado).toBeLessThan(topeEfectivoEsperado)
+    })
+
+    it('determinismo: misma entrada produce exactamente el mismo barrido, incluida la doble búsqueda (objetivo + margen del 125%)', () => {
+      const base = calcularProyeccionRPM({
+        historiaCotizacion: PERFIL_BASE.historiaCotizacion,
+        fechaNacimiento: PERFIL_BASE.fechaNacimiento,
+        edadJubilacionDeseada: PERFIL_BASE.edadJubilacionDeseada,
+        escenarioIbcFuturo: { valor: PERFIL_BASE.ibcAplicableSimulacion, origen: 'continuidad_ibc_actual' },
+        fecha: FECHA_CALCULO,
+      })
+      const objetivoValorMensual = base.pensionMensualProyectada * 1.5
+      const r1 = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual })
+      const r2 = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual })
+      expect(r1.barrido).toEqual(r2.barrido)
+    })
+  })
+
+  it('barrido: null en todos los casos donde el camino base no es evaluable', () => {
+    expect(generarCaminosRPM({ ...PERFIL_BASE, regimenActual: 'RAIS' }).barrido).toBeNull()
+    expect(generarCaminosRPM({ ...PERFIL_BASE, sexo: null }).barrido).toBeNull()
+    expect(
+      generarCaminosRPM({ ...PERFIL_BASE, fechaNacimiento: '2000-01-01', edadJubilacionDeseada: 50 }).barrido
+    ).toBeNull()
+    expect(
+      generarCaminosRPM({ ...PERFIL_BASE, historiaCotizacion: historiaDiezAniosCompleta() }).barrido
+    ).toBeNull()
+    expect(
+      generarCaminosRPM({
+        ...PERFIL_BASE,
+        historiaCotizacion: [],
+        fechaNacimiento: '1964-01-31',
+        edadJubilacionDeseada: 62,
+      }).barrido
+    ).toBeNull()
   })
 })

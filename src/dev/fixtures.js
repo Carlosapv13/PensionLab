@@ -201,6 +201,47 @@ export const FIXTURES = [
     },
   },
   {
+    id: 'rpm-empleado-proyecta-tu-pension-sin-margen-barrido',
+    nombre: 'RPM — empleado — Proyecta tu pensión, IBC actual ya en el tope legal (S4-005, infraestructura de desarrollo)',
+    // Infraestructura de desarrollo exclusiva de S4-005: mismo perfil/historia de
+    // rpm-empleado-proyecta-tu-pension (arriba), con valorBaseCotizacionDeclarado
+    // deliberadamente muy por encima del tope legal (25 SMLV) para ejercitar en la
+    // revisión visual el caso barrido.estado === 'sin_margen' — ni el gráfico ni el
+    // camino alternativo tienen margen de IBC futuro que explorar. No demuestra ningún
+    // caso nuevo de dominio (mismo camino YA_EN_TOPE_LEGAL ya cubierto por tests de
+    // S4-003), solo facilita verlo sin construir el caso a mano.
+    //
+    // objetivoPensionMensual deliberadamente absurdo (verificado, 2026-08-21, tercera
+    // iteración de S4-005): con el IBC ya capado al tope legal, la pensión de continuidad
+    // ronda los $24.7M — cualquier objetivo módico cae en 'objetivo_ya_alcanzado' antes de
+    // llegar siquiera a evaluar el tope. Se necesita un objetivo que ni el tope legal
+    // alcance para ejercitar realmente 'sin_margen'/SIN_MARGEN_TOPE_LEGAL.
+    vistaSugerida: 'proyectaTuPensionRPM',
+    datos: {
+      objetivoSeleccionado: 'Descubrir mis opciones pensionales.',
+      lugarResidencia: 'Colombia',
+      cotizaActualmente: 'si',
+      sexo: 'Hombre',
+      fechaNacimiento: '1978-02-11',
+      regimenActual: 'RPM',
+      trasladoRegimen: 'no',
+      tipoCotizante: 'empleado',
+      lugarCotizacion: 'colombia',
+      nivelConocimientoSemanas: 'aproximado',
+      semanasCotizadas: '527',
+      anioInicioCotizacion: '2016',
+      certezaBaseCotizacion: 'conocido',
+      valorBaseCotizacionDeclarado: '50000000',
+      infoEsencialCompletada: true,
+      historiaCotizacion: [
+        { fechaDesde: '2016-01-01', fechaHasta: '2019-06-30', ibc: 2100000, diasCotizados: 1277 },
+        { fechaDesde: '2020-01-01', fechaHasta: '2026-08-10', ibc: 2900000, diasCotizados: 2414 },
+      ],
+      edadJubilacionDeseada: '65',
+      objetivoPensionMensual: '900000000',
+    },
+  },
+  {
     id: 'rpm-trasladada-indicios-transicion',
     nombre: 'RPM — trasladado de RAIS — hasta Indicios de régimen de transición (ficticio, S4-001A)',
     // Caso ficticio, representativo de la clase de validación del Entregable 2 —

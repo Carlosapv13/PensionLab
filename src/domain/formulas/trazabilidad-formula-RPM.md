@@ -483,6 +483,122 @@ explícita de producto/arquitectura, decisión de Carlos/Atlas (2026-08-20).
 mismo criterio que `generarCaminosRAIS.js`: `aporteMensualPensionPropuesto -
 aporteMensualPensionActual`, vía `obtenerTasaCotizacion` (regime-agnóstico, sin cambios).
 
+## Barrido esfuerzo↔resultado (S4-005)
+
+**Reemplaza por completo la versión anterior de esta sección** (tercera iteración de
+diseño, 2026-08-21). La primera versión extendía el barrido incondicionalmente hasta
+`topeEfectivo` — verificado empíricamente con datos reales: cuando el objetivo era
+alcanzable con un esfuerzo mucho menor al tope legal (un caso real llegaba al objetivo al
+6% del rango hasta el tope), el tope legal aplastaba visualmente la zona relevante para la
+decisión del usuario y respondía una pregunta que nadie hizo. Decisión de producto
+Carlos/Atlas: el rango depende de si el objetivo es alcanzable.
+
+5 puntos deterministas de la misma curva que `escenarios` ya evalúa, uniformemente
+espaciados en IBC dentro de `[ibcAplicableSimulacion, limiteSuperior]` — pero
+`limiteSuperior` ya **no** es siempre `topeEfectivo`. Se construye al final de
+`generarCaminosRPM()` (no en paralelo, como en la versión anterior), leyendo el resultado
+ya construido de `escenarios` — nunca recalcula lo que S4-003 ya decidió.
+
+**Separado de `escenarios` a propósito** (decisión Carlos/Atlas, 2026-08-21): un punto del
+barrido no es un "camino" con decisión/limitaciones/trazabilidad propias, es una muestra de
+la curva. Mezclarlo dentro de `escenarios` rompería la semántica de `calcularOrientacion()`
+— con un barrido monótono denso, en cuanto un punto cumple el objetivo, todos los puntos
+por encima también cumplen, disparando `VARIOS_CUMPLEN_FALTA_PRIORIDAD` de forma artificial
+para prácticamente cualquier objetivo alcanzable. `calcularOrientacion()` no se modifica
+para S4-005.
+
+### Cuatro casos, en este orden de prioridad
+
+1. **El camino base ya cumple el objetivo** (`escenarioBase.distanciaObjetivo.cumple`) →
+   `estado: 'objetivo_ya_alcanzado'`, `puntos: []`, `puntoObjetivo: null`. No se dibuja
+   ninguna curva de aumentos innecesarios — representación mínima y honesta: un mensaje,
+   no un gráfico con un solo punto disfrazado de gráfico.
+2. **No hay alternativo viable** (`escenarios[1]` inexistente o `estado: 'descartado'` —
+   objetivo no alcanzable ni en el tope legal ni dentro de la restricción) →
+   `limiteSuperior = topeEfectivo`, `posicion` del punto 4: `'extremo_superior'`. Aquí sí
+   importa "¿hasta dónde podrías llegar como máximo?" — es la pregunta relevante cuando el
+   objetivo declarado no se alcanza de ninguna forma.
+3. **Alternativo viable pero no cumple el objetivo** (única causa posible por construcción:
+   la restricción de costo, `topeEfectivo < topeAplicado` — ver auditoría de S4-003 más
+   abajo) → `limiteSuperior = topeEfectivo`, que **coincide exactamente** con
+   `escenarios[1].esfuerzo.ibcPropuesto` (demostrado: la bisección, cuando el objetivo
+   nunca se alcanza dentro del rango, converge por construcción a su propio límite
+   superior). `posicion`: `'limite_restriccion'`. `puntoObjetivo: null` — nunca se alcanzó
+   nada que marcar.
+4. **Alternativo cumple el objetivo** → `limiteSuperior` se extiende hasta
+   **objetivoValorMensual × 1.25** — margen de exploración de producto, explícitamente
+   **no una segunda meta del usuario** (decisión de producto, 2026-08-21) — encontrado
+   reutilizando `biseccionarEscenarioIbcFuturo` con un objetivo distinto (misma
+   infraestructura de búsqueda de S4-003, cero fórmulas nuevas). Si el ×1.25 no cabe en
+   `topeEfectivo`, la propia bisección converge honestamente al límite real — sin ninguna
+   verificación previa de alcanzabilidad, es una propiedad emergente del mecanismo ya
+   existente (mismo verificado para el caso 3). Tres subvariantes según qué determina el
+   extremo del rango, verificadas cada una con datos numéricos reales en
+   `generarCaminosRPM.test.js`:
+   - **El ×1.25 se alcanza dentro de `topeEfectivo`** → `posicion: 'referencia_superior'`.
+   - **El tope legal lo impide** (sin restricción vinculante) → `posicion:
+     'extremo_superior'`, valor = `topeAplicado`.
+   - **La restricción de costo lo impide** (pero permitió alcanzar el objetivo mismo) →
+     `posicion: 'limite_restriccion'`, valor = `topeEfectivo`.
+   `puntoObjetivo` siempre está presente en este caso, reutilizado **bit a bit** de
+   `escenarios[1]` (nunca una segunda evaluación de `calcularProyeccionRPM`) —
+   `puntoObjetivo.escenarioIbcFuturo.origen === 'busqueda_objetivo_rpm'`, distinto del
+   `'barrido_esfuerzo_resultado'` de los 5 puntos de la rejilla. Demostrado (§8.5,
+   monotonicidad): el IBC de `puntoObjetivo` nunca excede `limiteSuperior` — no se defiende
+   con `Math.max`, es una invariante matemática, no un caso incierto.
+
+### `MULTIPLICADOR_REFERENCIA_SUPERIOR` — convención de producto revisable
+
+`1.25` (25% por encima del objetivo). **No es una constante legal ni una segunda meta del
+usuario** — es un margen de exploración elegido por producto para mostrar "qué ocurre un
+poco más allá de tu meta", del mismo tipo que la convención de 3.650 días del selector de
+ventana: explícita, documentada, y revisable si la experiencia real muestra que otro valor
+comunica mejor. La UI nunca lo presenta como "objetivo superior" ni como recomendación —
+su etiqueta visible es neutral ("Fin de exploración").
+
+### Tratamiento de los extremos — exacto, sin `Math.floor`
+
+El punto `indice: 0` es `ibcAplicableSimulacion` exacto; el punto `indice: 4` es
+`limiteSuperior` exacto (sea `topeEfectivo`, `topeAplicado`, o el IBC del ×1.25).
+Verificado explícitamente contra el contrato real de `calcularProyeccionRPM`
+(`calcularProyeccionRPM.js`, validación de `escenarioIbcFuturo.valor`): exige únicamente
+`Number.isFinite`, nunca `Number.isInteger` — no hay ninguna razón de contrato para forzar
+un entero en los extremos. Cuando `limiteSuperior` proviene de una restricción de costo,
+puede traer decimales: ese decimal **es el límite matemático real** de la restricción
+declarada por el usuario, no un artefacto de redondeo — el extremo superior lo representa
+tal cual, sin ocultarlo detrás de un `Math.floor`/`Math.ceil`. No existe una distinción
+entre "límite matemático" y "máximo IBC evaluable": son el mismo número, porque
+`calcularProyeccionRPM` acepta ese número fraccionario directamente.
+
+**Los 3 puntos intermedios sí se redondean hacia abajo (`Math.floor`)** a pesos enteros —
+son muestras exploratorias de la curva, no límites que deban preservarse exactos. `Math.floor`
+garantiza, sin código de defensa adicional: ningún punto excede `limiteSuperior` (el valor
+sin redondear ya es estrictamente menor), orden no decreciente (`floor` de una secuencia no
+decreciente nunca decrece), y reproducibilidad (aritmética determinista).
+
+### `sin_margen`
+
+Cuando `topeEfectivo <= ibcAplicableSimulacion` (ya en el tope legal, o una restricción de
+costo que cierra el rango a cero) dentro de los casos 2 o 3 — nunca en el caso 1
+(`objetivo_ya_alcanzado`, que tiene prioridad y no llega a evaluar `topeEfectivo`) ni en el
+caso 4 (matemáticamente imposible: si el objetivo es alcanzable, `limiteSuperior` siempre
+excede `ibcAplicableSimulacion`) — no se fabrican 5 puntos idénticos: `barrido: { estado:
+'sin_margen', codigo, razon, puntos: [] }`, con `codigo` distinguiendo la causa real
+(`SIN_MARGEN_TOPE_LEGAL` vs. `SIN_MARGEN_RESTRICCION_COSTO`), mismo principio de "Explicar
+todo bloqueo" ya vigente en el resto del proyecto.
+
+### `origen`
+
+`'barrido_esfuerzo_resultado'` para los 5 puntos de la rejilla — tercer valor del campo
+abierto `origen`, junto a `'continuidad_ibc_actual'` (S4-002) y `'busqueda_objetivo_rpm'`
+(S4-003, reutilizado también por `puntoObjetivo`).
+
+### `barrido: null`
+
+En los mismos casos donde `escenarios: []` (perfil fuera de alcance, datos incompletos,
+elegibilidad legal no cumplida, o camino base `no_evaluable`) — el barrido nunca se calcula
+si ni siquiera el camino base es evaluable.
+
 ### Contrato de entrada/salida de `generarCaminosRPM`
 
 ```
@@ -512,6 +628,20 @@ generarCaminosRPM({
     razonDescartado: { codigo, mensaje, reglaAplicada } | null,
   }],
   orientacion: { caminoMasAlineadoId, codigo, razon },
+  barrido: {
+    estado: 'calculado' | 'sin_margen' | 'objetivo_ya_alcanzado',
+    codigo: string | null,
+    razon: string | null,
+    puntos: [{
+      indice: 0..4,
+      posicion: 'actual' | 'intermedio' | 'referencia_superior' | 'limite_restriccion' | 'extremo_superior',
+      escenarioIbcFuturo: {valorDeclarado, valorAplicado, origen, topeAplicado},
+      esfuerzo: { ibcActual, ibcPropuesto, aumentoIBC, aporteMensualPensionActual,
+                  aporteMensualPensionPropuesto, costoPensionalAdicionalMensual },
+      resultado: { valor, moneda: 'COP', periodoReferencia: 'mensual' },
+    }],
+    puntoObjetivo: { escenarioIbcFuturo, esfuerzo, resultado } | null,
+  } | null,
 }
 ```
 

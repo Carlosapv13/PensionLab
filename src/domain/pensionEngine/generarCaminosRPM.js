@@ -10,6 +10,21 @@
 // en §7.2 del Entregable 2) no está definida en ningún documento del proyecto; no se
 // inventa su contenido ni se asigna a ningún Slice futuro como obligación (decisión
 // Carlos/Atlas, 2026-08-20).
+//
+// S4-005 agrega `barrido` — 5 puntos deterministas de la misma curva esfuerzo↔resultado.
+// Separado a propósito de `escenarios`: no son caminos con decisión/limitaciones/
+// trazabilidad propias, son muestras de la misma curva que `escenarios` ya evalúa —
+// mezclarlos rompería la semántica de calcularOrientacion() (un barrido monótono denso
+// dispararía VARIOS_CUMPLEN_FALTA_PRIORIDAD de forma artificial en cuanto un punto
+// cumpliera el objetivo, ya que todos los puntos por encima también cumplirían).
+//
+// Rediseño de producto (2026-08-21, tercera iteración de S4-005): el rango del barrido ya
+// NO es incondicionalmente [ibcActual, topeEfectivo] — el tope legal aplastaba visualmente
+// la zona relevante para la decisión del usuario en cualquier caso donde el objetivo era
+// alcanzable con un esfuerzo mucho menor (verificado empíricamente: en un caso real el
+// objetivo se alcanzaba al 6% del rango hasta el tope). El rango depende de si el objetivo
+// es alcanzable — ver `construirBarridoEsfuerzoResultado`, que lee `escenarios` ya
+// construido (por eso el barrido se calcula al final de esta función, no en paralelo).
 
 import { calcularProyeccionRPM } from './calcularProyeccionRPM.js'
 import { calcularFechaPorEdad } from '../calcularFechaPorEdad.js'
@@ -35,6 +50,7 @@ function resultadoVacio(codigo, razon, detalleElegibilidad = null) {
     escenarios: [],
     orientacion: { caminoMasAlineadoId: null, codigo, razon },
     detalleElegibilidad,
+    barrido: null,
   }
 }
 
@@ -134,6 +150,199 @@ function caminoDescartado(id, decision, razonDescartado) {
   }
 }
 
+const CANTIDAD_PUNTOS_BARRIDO = 5
+
+// Margen de exploración de producto, NO una segunda meta del usuario — decisión Carlos/
+// Atlas, 2026-08-21. Cuando el objetivo es alcanzable, el barrido se extiende un poco más
+// allá de él (aproximadamente) para mostrar "qué ocurre un poco más allá de tu meta", sin
+// llegar innecesariamente hasta el tope legal. Revisable como convención de producto, igual
+// que la ventana de 3.650 días — ver trazabilidad-formula-RPM.md.
+const MULTIPLICADOR_REFERENCIA_SUPERIOR = 1.25
+
+const RAZON_SIN_MARGEN_TOPE_LEGAL = {
+  codigo: 'SIN_MARGEN_TOPE_LEGAL',
+  razon:
+    'Ya declaraste una base actual en el tope máximo legal (25 SMLV) — no hay margen de IBC futuro para explorar.',
+}
+
+const RAZON_SIN_MARGEN_RESTRICCION_COSTO = {
+  codigo: 'SIN_MARGEN_RESTRICCION_COSTO',
+  razon: 'El límite que declaraste para tu aporte pensional adicional no deja margen de IBC futuro para explorar.',
+}
+
+const RAZON_OBJETIVO_YA_ALCANZADO = {
+  codigo: 'OBJETIVO_YA_ALCANZADO',
+  razon: 'Tu situación actual ya alcanza tu objetivo — no hace falta explorar ningún aumento.',
+}
+
+// Evalúa un único punto del barrido vía calcularProyeccionRPM (caja negra) y le da la
+// misma forma que ya usa construirCamino() para esfuerzo/resultado — sin decision,
+// limitaciones ni trazabilidad propias (S4-005 no es un camino, es una muestra).
+function construirPuntoBarrido({ construirInput, ibcActual, tasaCotizacion, indice, posicion, valorCandidato }) {
+  const proyeccion = calcularProyeccionRPM(construirInput(valorCandidato))
+  return {
+    indice,
+    posicion,
+    escenarioIbcFuturo: proyeccion.escenarioIbcFuturo,
+    esfuerzo: construirEsfuerzo(ibcActual, proyeccion.escenarioIbcFuturo.valorAplicado, tasaCotizacion),
+    resultado: { valor: proyeccion.pensionMensualProyectada, moneda: 'COP', periodoReferencia: 'mensual' },
+  }
+}
+
+// 5 puntos deterministas, uniformemente espaciados en IBC dentro de [ibcActual,
+// limiteSuperior] — el mismo mecanismo para cualquiera de los 4 casos de S4-005, el único
+// dato que cambia entre casos es dónde cae limiteSuperior y cómo se etiqueta ese extremo
+// (posicionExtremo).
+//
+// Tratamiento de los extremos (decisión explícita, 2026-08-21): índice 0 = ibcActual
+// exacto, índice 4 = limiteSuperior exacto — SIN Math.floor. Verificado contra el contrato
+// real de calcularProyeccionRPM: valida únicamente Number.isFinite(escenarioIbcFuturo.valor),
+// nunca Number.isInteger — no exige un IBC entero. Cuando limiteSuperior proviene de una
+// restricción de costo, puede traer decimales; ese decimal es el límite matemático real de
+// la restricción declarada, no un artefacto de redondeo, y el extremo superior lo
+// representa tal cual, sin ocultarlo. Distinto de biseccionarEscenarioIbcFuturo (abajo),
+// que sí redondea porque busca alcanzar un objetivo puntual — aquí no hay objetivo por
+// punto, así que no hay razón de contrato para forzar un entero en los extremos.
+//
+// Los 3 puntos intermedios sí se redondean hacia abajo (Math.floor) a pesos enteros — son
+// solo muestras exploratorias de la curva, no límites que deban preservarse exactos. Floor
+// garantiza, por construcción y sin código adicional: (a) ningún punto excede
+// limiteSuperior (el valor sin redondear ya es estrictamente menor); (b) orden no
+// decreciente (floor de una secuencia no decreciente nunca decrece); (c) reproducibilidad
+// (aritmética determinista, sin aleatoriedad ni dependencia de entorno).
+function construirRejillaUniforme({ construirInput, ibcActual, limiteSuperior, posicionExtremo, tasaCotizacion }) {
+  const ultimoIndice = CANTIDAD_PUNTOS_BARRIDO - 1
+  const paso = (limiteSuperior - ibcActual) / ultimoIndice
+
+  const puntos = []
+  for (let indice = 0; indice < CANTIDAD_PUNTOS_BARRIDO; indice++) {
+    let valorCandidato
+    let posicion
+    if (indice === 0) {
+      valorCandidato = ibcActual
+      posicion = 'actual'
+    } else if (indice === ultimoIndice) {
+      valorCandidato = limiteSuperior
+      posicion = posicionExtremo
+    } else {
+      valorCandidato = Math.floor(ibcActual + indice * paso)
+      posicion = 'intermedio'
+    }
+    puntos.push(construirPuntoBarrido({ construirInput, ibcActual, tasaCotizacion, indice, posicion, valorCandidato }))
+  }
+  return puntos
+}
+
+// Reutiliza un escenario de `escenarios` (S4-003) tal cual, sin volver a evaluar
+// calcularProyeccionRPM — usado exclusivamente para `puntoObjetivo`, que debe ser
+// bit-idéntico a lo que ya muestra la comparación de caminos (S4-003/S4-004).
+function puntoDesdeEscenario(escenario) {
+  return {
+    escenarioIbcFuturo: escenario.entradas.escenarioIbcFuturo,
+    esfuerzo: escenario.esfuerzo,
+    resultado: escenario.resultado,
+  }
+}
+
+/**
+ * Construye `barrido` a partir de `escenarios` ya resuelto (S4-003) — no recalcula nada
+ * que S4-003 ya haya decidido, solo lee su resultado para elegir el rango a explorar.
+ *
+ * Cuatro casos, en este orden de prioridad:
+ * 1. El camino base ya cumple el objetivo → 'objetivo_ya_alcanzado', sin puntos (ninguna
+ *    curva de aumentos innecesarios).
+ * 2. No hay alternativo viable (objetivo no alcanzable, ni en el tope legal ni dentro de
+ *    la restricción) → rango hasta topeEfectivo — aquí sí importa "¿hasta dónde podrías
+ *    llegar como máximo?".
+ * 3. Hay alternativo viable pero no cumple el objetivo (la restricción de costo lo impidió
+ *    — único caso posible por construcción, ver auditoría de S4-003) → mismo rango que ya
+ *    encontró el alternativo (topeEfectivo), reutilizado, nunca recalculado.
+ * 4. El alternativo cumple el objetivo → el rango se extiende hasta
+ *    objetivoValorMensual × 1.25 (margen de exploración de producto, nunca una segunda
+ *    meta), encontrado reutilizando biseccionarEscenarioIbcFuturo con un objetivo distinto
+ *    — misma infraestructura de búsqueda de S4-003, sin segunda fórmula. Si ese margen no
+ *    cabe en topeEfectivo, la propia bisección converge honestamente al límite real (mismo
+ *    mecanismo ya usado cuando un objetivo no es alcanzable — no hace falta ninguna
+ *    verificación previa).
+ */
+function construirBarridoEsfuerzoResultado({
+  construirInput,
+  ibcActual,
+  topeAplicado,
+  topeEfectivo,
+  tasaCotizacion,
+  objetivoValorMensual,
+  escenarioBase,
+  alternativo,
+}) {
+  if (escenarioBase.distanciaObjetivo.cumple) {
+    return { estado: 'objetivo_ya_alcanzado', ...RAZON_OBJETIVO_YA_ALCANZADO, puntos: [], puntoObjetivo: null }
+  }
+
+  if (!alternativo || alternativo.estado !== 'viable') {
+    if (topeEfectivo <= ibcActual) {
+      const razonSinMargen = topeAplicado <= ibcActual ? RAZON_SIN_MARGEN_TOPE_LEGAL : RAZON_SIN_MARGEN_RESTRICCION_COSTO
+      return { estado: 'sin_margen', ...razonSinMargen, puntos: [], puntoObjetivo: null }
+    }
+    const puntos = construirRejillaUniforme({
+      construirInput,
+      ibcActual,
+      limiteSuperior: topeEfectivo,
+      posicionExtremo: 'extremo_superior',
+      tasaCotizacion,
+    })
+    return { estado: 'calculado', codigo: null, razon: null, puntos, puntoObjetivo: null }
+  }
+
+  if (!alternativo.distanciaObjetivo.cumple) {
+    if (topeEfectivo <= ibcActual) {
+      return { estado: 'sin_margen', ...RAZON_SIN_MARGEN_RESTRICCION_COSTO, puntos: [], puntoObjetivo: null }
+    }
+    const puntos = construirRejillaUniforme({
+      construirInput,
+      ibcActual,
+      limiteSuperior: topeEfectivo,
+      posicionExtremo: 'limite_restriccion',
+      tasaCotizacion,
+    })
+    return { estado: 'calculado', codigo: null, razon: null, puntos, puntoObjetivo: null }
+  }
+
+  // Reutiliza el mismo construirInput que arma la rejilla (mismo origen,
+  // 'barrido_esfuerzo_resultado') — el resultado de esta búsqueda interna nunca se expone
+  // tal cual; solo se leen su IBC final y su pensión proyectada, y el punto 4 de la
+  // rejilla se vuelve a evaluar más abajo con el mismo mecanismo que los otros 4 puntos.
+  const objetivoReferenciaSuperior = objetivoValorMensual * MULTIPLICADOR_REFERENCIA_SUPERIOR
+  const resultadoReferenciaSuperior = biseccionarEscenarioIbcFuturo({
+    construirInput,
+    ibcActual,
+    topeAplicado: topeEfectivo,
+    objetivoValorMensual: objetivoReferenciaSuperior,
+  })
+  const ibcReferenciaSuperior = resultadoReferenciaSuperior.escenarioIbcFuturo.valorAplicado
+  const referenciaSuperiorAlcanzada = resultadoReferenciaSuperior.pensionMensualProyectada >= objetivoReferenciaSuperior
+
+  // §8.5 (monotonicidad) garantiza ibcReferenciaSuperior >= ibcObjetivo del alternativo —
+  // objetivoReferenciaSuperior > objetivoValorMensual, y ambas búsquedas comparten el mismo
+  // límite superior (topeEfectivo). No se defiende con Math.max: es una invariante
+  // demostrada, no un caso incierto.
+  const posicionExtremo = referenciaSuperiorAlcanzada
+    ? 'referencia_superior'
+    : topeEfectivo < topeAplicado
+      ? 'limite_restriccion'
+      : 'extremo_superior'
+
+  const puntos = construirRejillaUniforme({
+    construirInput,
+    ibcActual,
+    limiteSuperior: ibcReferenciaSuperior,
+    posicionExtremo,
+    tasaCotizacion,
+  })
+
+  return { estado: 'calculado', codigo: null, razon: null, puntos, puntoObjetivo: puntoDesdeEscenario(alternativo) }
+}
+
 // Bisección sobre escenarioIbcFuturo.valor, acotada a [ibcActual, topeAplicado] — nunca
 // fuera de ese rango (§8.5, ver trazabilidad-formula-RPM.md). Cada evaluación intermedia
 // llama a calcularProyeccionRPM sin transformar ni reinterpretar su resultado.
@@ -188,6 +397,19 @@ function biseccionarEscenarioIbcFuturo({ construirInput, ibcActual, topeAplicado
  *   escenarios: Array<Object>,
  *   orientacion: { caminoMasAlineadoId: string|null, codigo: string, razon: string },
  *   detalleElegibilidad: Object|null,
+ *   barrido: {
+ *     estado: 'calculado'|'sin_margen'|'objetivo_ya_alcanzado',
+ *     codigo: string|null,
+ *     razon: string|null,
+ *     puntos: Array<{
+ *       indice: number,
+ *       posicion: 'actual'|'intermedio'|'referencia_superior'|'limite_restriccion'|'extremo_superior',
+ *       escenarioIbcFuturo: Object,
+ *       esfuerzo: Object,
+ *       resultado: { valor: number, moneda: 'COP', periodoReferencia: 'mensual' },
+ *     }>,
+ *     puntoObjetivo: { escenarioIbcFuturo: Object, esfuerzo: Object, resultado: Object } | null,
+ *   } | null,
  * }}
  */
 export function generarCaminosRPM({
@@ -289,12 +511,21 @@ export function generarCaminosRPM({
 
   const escenarios = [escenarioBase]
 
+  // --- Rango compartido por el barrido (S4-005) y por el camino alternativo (S4-003) ---
+  // Límite propio declarado por el usuario (restricción de costo), convertido a un límite
+  // de IBC — mismo criterio que generarCaminosRAIS.js: dividir entre la tasa de
+  // cotización, nunca sumar directamente el peso de restricción al IBC.
+  const topeAplicado = resultadoBase.escenarioIbcFuturo.topeAplicado
+  const limiteIBCPorRestriccion =
+    restriccionCostoPensionalAdicionalMaximoMensual !== null && esNumeroValido(restriccionCostoPensionalAdicionalMaximoMensual)
+      ? ibcAplicableSimulacion + restriccionCostoPensionalAdicionalMaximoMensual / tasaCotizacionFraccion
+      : Infinity
+  const topeEfectivo = Math.min(topeAplicado, limiteIBCPorRestriccion)
+
   // --- Camino alternativo: buscar el IBC futuro necesario ---
   // Solo se genera cuando el base no alcanza el objetivo — si ya lo alcanza o lo supera,
   // no hay brecha que cerrar (mismo criterio que generarCaminosRAIS.js).
   if (escenarioBase.distanciaObjetivo.delta > 0) {
-    const topeAplicado = resultadoBase.escenarioIbcFuturo.topeAplicado
-
     if (ibcAplicableSimulacion >= topeAplicado) {
       escenarios.push(
         caminoDescartado('aumentar-ibc-futuro', 'Aumentar tu IBC futuro para acercarte a tu objetivo.', {
@@ -323,16 +554,8 @@ export function generarCaminosRPM({
           })
         )
       } else {
-        // Límite propio declarado por el usuario (restricción de costo), convertido a un
-        // límite de IBC — mismo criterio que generarCaminosRAIS.js: dividir entre la tasa
-        // de cotización, nunca sumar directamente el peso de restricción al IBC.
-        const limiteIBCPorRestriccion =
-          restriccionCostoPensionalAdicionalMaximoMensual !== null && esNumeroValido(restriccionCostoPensionalAdicionalMaximoMensual)
-            ? ibcAplicableSimulacion + restriccionCostoPensionalAdicionalMaximoMensual / tasaCotizacionFraccion
-            : Infinity
-
-        const topeEfectivo = Math.min(topeAplicado, limiteIBCPorRestriccion)
-
+        // topeEfectivo ya está calculado arriba (rango compartido con el barrido de S4-005).
+        //
         // Siempre se biseca para encontrar el IBC MÍNIMO suficiente — resultadoEnTope
         // arriba solo sirvió para confirmar que el objetivo es alcanzable dentro del tope
         // legal, nunca es en sí mismo la respuesta a ofrecer (ofrecer directamente "sube
@@ -379,5 +602,23 @@ export function generarCaminosRPM({
     }
   }
 
-  return { escenarios, orientacion: calcularOrientacion(escenarios), detalleElegibilidad: null }
+  // S4-005: el barrido se construye al final, a partir de escenarios ya resuelto — su
+  // rango depende de si el objetivo es alcanzable (ver construirBarridoEsfuerzoResultado),
+  // así que no puede calcularse antes de saber qué encontró el camino alternativo.
+  const alternativo = escenarios.find((e) => e.id === 'aumentar-ibc-futuro') ?? null
+  const barrido = construirBarridoEsfuerzoResultado({
+    construirInput: (valor) => ({
+      ...escenarioBaseInput,
+      escenarioIbcFuturo: { valor, origen: 'barrido_esfuerzo_resultado' },
+    }),
+    ibcActual: ibcAplicableSimulacion,
+    topeAplicado,
+    topeEfectivo,
+    tasaCotizacion: tasaCotizacionFraccion,
+    objetivoValorMensual,
+    escenarioBase,
+    alternativo,
+  })
+
+  return { escenarios, orientacion: calcularOrientacion(escenarios), detalleElegibilidad: null, barrido }
 }

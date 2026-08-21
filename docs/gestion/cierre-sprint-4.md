@@ -309,3 +309,100 @@ Carlos y Atlas autorizaron el cierre y el commit de este Slice.
 - **Decisión obligatoria previa a S4-002** (Entregable 2 §14.1, sin cambios): convención
   económica de proyección RPM.
 - Continuar con S4-002 (`calcularProyeccionRPM.js`) solo después de resolverla.
+
+---
+
+## Slice correctivo — Selector de ventana del IBL por días efectivamente cotizados
+
+**Estado:** ✅ Cerrado y aprobado — pendiente de commit.
+
+### Objetivo
+
+Corregir la subcobertura del selector de ventana del IBL frente a la jurisprudencia: la
+ventana calendario fija de los últimos 10 años (`calcularVentana()`) bloqueaba por
+completo el cálculo ante cualquier hueco de cotización dentro de ese rango
+(`VACIOS_EN_VENTANA_IBL_NO_SOPORTADOS`), aun en un caso real donde la Corte Suprema de
+Justicia, Sala de Casación Laboral (SL1006-2025), ante una historia con un vacío de más
+de una década dentro de esa misma ventana, no bloqueó el cálculo — retrocedió en el
+calendario para completarlo. Investigación normativa acotada, registrada en
+`src/data/legal/trazabilidad-normativa.md`, sección "Ventana temporal del IBL ordinario".
+
+### Convención provisional de 3.650 días — evidencia, interpretación y decisión, distinguidas
+
+`calcularVentana()` se reemplaza por selección retrospectiva de **3.650 días calendario
+efectivamente cotizados**. La redacción de esta convención distingue explícitamente tres
+niveles, para no confundir evidencia con decisión:
+
+- **Evidencia primaria observada:** el texto de SL1006-2025 muestra que, ante un vacío de
+  cotización de más de una década dentro de la ventana de "10 años", la Sala retrocedió en
+  el calendario para completar el período en vez de bloquear el cálculo — un único caso
+  real, reconstruido matemáticamente de forma verificable (3.653 días totales, tramo límite
+  recortado 3 días → 3.650 restantes, tratamiento correcto de bisiestos).
+- **Interpretación técnica derivada:** ese caso confirma que un mecanismo de "retroceder
+  por días efectivamente cotizados, saltando huecos" es compatible con la jurisprudencia
+  revisada — pero una segunda investigación acotada (metodología de Colpensiones,
+  SL1236-2025, SL7061-2016, un segundo caso primario con tabla) no logró producir una
+  segunda reconstrucción verificable ni una formulación general de la regla en prosa.
+- **Decisión de producto de PensionLab:** **PensionLab adopta provisionalmente un umbral
+  técnico de 3.650 días efectivamente cotizados para esta selección. La decisión es
+  consistente con la evidencia primaria analizada y con la reconstrucción del caso
+  SL1006-2025, pero se registra expresamente como convención técnica revisable de
+  PensionLab, no como una constante legal universal demostrada del artículo 21.**
+- **Carácter revisable:** sujeta a reapertura si aparece evidencia primaria adicional
+  (un segundo caso reconstruible, o una formulación general de la regla en fuente
+  primaria) — criterios exactos de reapertura listados en
+  `trazabilidad-normativa.md`, sección "Convención técnica provisional — 3.650 días
+  efectivamente cotizados".
+
+### Separación suficiencia temporal / cobertura IPC / cálculo
+
+Un hallazgo posterior a la implementación de la convención anterior mostró que una
+historia temporalmente suficiente (alcanza los 3.650 días) podía seguir fallando porque
+`ipc-historico.json` no cubre alguno de los años que esa ventana requiere. Se separaron
+explícitamente tres preguntas que antes quedaban confundidas bajo una sola excepción:
+
+- **Suficiencia temporal** (`seleccionarPeriodosIBL.js`) → no evaluable con
+  `HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA` cuando toda la historia declarada,
+  sumada y retrocediendo por huecos, no alcanza 3.650 días.
+- **Cobertura económica IPC** (`calcularPensionRPM.js`, vía el nuevo `tieneIPC()` de
+  `src/data/legal/index.js`) → no evaluable con `COBERTURA_IPC_INSUFICIENTE_PARA_IBL_ORDINARIO`
+  cuando la ventana temporal sí se completó pero falta IPC real para alguno de los años que
+  toca. Comprobación explícita **antes** de calcular, no un `try/catch` alrededor del
+  cálculo — para no convertir en "falta de IPC" cualquier excepción del cálculo ordinario,
+  incluido un error real de programación (verificado con test dedicado: una excepción no
+  relacionada con IPC sigue propagándose sin interceptarse).
+- **Cálculo del IBL** propiamente dicho, que ya no se confunde con ninguno de los dos
+  casos anteriores.
+
+### Mejora de cobertura frente a huecos
+
+Los huecos de calendario entre períodos declarados ya no bloquean el cálculo — el
+selector retrocede a través de ellos acumulando días efectivamente cotizados, y cada
+hueco saltado queda registrado en `trazabilidadVentana.huecosCalendarioSaltados`, sin
+inventar cuáles días concretos estuvieron cotizados dentro de él.
+
+### Limitaciones vigentes
+
+- La convención de 3.650 días sigue siendo provisional y técnica, no una constante legal
+  universal — ver distinción de niveles arriba.
+- `ipc-historico.json` no se amplió en este Slice — la cobertura económica real del
+  proyecto no cambió, solo cómo se comunica su ausencia cuando falta.
+- La decisión obligatoria de convención económica de proyección RPM (Entregable 2 §14.1)
+  sigue sin resolver.
+
+### Tests y verificación
+
+- `npm test` — suite completa en verde (403/403, 25 archivos), incluyendo regresión
+  directa contra SL1006-2025, casos de huecos (6 meses, varios años, huecos previos al
+  punto donde ya se completaron los 3.650 días), y el caso dedicado de separación
+  temporal/IPC (`calcularPensionRPM.test.js`, "Caso 7: suficiencia temporal vs. cobertura
+  económica (IPC), separadas").
+- `npm run lint` — sin errores.
+- `npm run build` — build de producción exitoso.
+
+### Pendiente para el siguiente Slice
+
+- **S4-002 todavía no ha comenzado.** Sigue bloqueado por la decisión obligatoria de
+  convención económica de proyección RPM (Entregable 2 §14.1), sin cambios respecto al
+  cierre de S4-001A — este Slice correctivo no la resuelve, solo corrige el selector de
+  ventana que esa decisión también necesitará.

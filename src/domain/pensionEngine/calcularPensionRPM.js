@@ -30,6 +30,7 @@ import {
   obtenerParametrosTasaReemplazoRPM,
   obtenerSemanasHabilitanAlternativaIBL,
   obtenerSmlv,
+  tieneIPC,
 } from '../../data/legal/index.js'
 
 function hoyISO() {
@@ -45,7 +46,7 @@ const LIMITACION_NO_ES_PROYECCION_FUTURA = {
     'tu situación acumulada hasta este momento.',
 }
 
-function noEvaluable(razonNoEvaluable) {
+function noEvaluable(razonNoEvaluable, trazabilidadVentana, datosFaltantes) {
   return {
     estado: 'no_evaluable',
     razonNoEvaluable,
@@ -55,6 +56,8 @@ function noEvaluable(razonNoEvaluable) {
     tasaReemplazo: null,
     resultadoEconomicoActual: null,
     limitaciones: [],
+    trazabilidadVentana: trazabilidadVentana ?? null,
+    datosFaltantes: datosFaltantes ?? null,
   }
 }
 
@@ -71,6 +74,17 @@ function aniosRequeridosParaIPC(periodos, anioReferenciaIPC) {
   return anios
 }
 
+// Comprobación explícita de cobertura, antes de calcular — no un try/catch alrededor del
+// cálculo. La diferencia importa (hallazgo de la revisión del Slice correctivo, 2026-08-19):
+// un try/catch amplio convertiría en COBERTURA_IPC_INSUFICIENTE_PARA_IBL_ORDINARIO cualquier
+// excepción del cálculo ordinario, no solo la ausencia conocida de IPC — incluido un error
+// real de programación, que quedaría oculto como si fuera un problema de datos. Esta función
+// solo identifica el caso específico y conocido; cualquier otra excepción del cálculo
+// posterior sigue sin capturarse aquí y se propaga como lo hacía antes de este Slice.
+function aniosIPCFaltantes(anios) {
+  return [...anios].filter((anio) => !tieneIPC(anio)).sort((a, b) => a - b)
+}
+
 function construirTablaIPC(anios) {
   const tabla = {}
   for (const anio of anios) {
@@ -85,7 +99,7 @@ function construirTablaIPC(anios) {
  * @param {string} [input.fecha] - ISO, por defecto hoy; parametrizable para pruebas
  * @returns {{
  *   estado: 'calculado' | 'no_evaluable',
- *   razonNoEvaluable: ('VACIOS_EN_VENTANA_IBL_NO_SOPORTADOS'|'PERIODOS_SUPERPUESTOS_NO_SOPORTADOS'|'INCONSISTENCIA_DIAS_COTIZADOS_INVALIDOS'|'COTIZACION_PARCIAL_EN_VENTANA_IBL_NO_SOPORTADA'|null),
+ *   razonNoEvaluable: ('HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA'|'COTIZACION_PARCIAL_EN_LIMITE_VENTANA_IBL_NO_SOPORTADA'|'COBERTURA_IPC_INSUFICIENTE_PARA_IBL_ORDINARIO'|'PERIODOS_SUPERPUESTOS_NO_SOPORTADOS'|'INCONSISTENCIA_DIAS_COTIZADOS_INVALIDOS'|null),
  *   ibl: {
  *     ordinario: { valor: number, detalle: Array<Object> },
  *     vidaLaboral: { valor: number, detalle: Array<Object> } | null,
@@ -98,18 +112,38 @@ function construirTablaIPC(anios) {
  *   tasaReemplazo: number | null,
  *   resultadoEconomicoActual: number | null,
  *   limitaciones: Array<{codigo: string, mensaje: string}>,
+ *   trazabilidadVentana: Object | null - ver seleccionarPeriodosIBL.js (TrazabilidadVentana);
+ *     null solo cuando razonNoEvaluable es PERIODOS_SUPERPUESTOS_NO_SOPORTADOS o
+ *     INCONSISTENCIA_DIAS_COTIZADOS_INVALIDOS (fallan antes de intentar seleccionar la ventana).
+ *     Presente y completa (3.650 días) cuando razonNoEvaluable es
+ *     COBERTURA_IPC_INSUFICIENTE_PARA_IBL_ORDINARIO — la ventana temporal sí se completó.
+ *   datosFaltantes: {ipcAnios: number[]} | null - solo poblado cuando razonNoEvaluable es
+ *     COBERTURA_IPC_INSUFICIENTE_PARA_IBL_ORDINARIO; los años exactos que faltan en
+ *     ipc-historico.json para valorar económicamente la ventana ya seleccionada.
  * }}
  */
 export function calcularPensionRPM({ historiaCotizacion = [], fecha = hoyISO() } = {}) {
   const seleccion = seleccionarPeriodosIBL({ historiaCotizacion, fechaCalculo: fecha })
 
   if (!seleccion.evaluable) {
-    return noEvaluable(seleccion.razonNoEvaluable)
+    return noEvaluable(seleccion.razonNoEvaluable, seleccion.trazabilidadVentana)
   }
 
   const anioReferenciaIPC = new Date(fecha).getUTCFullYear() - 1
 
-  const tablaIPCOrdinario = construirTablaIPC(aniosRequeridosParaIPC(seleccion.periodosOrdinario, anioReferenciaIPC))
+  // Suficiencia temporal (arriba, seleccion.evaluable) y cobertura económica son dos
+  // preguntas distintas (decisión Carlos/Atlas, revisión del Slice correctivo): la ventana
+  // ya se construyó correctamente aquí — lo que se comprueba ahora es si PensionLab tiene
+  // cargado el IPC real necesario para valorarla, antes de intentar calcular.
+  const aniosOrdinario = aniosRequeridosParaIPC(seleccion.periodosOrdinario, anioReferenciaIPC)
+  const faltantesOrdinario = aniosIPCFaltantes(aniosOrdinario)
+  if (faltantesOrdinario.length > 0) {
+    return noEvaluable('COBERTURA_IPC_INSUFICIENTE_PARA_IBL_ORDINARIO', seleccion.trazabilidadVentana, {
+      ipcAnios: faltantesOrdinario,
+    })
+  }
+
+  const tablaIPCOrdinario = construirTablaIPC(aniosOrdinario)
   const iblOrdinario = calcularPromedioIBL({
     periodos: seleccion.periodosOrdinario,
     tablaIPC: tablaIPCOrdinario,
@@ -182,5 +216,7 @@ export function calcularPensionRPM({ historiaCotizacion = [], fecha = hoyISO() }
     tasaReemplazo,
     resultadoEconomicoActual,
     limitaciones: [LIMITACION_NO_ES_PROYECCION_FUTURA],
+    trazabilidadVentana: seleccion.trazabilidadVentana,
+    datosFaltantes: null,
   }
 }

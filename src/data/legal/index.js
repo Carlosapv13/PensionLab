@@ -391,6 +391,19 @@ export function obtenerIPC(anio) {
 }
 
 /**
+ * Comprobación de cobertura sin lanzar — permite a un llamador (ej. calcularPensionRPM.js)
+ * verificar de antemano si obtenerIPC(anio) tendría datos, para distinguir estructuralmente
+ * "no hay IPC cargado para este año" de cualquier otra excepción real durante el cálculo,
+ * en vez de intentar clasificar excepciones después de que ocurren.
+ *
+ * @param {number} anio
+ * @returns {boolean}
+ */
+export function tieneIPC(anio) {
+  return ipcHistorico.entradas.some((e) => e.anio === anio)
+}
+
+/**
  * Resuelve el umbral de edad del régimen de transición (Art. 36, inciso 2, Ley 100
  * de 1993), según sexo — 35 años o más (mujeres) / 40 años o más (hombres) al
  * momento de entrar en vigencia el Sistema (ver obtenerFechaEntradaVigenciaSistema).

@@ -32,25 +32,51 @@ const TEXTO_SIN_HISTORIA =
 
 const TEXTO_CIERRE_SIN_HISTORIA = 'Hasta aquí llega la lectura económica RPM en esta versión de PensionLab.'
 
-const TEXTO_NO_EVALUABLE = {
-  VACIOS_EN_VENTANA_IBL_NO_SOPORTADOS:
-    'Encontramos huecos sin cotización dentro de los últimos 10 años de tu historia. Por ' +
-    'ahora, PensionLab solo puede calcular tu IBL cuando esos 10 años están completamente ' +
-    'cubiertos — no inventamos cómo tratar esos huecos, porque la forma correcta de ' +
-    'hacerlo todavía no está confirmada.',
-  PERIODOS_SUPERPUESTOS_NO_SOPORTADOS:
-    'Encontramos períodos de tu historia que se superponen en el tiempo. PensionLab no ' +
-    'puede calcular tu IBL sobre una historia con esa inconsistencia.',
-  INCONSISTENCIA_DIAS_COTIZADOS_INVALIDOS:
-    'Uno de los períodos de tu historia declara más días cotizados que días calendario ' +
-    'tiene su propio rango de fechas — es un dato inconsistente que PensionLab no puede usar.',
-  COTIZACION_PARCIAL_EN_VENTANA_IBL_NO_SOPORTADA:
-    'Dentro de los últimos 10 años, encontramos un período con cotización parcial (menos ' +
-    'días cotizados que días calendario). PensionLab no asume cuáles días fueron los ' +
-    'cotizados, así que todavía no puede calcular tu IBL con esa información.',
+// Ventana del IBL ordinario — convención técnica provisional de PensionLab, no una
+// constante legal (ver src/data/legal/trazabilidad-normativa.md, sección "Convención
+// técnica provisional — 3.650 días efectivamente cotizados").
+function textoHistoriaInsuficiente(resultado) {
+  const dias = resultado?.trazabilidadVentana?.diasEfectivosAcumulados ?? null
+  const detalle = dias !== null ? ` Por ahora identificamos ${dias} de los 3.650 días que esta lectura necesita.` : ''
+  return (
+    'Tu historia declarada, sumada, todavía no alcanza los años de cotización efectiva que ' +
+    'esta lectura necesita para calcular tu IBL — no es un error, es información real que ' +
+    `todavía no tienes completa.${detalle}`
+  )
 }
 
-const TEXTO_NO_EVALUABLE_GENERICO = 'Tu historia no es evaluable con la información disponible todavía.'
+// Distinta de textoHistoriaInsuficiente a propósito: aquí la historia SÍ alcanza los 3.650
+// días — el problema es que PensionLab no tiene cargado el IPC real de alguno de los años
+// que esa historia toca, nunca la cantidad de historia declarada por la persona.
+function textoCoberturaIPCInsuficiente(resultado) {
+  const anios = resultado?.datosFaltantes?.ipcAnios ?? []
+  const detalleAnios = anios.length > 0 ? ` Nos falta el índice de precios (IPC) de ${anios.join(', ')}.` : ''
+  return (
+    'Tu historia sí tiene los años de cotización efectiva que esta lectura necesita — el ' +
+    'problema no es tu historia. PensionLab todavía no tiene cargada la inflación oficial ' +
+    `(IPC) de algunos de esos años para poder actualizar los valores.${detalleAnios} No ` +
+    'inventamos ese dato: preferimos decírtelo con honestidad a mostrarte una cifra que no ' +
+    'podemos respaldar.'
+  )
+}
+
+const TEXTO_NO_EVALUABLE = {
+  HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA: textoHistoriaInsuficiente,
+  COBERTURA_IPC_INSUFICIENTE_PARA_IBL_ORDINARIO: textoCoberturaIPCInsuficiente,
+  PERIODOS_SUPERPUESTOS_NO_SOPORTADOS: () =>
+    'Encontramos períodos de tu historia que se superponen en el tiempo. PensionLab no ' +
+    'puede calcular tu IBL sobre una historia con esa inconsistencia.',
+  INCONSISTENCIA_DIAS_COTIZADOS_INVALIDOS: () =>
+    'Uno de los períodos de tu historia declara más días cotizados que días calendario ' +
+    'tiene su propio rango de fechas — es un dato inconsistente que PensionLab no puede usar.',
+  COTIZACION_PARCIAL_EN_LIMITE_VENTANA_IBL_NO_SOPORTADA: () =>
+    'El período más antiguo que necesitábamos usar de tu historia tiene cotización parcial ' +
+    '(menos días cotizados que días calendario en su propio rango). PensionLab no asume ' +
+    'cuáles días concretos fueron los cotizados, así que todavía no puede calcular tu IBL ' +
+    'con esa información.',
+}
+
+const TEXTO_NO_EVALUABLE_GENERICO = () => 'Tu historia no es evaluable con la información disponible todavía.'
 
 const TEXTO_NO_ES_PROYECCION =
   'Esta lectura usa exclusivamente tu historia de cotización observada hasta hoy. No ' +
@@ -154,7 +180,7 @@ function ExploraTuProyeccionRPM({
         <div className="insight">
           <p className="insight__label">Todavía no podemos calcular tu IBL</p>
           <p className="insight__message">
-            {TEXTO_NO_EVALUABLE[resultado.razonNoEvaluable] ?? TEXTO_NO_EVALUABLE_GENERICO}
+            {(TEXTO_NO_EVALUABLE[resultado.razonNoEvaluable] ?? TEXTO_NO_EVALUABLE_GENERICO)(resultado)}
           </p>
         </div>
       )}

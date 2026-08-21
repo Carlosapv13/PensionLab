@@ -128,6 +128,43 @@ export const FIXTURES = [
     },
   },
   {
+    id: 'rpm-empleado-historia-con-hueco',
+    nombre: 'RPM — empleado — historia con hueco de 6 meses (Slice correctivo, ventana por días efectivamente cotizados)',
+    // Demuestra el comportamiento central del Slice correctivo (2026-08-19): un hueco real
+    // de cotización (jul-dic 2019, 184 días sin período declarado) ya NO vuelve la historia
+    // no evaluable — el selector retrocede hasta enero de 2016 para completar los 3.650 días
+    // de la convención técnica provisional (ver src/data/legal/trazabilidad-normativa.md).
+    //
+    // Total declarado: 1277 (2016-01-01 a 2019-06-30) + 2414 (2020-01-01 a 2026-08-10) =
+    // 3691 días — 41 días por encima de los 3.650 necesarios, así que el tramo de 2016 queda
+    // recortado a sus últimos 1236 días (no se toca 2015, fuera del rango de
+    // ipc-historico.json). Antes de este Slice, este mismo hueco habría bloqueado la
+    // evaluación por completo (VACIOS_EN_VENTANA_IBL_NO_SOPORTADOS).
+    vistaSugerida: 'exploraTuProyeccionRPM',
+    datos: {
+      objetivoSeleccionado: 'Descubrir mis opciones pensionales.',
+      lugarResidencia: 'Colombia',
+      cotizaActualmente: 'si',
+      sexo: 'Hombre',
+      fechaNacimiento: '1978-02-11',
+      regimenActual: 'RPM',
+      trasladoRegimen: 'no',
+      tipoCotizante: 'empleado',
+      lugarCotizacion: 'colombia',
+      nivelConocimientoSemanas: 'aproximado',
+      semanasCotizadas: '527',
+      anioInicioCotizacion: '2016',
+      certezaBaseCotizacion: 'conocido',
+      valorBaseCotizacionDeclarado: '2900000',
+      infoEsencialCompletada: true,
+      historiaCotizacion: [
+        { fechaDesde: '2016-01-01', fechaHasta: '2019-06-30', ibc: 2100000, diasCotizados: 1277 },
+        // Hueco real: 2019-07-01 a 2019-12-31 (184 días) — sin período declarado a propósito.
+        { fechaDesde: '2020-01-01', fechaHasta: '2026-08-10', ibc: 2900000, diasCotizados: 2414 },
+      ],
+    },
+  },
+  {
     id: 'rpm-trasladada-indicios-transicion',
     nombre: 'RPM — trasladado de RAIS — hasta Indicios de régimen de transición (ficticio, S4-001A)',
     // Caso ficticio, representativo de la clase de validación del Entregable 2 —

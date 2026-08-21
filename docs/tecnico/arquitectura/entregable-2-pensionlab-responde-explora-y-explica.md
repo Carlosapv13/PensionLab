@@ -184,9 +184,18 @@ vía el Panel de Desarrollo (`ExploraTuProyeccionRPM.jsx`, comentario de cabecer
 La captura debe:
 - Producir el mismo shape ya validado: `{fechaDesde, fechaHasta|null, ibc,
   diasCotizados}`.
-- Heredar la misma honestidad que ya aplica `seleccionarPeriodosIBL.js`: un hueco dentro
-  de la ventana de 10 años se declara `VACIOS_EN_VENTANA_IBL_NO_SOPORTADOS`, nunca se
-  rellena con un supuesto (ver bloqueo §8.7).
+- Heredar la misma honestidad que ya aplica `seleccionarPeriodosIBL.js`: nunca rellenar
+  un hueco con un supuesto. El comportamiento actual (Slice correctivo, 2026-08-19) es que
+  un hueco de calendario entre períodos declarados **no bloquea por sí mismo** — el
+  selector retrocede a través de él, acumulando días efectivamente cotizados hasta
+  completar la convención de 3.650 días (ver bloqueo §8.7 y
+  `src/data/legal/trazabilidad-normativa.md`, sección "Convención técnica provisional —
+  3.650 días efectivamente cotizados"), y el hueco queda registrado en
+  `trazabilidadVentana.huecosCalendarioSaltados`, nunca relleno con un supuesto. *(Nota
+  histórica: antes de ese Slice, cualquier hueco dentro de la ventana calendario fija de
+  10 años se declaraba `VACIOS_EN_VENTANA_IBL_NO_SOPORTADOS`, un comportamiento
+  deliberadamente conservador que se confirmó generaba subcobertura frente a la
+  jurisprudencia — bloqueo §8.7, ya resuelto.)*
 - Revalidar en capas (Principio 11): la UI valida para dar mensajes usables, el dominio
   vuelve a validar sin asumir que la UI lo hizo.
 - **Nunca presentar "los últimos 10 años" como si fueran los años jurídicamente
@@ -358,10 +367,30 @@ supuestos:
    del IBC (una decisión dentro de un rango legal), las semanas que se acumulan hasta el
    horizonte están determinadas por cuánto tiempo falta hasta la edad de jubilación
    declarada — el horizonte es tiempo, no un parámetro de búsqueda independiente.
-7. **Huecos de historia que no pueden inferirse.** `seleccionarPeriodosIBL.js` ya declara
-   esto no evaluable deliberadamente (`VACIOS_EN_VENTANA_IBL_NO_SOPORTADOS`,
-   `COTIZACION_PARCIAL_EN_VENTANA_IBL_NO_SOPORTADA`) — la captura (§7.1) y la proyección
-   deben heredar esa misma honestidad, nunca rellenar un hueco con un supuesto.
+7. **`calcularVentana()` es una simplificación técnica provisional, no el contrato
+   jurídico del IBL — confirmado con evidencia primaria (2026-08-19).** Investigación
+   normativa acotada (ver `src/data/legal/trazabilidad-normativa.md`, sección "Ventana
+   temporal del IBL ordinario") cotejó directamente el texto de **SL1006-2025** (Corte
+   Suprema de Justicia, Sala de Casación Laboral): ante una historia real con un vacío de
+   cotización de más de una década dentro de lo que sería la ventana calendario de "10
+   años", la Sala no bloqueó el cálculo — retrocedió en el calendario para completar el
+   período. Esto confirma que el comportamiento actual de `seleccionarPeriodosIBL.js`
+   (ventana de años calendario fijos + `VACIOS_EN_VENTANA_IBL_NO_SOPORTADOS` ante
+   cualquier hueco) **genera subcobertura**: rechaza como "no evaluable" casos que la
+   jurisprudencia sí permite calcular. El futuro selector deberá construir la ventana por
+   **períodos efectivamente cotizados** (retrocediendo para saltar huecos), no por
+   calendario. **Criterio de corte — resuelto como decisión de producto (2026-08-19),
+   no como hecho legal universal:** tras una segunda investigación acotada que no logró
+   producir un segundo caso primario ni localizar SL1236-2025, Carlos/Atlas adoptaron
+   **3.650 días calendario efectivamente cotizados** como convención técnica provisional
+   (ver `src/data/legal/trazabilidad-normativa.md`, sección "Convención técnica
+   provisional — 3.650 días efectivamente cotizados"), respaldada por la reconstrucción
+   matemática verificable de SL1006-2025 (3.653 días totales, tramo inicial recortado de 3
+   días → 3.650 restantes, tratamiento correcto de bisiestos). **Explícitamente no es una
+   lectura del Art. 21** — es una aproximación técnica declarada como tal, sujeta a
+   revisión si aparece evidencia primaria adicional (criterios exactos de reapertura
+   listados en esa misma sección). El Slice correctivo que implementa esta convención se
+   describe en §14.8.
 8. **Falsa precisión en horizontes largos.** Un camino a 20-30 años debe declarar
    explícitamente un grado de certeza bajo (`Explanation.gradoEstimacion`, campo
    reservado desde Sprint 2 y nunca poblado hasta ahora), nunca presentarse con la
@@ -495,10 +524,14 @@ identificó durante el análisis de este Entregable y **no se resuelve en este d
 
 1. **Convención económica de proyección RPM** (bloqueo §8.2) — cómo tratar la ventana de
    10 años del IBL cuando queda parcial o totalmente en el futuro, y cómo se relaciona el
-   año de referencia de IPC/SMLV con una fecha de jubilación futura. Es una **decisión
-   obligatoria previa a S4-002**, con su propio documento corto de diseño (Principio 8),
-   análoga a la Convención Económica v1 ya aprobada para RAIS
-   (`trazabilidad-formula-RAIS.md`) — no se inventa en este documento de apertura.
+   año de referencia de IPC/SMLV con una fecha de jubilación futura. **Alternativa C
+   (fecha base monetaria = fecha de cálculo; históricos indexados con IPC real; IBC
+   futuro declarado en poder adquisitivo de esa fecha base; ningún IPC futuro inventado;
+   declaraciones antiguas de IBC futuro requieren reconfirmación o política explícita de
+   actualización) aprobada conceptualmente por Carlos/Atlas (2026-08-19)** —
+   condicionada a resolver primero el punto 8 de esta lista (selector temporal del IBL
+   ordinario) antes de iniciar S4-002, porque la convención económica no define por sí
+   sola qué períodos entran a la ventana proyectada.
 2. **Límites exactos del perfil soportado** (§3) — qué combinaciones de
    `tipoCotizante`/`lugarCotizacion`/`trasladoRegimen` quedan dentro de alcance de
    S4-001/S4-002. Se decide al diseñar esos Slices, no aquí.
@@ -519,3 +552,16 @@ identificó durante el análisis de este Entregable y **no se resuelve en este d
    en el expediente) con `historiaCotizacion`/`semanasObservadas` (derivados de la
    historia estructurada)** (bloqueo §8.10) — analizado conceptualmente durante la
    revisión de S4-001, sin cambio de motor todavía autorizado.
+8. **Criterio exacto de corte del selector de "10 años efectivamente cotizados"**
+   (bloqueo §8.7) — **resuelto como decisión de producto (2026-08-19), no como hallazgo
+   normativo universal.** Dos rondas de investigación acotada (metodología oficial de
+   Colpensiones, jurisprudencia primaria adicional, SL1236-2025, SL7061-2016, un segundo
+   caso primario con tabla) no lograron producir una segunda reconstrucción verificable ni
+   una formulación general de la regla en prosa. Carlos/Atlas adoptaron **3.650 días
+   calendario efectivamente cotizados** como convención técnica provisional de PensionLab
+   — no como constante legal — respaldada por la reconstrucción matemática de SL1006-2025
+   (ver `src/data/legal/trazabilidad-normativa.md`, sección "Convención técnica
+   provisional — 3.650 días efectivamente cotizados", que también lista qué evidencia
+   futura obligaría a reabrir esta decisión). El Slice correctivo que la implementa
+   reemplaza `calcularVentana()` como definición de la ventana ordinaria del IBL; **sigue
+   bloqueando S4-002** hasta que ese Slice cierre.

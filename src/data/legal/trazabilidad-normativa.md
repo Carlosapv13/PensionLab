@@ -204,7 +204,7 @@ cotización para efectos del IBL.
 |---|---|---|---|---|---|---|---|---|---|
 | *(no se carga — solo referencia)* `ventanaIBLAnclaFechaReconocimiento` | Ancla temporal de la ventana de 10 años del IBL | "el promedio de los salarios o rentas sobre los cuales ha cotizado el afiliado durante los diez (10) años anteriores al reconocimiento de la pensión, o en todo el tiempo si éste fuere inferior" | Función Pública — Gestor Normativo (texto literal cotejado) | Art. 21, inciso 1, Ley 100 de 1993 | No aplica (es la fecha misma) | Vigente desde 1993, sin cambio conocido en este punto | `calcularPensionRPM.js` usa `fecha = hoy` en su lugar, ya declarado como `LIMITACION_NO_ES_PROYECCION_FUTURA` — decisión de producto ya tomada, no una lectura de esta norma | Proyección a la fecha real de reconocimiento — exigiría IPC/SMLV futuro, ya excluido por decisión del proyecto | Verificado en fuente oficial (texto literal); la fecha usada por el código es una simplificación declarada, no una interpretación de esta norma |
 | *(no se carga — referencia)* `iblAlternativaVidaLaboralUmbral` | Umbral de semanas para optar por el promedio de toda la vida laboral | "el trabajador podrá optar por este sistema, siempre y cuando haya cotizado 1250 semanas como mínimo" | Función Pública — Gestor Normativo (texto literal cotejado) | Art. 21, inciso 2, Ley 100 de 1993 | No aplica | Vigente desde 1993 | `obtenerSemanasHabilitanAlternativaIBL` ya resuelve un valor equivalente en `data/legal` — esta fila documenta su respaldo literal, no agrega un campo nuevo | Si el umbral de 1250 de este artículo y el de la Sentencia C-197/2023 (registrada arriba, sección "Régimen de transición", sobre el requisito de *pensión*, no de esta alternativa del IBL) son el mismo umbral o dos umbrales distintos — no cotejado en esta sesión | Verificado en fuente oficial (texto literal); relación con C-197/2023 pendiente de cotejo cruzado |
-| *(no se carga — solo texto de limitación)* | Ausencia de mecanismo legal para huecos de cotización | El Art. 21 no contiene ningún mecanismo de relleno ni reducción porcentual para períodos sin cotización dentro de los 10 años | Función Pública — Gestor Normativo (verificado por ausencia — artículo leído íntegro) | Art. 21, Ley 100 de 1993 (texto completo revisado) | No aplica | Vigente desde 1993 | `seleccionarPeriodosIBL.js` ya rechaza evaluar historias con huecos en la ventana en vez de inventar un relleno — este hallazgo confirma que esa decisión es jurídicamente prudente, no solo conservadora de ingeniería | Si existe una regla de relleno en una fuente distinta al Art. 21 (reglamento, jurisprudencia) — no investigado | Verificado en fuente oficial (ausencia confirmada en el texto literal del artículo; no se investigaron fuentes reglamentarias adicionales) |
+| *(no se carga — solo texto de limitación)* | Ausencia de mecanismo legal para huecos de cotización | El Art. 21 no contiene ningún mecanismo de relleno ni reducción porcentual para períodos sin cotización dentro de los 10 años | Función Pública — Gestor Normativo (verificado por ausencia — artículo leído íntegro) | Art. 21, Ley 100 de 1993 (texto completo revisado) | No aplica | Vigente desde 1993 | `seleccionarPeriodosIBL.js` ya rechaza evaluar historias con huecos en la ventana en vez de inventar un relleno | Si existe una regla de relleno en una fuente distinta al Art. 21 (reglamento, jurisprudencia) — no investigado | **Corregido (2026-08-19):** la ausencia de un mecanismo de relleno en el texto del Art. 21 sigue confirmada, pero la conclusión previa de que bloquear con `VACIOS_EN_VENTANA_IBL_NO_SOPORTADOS` era "jurídicamente prudente" queda **superada por evidencia primaria** — ver sección "Ventana temporal del IBL ordinario" más abajo. El artículo no rellena huecos, pero tampoco exige un intervalo calendario continuo; la jurisprudencia muestra que un hueco no vuelve la historia no evaluable, la ventana simplemente retrocede para completarse. |
 | *(no se carga — solo texto de limitación)* | Reconocimiento del tiempo cotizado en RAIS al volver a RPM | "el tiempo cotizado en el Régimen de Ahorro Individual le será computado al del Régimen de Prima Media" | Colpensiones — Normativa (Decreto 3800 de 2003, texto literal cotejado) | Art. 3, Decreto 3800 de 2003 | No aplica | Vigente desde 2003, sin cambio conocido | Confirma que las semanas de un traslado RAIS→RPM sí tienen respaldo normativo para reconocerse — ninguna función del dominio las descarta hoy, pero tampoco documentaba explícitamente este respaldo hasta ahora | Si "tiempo cotizado" reconocido equivale a "IBC histórico utilizable para el IBL" — el propio decreto no lo dice (ver fila siguiente) | Verificado en fuente oficial (texto literal del artículo 3) |
 | *(no se carga — cuestión pendiente, sin fundamento normativo suficiente)* | Tratamiento del IBC histórico cotizado en RAIS dentro del promedio del IBL en RPM | Ninguna fuente encontrada (Art. 21; Art. 36; Decreto 3800/2003, Art. 3 y 4) resuelve si el IBC —no solo el tiempo— cotizado en RAIS debe incorporarse al promedio de los 10 años o de toda la vida laboral | — (ausencia confirmada en las fuentes ya revisadas) | — | — | — | **Ninguno — PensionLab no incluye ni excluye esta historia mediante una regla propia**; `historiaCotizacion` se trata igual sin distinguir régimen de origen, sin que eso sea una afirmación normativa | Todo el mecanismo de integración del IBC histórico de un traslado — requiere investigación adicional (reglamento específico, jurisprudencia, o consulta directa a Colpensiones) antes de poder resolverse | **Cuestión pendiente — no demostrable con las fuentes consultadas hasta ahora** |
 
@@ -245,3 +245,210 @@ durante un tiempo.
 - [Consultar y entender la Historia Laboral — Colpensiones](https://www.colpensiones.gov.co/pensiones/publicaciones/127/consultar-y-entender-la-historia-laboral/)
 - [Traslado — Preguntas frecuentes, Colpensiones](https://www.colpensiones.gov.co/preguntas-frecuentes/276/traslado/)
 - [Ministerio de Trabajo publica proyecto de decreto sobre traslado de recursos del RAIS al RPM — Colpensiones](https://www.colpensiones.gov.co/publicaciones/5149/ministerio-de-trabajo-publica-proyecto-de-decreto-que-reglamenta-el-traslado-de-recuros-del-rais-al-rpm-administrado-por-colpensiones/) (indicio de reglamentación en trámite, contenido no investigado)
+
+---
+
+# Ventana temporal del IBL ordinario — selección por períodos efectivamente cotizados (investigación previa a S4-002, Entregable 2, Sprint 4)
+
+Investigación realizada por cotejo directo de fuente primaria (fecha de consulta:
+2026-08-19), a raíz de la decisión obligatoria de convención económica de proyección
+RPM previa a S4-002. Motivada por la necesidad de verificar si `calcularVentana()`
+(`seleccionarPeriodosIBL.js`) — que modela "los últimos 10 años" como un intervalo de
+años calendario completos — representa correctamente el Art. 21 de la Ley 100 de 1993,
+o si es una simplificación técnica no confirmada. Alcance explícitamente acotado: esta
+sección resuelve la pregunta macro (¿la ventana es calendario fija o retrospectiva por
+cotización efectiva?), **no** el criterio exacto de corte al día — ver "Bloqueo" abajo.
+
+## Fuente normativa
+
+**Art. 21, inciso 1, Ley 100 de 1993** (texto ya cotejado en la sección "Traslado de
+régimen" de este mismo archivo): *"el promedio de los salarios o rentas sobre los
+cuales ha cotizado el afiliado durante los diez (10) años anteriores al reconocimiento
+de la pensión, o en todo el tiempo si éste fuere inferior para el caso de las pensiones
+de invalidez o sobrevivencia"*. El texto no distingue expresamente entre años calendario
+y años efectivamente cotizados — de ahí la necesidad de esta investigación.
+
+## Evidencia jurisprudencial primaria
+
+**SL1006-2025**, Corte Suprema de Justicia, Sala de Casación Laboral. Magistrado
+ponente: Luis Benedicto Herrera Díaz. Radicación n.° 05001-31-05-016-2019-00476-01.
+Bogotá D.C., 12 de febrero de 2025. Texto completo obtenido y cotejado directamente del
+archivo digital oficial de la Corte
+(`archivodigitalapi.cortesuprema.gov.co/share/2025/5/Sentencias/SL1006-2025.pdf`).
+
+Aplicando expresamente el artículo 21 de la Ley 100 de 1993 ("le es aplicable el
+artículo 21 de la norma en cita"), la Sala construye el IBL de la demandante (María
+Ruth Moncada Marín) con una tabla titulada literalmente:
+
+> *"1. INGRESO BASE DE LIQUIDACIÓN CORRESPONDIENTE A LOS 10 ÚLTIMOS AÑOS EFECTIVAMENTE
+> COTIZADOS"*
+
+El párrafo introductorio de la tabla dice, también literalmente: *"...se realizará la
+liquidación de la prestación teniendo en cuenta las semanas cotizadas que aparecen en
+la documental... que corresponde a los últimos diez años de cotización de la actora..."*
+
+**El hallazgo central:** la tabla recorre los períodos de cotización reales de la
+afiliada desde el 28/11/1983 hasta el 28/02/2005, pero entre el 3/10/1991 y el
+1/04/2002 hay un **vacío de cotización de más de 10 años calendario** — ningún registro,
+ningún IBC, ninguna declaración de "no evaluable". La tabla **salta ese vacío por
+completo** y retoma los períodos reales de 2002-2005, sumando al final: *"TOTALES 3.653
+[días] 521,86 [semanas]"*.
+
+Es decir: ante una interrupción real de más de una década dentro de lo que sería la
+ventana calendario de "últimos 10 años antes del reconocimiento" (27-nov-2005), la Sala
+**no** aplicó un intervalo cronológico fijo — retrocedió en el calendario hasta 1983
+para completar aproximadamente 10 años de cotización efectivamente reportada.
+
+Como referencia adicional, de menor peso porque no se obtuvo su texto literal: el
+resumen oficial de la propia Sala de Casación Laboral sobre **SL7061-2016** (magistrado
+ponente Gerardo Botero Zuluaga, "Precisiones y cambios de criterio, Edición n.° 3",
+publicación institucional de la Corte) describe una lógica análoga —"transpolando desde
+la última cotización... hacia atrás"— para el IBL de Ley 33 de 1985 en un subcaso de
+régimen de transición. No es el mismo artículo que el que usa PensionLab (Ley 33/1985,
+no Art. 21 de la Ley 100/1993), así que se registra como refuerzo del mismo principio en
+un régimen distinto, no como evidencia directa.
+
+**SL1236-2025 no se cotejó en fuente primaria en esta investigación** — el PDF oficial
+localizado no tiene una capa de texto extraíble con las herramientas disponibles. Solo
+existe evidencia de fuentes secundarias (Gerencie.com) que describe, para ese caso,
+"514,29 semanas cotizadas" a partir de "123 cotizaciones" — un número compatible con la
+misma lógica de acumulación retrospectiva, pero no verificado literalmente.
+
+## Interpretación técnica que PensionLab deriva (macro, confirmada)
+
+La ventana de "los últimos 10 años" del Art. 21 **no se modela correctamente como un
+intervalo fijo de años calendario**. La evidencia primaria confirma que:
+
+1. Los huecos de cotización dentro de lo que sería la ventana calendario **no** vuelven
+   el IBL no evaluable.
+2. La ventana relevante se construye retrocediendo en el calendario, a partir del
+   período efectivamente cotizado más reciente antes del reconocimiento, hasta acumular
+   el equivalente a 10 años de cotización real — saltando los períodos sin cotización
+   sin que estos "cuenten" ni "bloqueen".
+
+Esto confirma y precisa la limitación que `seleccionarPeriodosIBL.js` ya declaraba
+sobre sí mismo desde su creación ("esta frontera la sortea exigiendo cobertura completa
+en vez de resolverla; no es una interpretación legal ni una regla permanente de
+PensionLab") — con evidencia primaria concreta de cuál sería la regla correcta, no solo
+con la sospecha de que la simplificación calendario era insuficiente.
+
+## Reconstrucción matemática del corte inicial (2026-08-19)
+
+Revisando fila por fila la tabla completa de SL1006-2025, solo una fila afecta el límite
+**inicial** de la ventana de 10 años sin corresponder a un mes calendario completo:
+
+> `28/11/1983  30/11/1983   3 $ 1.758,90   0,43     $ 69.761,77        $ 57,29`
+
+3 días, 0,43 semanas (3/7) — el **primer tramo** de toda la tabla. El total impreso es
+*"TOTALES 3.653 [días] 521,86 [semanas]"*. **3.653 − 3 = 3.650 — exactamente 365 × 10.**
+
+Dentro de los meses completos de la tabla, los años bisiestos se cuentan con su día real
+(ej. `1/02/1988 29/02/1988 29 ... 4,14` — febrero de 1988 con sus 29 días correctos), así
+que el ajuste de 3 días no es un artefacto de redondeo de bisiestos.
+
+**Lectura de Carlos/Atlas sobre esta reconstrucción (2026-08-19):** la combinación de (a)
+un tramo inicial parcial de exactamente 3 días, (b) un total que sin ese tramo cae en un
+número redondo (3.650 = 365×10), y (c) el tratamiento correcto de bisiestos en el resto de
+la tabla, es **suficientemente fuerte para cerrar la hipótesis de que el 28/11/1983 fuera
+solo el comienzo accidental de la documentación disponible en ese expediente** — hay un
+corte deliberado a nivel de día en este caso. Sigue siendo, sin embargo, **un solo caso
+primario**, no una formulación general de la regla declarada en prosa por la Corte.
+
+## Segunda investigación — búsqueda de un segundo caso primario (2026-08-19)
+
+Investigación adicional, extremadamente acotada, buscando un segundo caso primario que
+confirmara o refutara 3.650 días como patrón reproducible (no solo el resultado particular
+de SL1006-2025). Resultado:
+
+- **SL1236-2025 no localizada** ni por número de sentencia (intentado en la investigación
+  anterior) ni por radicación/partes/otros metadatos — la única fuente que la cita
+  (Gerencie.com) no aporta esos datos, y no apareció en el archivo oficial ni en ninguna
+  búsqueda dirigida.
+- **Segunda sentencia primaria real localizada: SL1378-2025** (Corte Suprema, Sala de
+  Casación Laboral, magistrada ponente Ana María Muñoz Segura, radicación
+  05001-31-05-006-2020-00228-01, Bogotá, 6 de mayo de 2025), con su propia tabla de IBL
+  (columnas paralelas "toda la vida" / "últimos 10 años", mismo patrón de fracciones
+  semanales por mes parcial que SL1006-2025). **No se pudo reconstruir su total**: el PDF
+  original dispone esas dos columnas lado a lado, y las herramientas de extracción de
+  texto disponibles en esta sesión no logran separarlas de forma confiable. Confirma el
+  formato recurrente de tabla día/semana de la Sala, pero no aporta un segundo dato
+  numérico verificado.
+- **Hallazgo colateral relevante**: comunicado oficial de la Corte Suprema
+  (`cortesuprema.gov.co`, no un blog) sobre **SL138-2024** (16-feb-2024): *"Semanas de
+  cotización a pensión se deben contabilizar con días calendario, no con meses de 30
+  días"* — cambio de criterio de una convención previa de 360 días/año (30 días/mes) a
+  días calendario reales (28-31 según el mes; 365 o 366 según el año). Esta sentencia
+  trata el **requisito mínimo de semanas del Art. 33** (elegibilidad), no la ventana del
+  Art. 21 (IBL) — no se puede extender automáticamente su alcance al selector del IBL. Sí
+  es coherente con, y refuerza indirectamente, que SL1006-2025 (posterior, feb-2025) haya
+  usado días calendario reales y no la convención de 360 días.
+
+**Conclusión de esta segunda investigación:** no apareció un segundo caso primario que
+permita confirmar 3.650 días como metodología reproducible más allá de SL1006-2025.
+
+## Bloqueo explícito: criterio exacto de corte
+
+**Sigue sin poder demostrarse un algoritmo general, declarado en prosa por la Corte, para
+determinar exactamente cuándo se completan los "10 años efectivamente cotizados".** Lo que
+sí está demostrado es que en SL1006-2025 el corte fue deliberado y aritméticamente
+consistente con 3.650 días — pero es un solo caso, y la relación entre ese número y
+cualquier cifra distinta atribuida secundariamente a SL1236-2025 (514,29 semanas / 3.600
+días, no verificada en fuente primaria) permanece sin resolver.
+
+## Fuentes consultadas (ventana temporal del IBL)
+
+- [SL1006-2025 — Corte Suprema de Justicia, Sala de Casación Laboral, archivo digital oficial](https://archivodigitalapi.cortesuprema.gov.co/share/2025/5/Sentencias/SL1006-2025.pdf) (texto completo cotejado)
+- ["Precisiones y cambios de criterio, Edición n.° 3" — Corte Suprema de Justicia, Sala de Casación Laboral, publicación institucional](https://cortesuprema.gov.co/corte/wp-content/uploads/relatorias/la/Publicacion/precisiones%20y%20criterios.pdf) (resumen oficial de SL7061-2016 cotejado)
+- [Semanas de cotización a pensión se deben contabilizar con días calendario, no con meses de 30 días — Corte Suprema de Justicia, comunicado oficial](https://cortesuprema.gov.co/semanas-de-cotizacion-a-pension-se-deben-contabilizar-con-dias-calendario-no-con-meses-de-30-dias/) (sobre SL138-2024; alcance limitado al Art. 33, no al Art. 21)
+- [¿Cómo se contabilizan los últimos 10 años cotizados a pensión? — Gerencie.com](https://www.gerencie.com/como-se-contabilizan-los-ultimos-10-anos-cotizados-a-pension.html) (fuente secundaria, usada solo para localizar la referencia a SL1236-2025, no como sustento de ningún valor)
+
+---
+
+# Convención técnica provisional — 3.650 días efectivamente cotizados (decisión de producto, 2026-08-19)
+
+**Decisión Carlos/Atlas (2026-08-19): PensionLab adopta 3.650 días calendario
+efectivamente cotizados como convención técnica provisional para la ventana ordinaria del
+IBL, en reemplazo de la ventana de años calendario que usa hoy `calcularVentana()`.**
+
+**Esto NO es una constante legal universal del Art. 21 de la Ley 100 de 1993.** No debe
+documentarse ni codificarse como tal en ningún punto del sistema — es una decisión de
+producto de PensionLab, respaldada por evidencia primaria fuerte de un solo caso, no una
+regla que la Corte haya declarado en esos términos generales.
+
+## Fundamento
+
+1. Reconstrucción matemática verificable de SL1006-2025 (ver sección anterior): 3.653 días
+   totales, de los cuales 3 corresponden a un tramo inicial recortado → 3.650 días
+   completos restantes.
+2. El tramo inicial parcial (3 días, no un mes completo) es compatible con un corte
+   deliberado a nivel de día, no con un artefacto de qué documentación existía en el
+   expediente.
+3. Tratamiento correcto de años bisiestos dentro de la tabla (no hay redondeo oculto que
+   explique el ajuste de otra forma).
+4. Coherencia indirecta con el criterio oficial posterior de la Corte (SL138-2024) de
+   contabilizar semanas con días calendario reales, no con la convención de 360 días.
+
+## Qué NO demuestra esta evidencia
+
+- Que 3.650 sea la cifra que aplicaría en cualquier otro caso — es la reconstrucción de
+  **un solo expediente**.
+- Que la Corte haya declarado esta cifra como regla general en ninguna sentencia — nunca
+  aparece en prosa, solo se deduce aritméticamente de una tabla.
+- Que resuelva la discrepancia con los 514,29 semanas/3.600 días atribuidos
+  secundariamente (no en fuente primaria) a SL1236-2025.
+
+## Qué evidencia futura obligaría a reabrir esta decisión
+
+- Texto primario de SL1236-2025 que confirme una cifra distinta a 3.650 para el mismo tipo
+  de cálculo.
+- Un segundo caso primario (por ejemplo, una reconstrucción confiable de SL1378-2025, si en
+  el futuro se logra separar sus columnas, u otra sentencia con un tramo inicial parcial)
+  que arroje una cifra distinta.
+- Una sentencia de unificación de la Sala de Casación Laboral, o una circular/manual
+  oficial de Colpensiones, que declare explícitamente el criterio de corte del Art. 21.
+- Cualquier hallazgo que muestre que el ajuste de 3 días en SL1006-2025 responde a una
+  causa distinta a completar 3.650 días (por ejemplo, si se lograra el texto primario y
+  este explicara el corte por otra razón).
+
+Mientras ninguna de estas condiciones se cumpla, 3.650 días permanece como la convención
+técnica activa de PensionLab, revisable, no como hecho normativo cerrado.

@@ -33,13 +33,8 @@ import { useCampoMonetario } from '../hooks/useCampoMonetario.js'
 import CampoMonetario from '../components/CampoMonetario.jsx'
 import CampoFechaDiaMesAnio from '../components/CampoFechaDiaMesAnio.jsx'
 import { formatearPesos } from '../format/formatearDinero.js'
-import { calcularVentana } from '../domain/seleccionarPeriodosIBL.js'
 import { evaluarIndicioVidaLaboral } from '../domain/evidenciaIndicioVidaLaboral.js'
 import { borradorVacio, evaluarNuevoPeriodo, construirPeriodoCotizacion } from './HistoriaCotizacionRPM.helpers.js'
-
-function hoyISO() {
-  return new Date().toISOString().slice(0, 10)
-}
 
 function textoRangoPeriodo(periodo) {
   const hasta = periodo.fechaHasta ?? 'actualidad'
@@ -91,7 +86,6 @@ function HistoriaCotizacionRPM({
   onVolver,
   onContinuar,
 }) {
-  const ventana = calcularVentana(hoyISO())
   const indicioVidaLaboral = evaluarIndicioVidaLaboral({ regimenActual, nivelConocimientoSemanas, semanasCotizadas })
   const [borrador, setBorrador] = useState(borradorVacio())
   const [intentoAgregar, setIntentoAgregar] = useState(false)
@@ -157,14 +151,18 @@ function HistoriaCotizacionRPM({
         tienes, puedes continuar igual con lo que ya conoces.
       </p>
 
-      {/* Capa 1 — mensaje principal corto + rango concreto calculado (nunca adivinado por el
-          usuario). No afirma que esta sea la ventana jurídicamente definitiva para su pensión
-          futura — eso se explica en la Capa 4, no aquí. "Años calendario completos" reemplaza la
-          expresión ambigua "los últimos 10 años" (hallazgo de revisión manual de S4-001). */}
+      {/* Capa 1 — mensaje principal corto. Desde el Slice correctivo de la ventana del IBL
+          (2026-08-19) ya no anunciamos un rango de fechas fijo: PensionLab retrocede
+          automáticamente en la historia declarada para completarlo, así que no hay un
+          "hasta aquí" que la persona deba adivinar ni cubrir sin huecos. No afirma que esta
+          sea la ventana jurídicamente definitiva para su pensión futura — eso se explica en
+          la Capa 4, no aquí. */}
       <p className="screen__subtitle">
-        Para tu primera lectura, necesitamos tu historia completa y sin huecos entre el{' '}
-        {ventana.desde} y el {ventana.hasta} (los últimos 10 años calendario completos). No es
-        necesario que tengas el resto de tu historia lista — puedes continuar con lo que ya tengas.
+        Para tu primera lectura, agrega los períodos de cotización que conozcas. No hace falta que
+        cubran exactamente los últimos 10 años ni que estén sin huecos — si tuviste una
+        interrupción, simplemente no agregues un período para ese tramo: PensionLab retrocederá en
+        tu historia lo que haga falta para completar el cálculo. Tampoco es necesario que tengas el
+        resto de tu historia lista — puedes continuar con lo que ya tengas.
       </p>
 
       {/* Capa 2 — invitación a más historia, condicionada al indicio declarado, no genérica. */}
@@ -185,13 +183,16 @@ function HistoriaCotizacionRPM({
         <p>
           La ley (Art. 21, Ley 100 de 1993) usa como referencia los 10 años anteriores al momento
           en que te reconozcan la pensión — una fecha futura que hoy no podemos calcular sin
-          inventar datos (inflación y salario mínimo futuros). Por eso esta lectura usa los últimos
-          10 años calculados desde hoy: es un punto de partida honesto, no tu resultado final.
+          inventar datos (inflación y salario mínimo futuros). Por eso esta lectura usa tus últimos
+          años efectivamente cotizados, contados hacia atrás desde hoy: es un punto de partida
+          honesto, no tu resultado final.
         </p>
         <p>
-          Usamos años calendario completos ({ventana.anioInicio} a {ventana.anioFin}): el año en
-          curso no se incluye porque su inflación acumulada (IPC de cierre) todavía no existe —
-          no podemos actualizar valores con un dato que aún no se publica.
+          Para saber cuándo esos años se completan usamos 3.650 días de cotización efectiva (el
+          equivalente a 10 años) — una convención técnica propia de PensionLab, respaldada por un
+          caso real de la Corte Suprema de Justicia, no una cifra que la ley fije expresamente. Si
+          tu historia tiene interrupciones, retrocedemos más atrás en el tiempo para completarlos,
+          en vez de exigir que esos años estén cubiertos sin huecos.
         </p>
         <p>
           Si acumulas 1250 semanas o más en total (no solo en los últimos 10 años), la ley te

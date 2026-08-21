@@ -52,7 +52,10 @@ function sumarDias(fechaISO, delta) {
   return d.toISOString().slice(0, 10)
 }
 
-function diaSiguiente(fechaISO) {
+// Exportada a partir de S4-002 (proyección RPM): segundo consumidor real fuera de este
+// archivo (domain/pensionEngine/calcularProyeccionRPM.js), para construir la fecha de
+// inicio del período futuro sintético sin reimplementar aritmética de fechas.
+export function diaSiguiente(fechaISO) {
   return sumarDias(fechaISO, 1)
 }
 
@@ -74,7 +77,21 @@ function noEvaluable(razonNoEvaluable, trazabilidadVentana) {
  * @property {(string|null)} fechaHasta - ISO, o null si sigue abierto (se resuelve a fechaCalculo)
  * @property {number} ibc
  * @property {number} diasCotizados - evidencia observada, obligatoria; nunca derivada de fechas
+ * @property {boolean} [esEscenarioFuturo] - Opcional, ausente en toda historia real. Uso
+ *   exclusivo de domain/pensionEngine/calcularProyeccionRPM.js (S4-002): marca el período
+ *   sintético que representa el escenario futuro declarado, para que ese orquestador pueda
+ *   distinguirlo estructuralmente de la historia observada en la salida — nunca infiriendo
+ *   el origen a partir de fechas (hallazgo de la revisión de S4-002, 2026-08-20). Ni
+ *   HistoriaCotizacionRPM.helpers.js ni ningún otro consumidor de PeriodoCotizacion lo
+ *   declara ni lo necesita.
  */
+
+// Preserva esEscenarioFuturo cuando el período de entrada lo trae — nunca lo añade ni lo
+// asume. Ausente en toda historia real, así que esto es un no-op para cualquier consumidor
+// existente que nunca declara ese campo (calcularPensionRPM.js incluido).
+function conMarcadorEscenarioFuturo(periodo) {
+  return periodo.esEscenarioFuturo ? { esEscenarioFuturo: true } : {}
+}
 
 /**
  * @typedef {Object} HuecoCalendarioSaltado
@@ -141,6 +158,7 @@ function seleccionarVentanaEfectivamenteCotizada({ periodos, fechaAncla }) {
         fechaHasta: periodo.fechaHastaResuelta,
         ibc: periodo.ibc,
         diasCotizados: periodo.diasCotizados,
+        ...conMarcadorEscenarioFuturo(periodo),
       })
       acumulado += periodo.diasCotizados
       if (acumulado === DIAS_VENTANA_IBL_EFECTIVAMENTE_COTIZADOS) {
@@ -164,6 +182,7 @@ function seleccionarVentanaEfectivamenteCotizada({ periodos, fechaAncla }) {
       fechaHasta: periodo.fechaHastaResuelta,
       ibc: periodo.ibc,
       diasCotizados: restante,
+      ...conMarcadorEscenarioFuturo(periodo),
     }
     periodosUsadosDesc.push(tramo)
     tramoInicialParcial = { fechaDesde: tramo.fechaDesde, fechaHasta: tramo.fechaHasta, diasCotizados: tramo.diasCotizados }
@@ -190,7 +209,15 @@ function seleccionarVentanaEfectivamenteCotizada({ periodos, fechaAncla }) {
 /**
  * @param {Object} params
  * @param {PeriodoCotizacion[]} params.historiaCotizacion
- * @param {string} params.fechaCalculo - ISO
+ * @param {string} params.fechaCalculo - ISO. Resuelve los períodos abiertos
+ *   (fechaHasta: null) — siempre hoy, incluso cuando fechaAncla difiere. Un período
+ *   abierto nunca se extiende hacia una fechaAncla futura: eso inventaría que un IBC
+ *   actual declarado se sostiene sin cambios hasta esa fecha (ver
+ *   domain/formulas/trazabilidad-formula-RPM.md, "Proyección RPM").
+ * @param {string} [params.fechaAncla] - ISO, por defecto fechaCalculo (preserva sin
+ *   cambios el comportamiento de S4-001B). Punto desde el que la ventana de 3.650 días
+ *   retrocede — hoy para la lectura histórica, fechaReconocimiento para una proyección
+ *   (S4-002, domain/pensionEngine/calcularProyeccionRPM.js).
  * @returns {
  *   | { evaluable: false, razonNoEvaluable: 'INCONSISTENCIA_DIAS_COTIZADOS_INVALIDOS' | 'PERIODOS_SUPERPUESTOS_NO_SOPORTADOS' | 'HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA' | 'COTIZACION_PARCIAL_EN_LIMITE_VENTANA_IBL_NO_SOPORTADA', trazabilidadVentana: TrazabilidadVentana }
  *   | {
@@ -202,7 +229,7 @@ function seleccionarVentanaEfectivamenteCotizada({ periodos, fechaAncla }) {
  *     }
  * }
  */
-export function seleccionarPeriodosIBL({ historiaCotizacion, fechaCalculo }) {
+export function seleccionarPeriodosIBL({ historiaCotizacion, fechaCalculo, fechaAncla = fechaCalculo }) {
   const conFechaResuelta = historiaCotizacion.map((p) => ({
     ...p,
     fechaHastaResuelta: p.fechaHasta ?? fechaCalculo,
@@ -225,7 +252,7 @@ export function seleccionarPeriodosIBL({ historiaCotizacion, fechaCalculo }) {
 
   const resultadoVentana = seleccionarVentanaEfectivamenteCotizada({
     periodos: conFechaResuelta,
-    fechaAncla: fechaCalculo,
+    fechaAncla,
   })
 
   if (!resultadoVentana.completa) {
@@ -237,6 +264,7 @@ export function seleccionarPeriodosIBL({ historiaCotizacion, fechaCalculo }) {
     fechaHasta: periodo.fechaHastaResuelta,
     ibc: periodo.ibc,
     diasCotizados: periodo.diasCotizados,
+    ...conMarcadorEscenarioFuturo(periodo),
   }))
 
   const totalDiasCotizados = conFechaResuelta.reduce((acc, periodo) => acc + periodo.diasCotizados, 0)

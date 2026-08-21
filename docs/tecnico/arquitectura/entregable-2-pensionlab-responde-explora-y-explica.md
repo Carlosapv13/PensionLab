@@ -344,10 +344,10 @@ supuestos:
    reemplazo escalonada y con clamps (`formulaRPM.js`). Requiere búsqueda numérica, no
    álgebra (ver §7.3).
 2. **Ventana móvil del IBL frente a horizonte futuro.** La ventana de "últimos 10 años"
-   está anclada a la fecha de cálculo, no a la fecha de jubilación
-   (`seleccionarPeriodosIBL.js`). Proyectar exige una decisión de diseño explícita sobre
-   cómo tratar esa ventana cuando queda parcial o totalmente en el futuro — **no está
-   tomada** (ver decisión obligatoria §14.1).
+   estaba anclada a la fecha de cálculo, no a la fecha de jubilación
+   (`seleccionarPeriodosIBL.js`). **Resuelto (§14.1, 2026-08-20):** el selector recibe un
+   `fechaAncla` separado de `fechaCalculo` — la ventana ancla a `fechaReconocimiento` para
+   la proyección, sin cambiar su algoritmo de retroceso por días efectivamente cotizados.
 3. **SMLV y parámetros legales futuros desconocidos.** Mismo hallazgo ya registrado para
    RAIS (`TOPE_IBC_CON_SMMLV_VIGENTE`, `docs/producto/oportunidades-futuras.md`).
    Cualquier camino RPM proyectado necesita una limitación equivalente, nunca un SMLV
@@ -522,16 +522,22 @@ uno de sus primeros efectos, no su definición.
 Consistente con la instrucción de no completar vacíos con supuestos, lo siguiente se
 identificó durante el análisis de este Entregable y **no se resuelve en este documento**:
 
-1. **Convención económica de proyección RPM** (bloqueo §8.2) — cómo tratar la ventana de
-   10 años del IBL cuando queda parcial o totalmente en el futuro, y cómo se relaciona el
-   año de referencia de IPC/SMLV con una fecha de jubilación futura. **Alternativa C
-   (fecha base monetaria = fecha de cálculo; históricos indexados con IPC real; IBC
-   futuro declarado en poder adquisitivo de esa fecha base; ningún IPC futuro inventado;
-   declaraciones antiguas de IBC futuro requieren reconfirmación o política explícita de
-   actualización) aprobada conceptualmente por Carlos/Atlas (2026-08-19)** —
-   condicionada a resolver primero el punto 8 de esta lista (selector temporal del IBL
-   ordinario) antes de iniciar S4-002, porque la convención económica no define por sí
-   sola qué períodos entran a la ventana proyectada.
+1. **Convención económica de proyección RPM** (bloqueo §8.2) — **resuelta (2026-08-20),
+   contrato completo en `src/domain/formulas/trazabilidad-formula-RPM.md`, sección
+   "Proyección RPM — Convención económica v1 (S4-002)".** Alternativa C (fecha base
+   monetaria = fecha de cálculo; históricos indexados con IPC real; IBC futuro declarado en
+   poder adquisitivo de esa fecha base; ningún IPC futuro inventado), aprobada
+   conceptualmente el 2026-08-19 y precisada tras revisión Carlos/Atlas del 2026-08-20 con
+   tres correcciones: (a) separación explícita `ibcAplicableSimulacion` (dato actual) /
+   `escenarioIbcFuturo: {valor, origen}` (escenario evaluado) — S4-002 produce únicamente
+   `origen: 'continuidad_ibc_actual'`, sin cerrar un enum especulativo para S4-003; (b) la
+   reconfirmación de declaraciones antiguas de IBC futuro se retira del contrato mínimo —
+   irrelevante sin persistencia (§9), queda registrada como decisión futura asociada a esa
+   capacidad, no diseñada aquí; (c) el tope legal de IBC nunca sobrescribe en silencio —
+   `escenarioIbcFuturo` conserva `valorDeclarado`, `valorAplicado`, `origen` y
+   `topeAplicado` en la salida. Desbloqueada por el cierre del selector temporal ordinario
+   (punto 8 de esta lista, S4-001B) — la convención económica no definía por sí sola qué
+   períodos entraban a la ventana proyectada hasta que ese selector existió.
 2. **Límites exactos del perfil soportado** (§3) — qué combinaciones de
    `tipoCotizante`/`lugarCotizacion`/`trasladoRegimen` quedan dentro de alcance de
    S4-001/S4-002. Se decide al diseñar esos Slices, no aquí.

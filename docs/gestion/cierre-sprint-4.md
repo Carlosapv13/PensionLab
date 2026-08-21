@@ -406,3 +406,134 @@ inventar cuáles días concretos estuvieron cotizados dentro de él.
   convención económica de proyección RPM (Entregable 2 §14.1), sin cambios respecto al
   cierre de S4-001A — este Slice correctivo no la resuelve, solo corrige el selector de
   ventana que esa decisión también necesitará.
+
+---
+
+## Slice S4-002 — Proyección RPM en escenario de continuidad
+
+**Estado:** ✅ Implementado, revisado y aprobado — pendiente de commit de cierre.
+
+### Objetivo
+
+Proyectar una lectura económica RPM a una fecha de reconocimiento futura (horizonte de
+jubilación), combinando historia observada real con un escenario de ingreso futuro
+declarado — sin inventar IPC futuro en ningún punto del cálculo. Cierra la decisión
+pendiente §14.1 del Entregable 2 (convención económica de proyección RPM), desbloqueada
+por el selector temporal ordinario ya cerrado en S4-001B.
+
+### Convención económica — fechaBaseMonetaria y escenario de continuidad
+
+Todo el resultado se expresa en pesos reales de `fecha` (**`fechaBaseMonetaria`**, por
+defecto hoy) — nunca pesos nominales futuros, mismo principio que la Convención Económica
+v1 ya aprobada para RAIS.
+
+Separación explícita, para no presentar un supuesto de producto como si fuera una decisión
+que la persona nunca tomó: `ibcAplicableSimulacion` (dato/base económica actual, ya
+resuelto) es distinto de `escenarioIbcFuturo: {valor, origen}` (lo que efectivamente entra
+al cálculo). S4-002 construye únicamente el **escenario base de continuidad**
+(`origen: 'continuidad_ibc_actual'`, `valor = ibcAplicableSimulacion` — "si sigues
+ganando, en términos reales, lo mismo que ganas hoy, hasta tu jubilación"). El campo
+`origen` queda abierto (no es un enum cerrado) para que S4-003 agregue sus propios valores
+sin cambiar la forma del contrato.
+
+### Tope legal de IBC — trazabilidad completa
+
+Si el escenario supera el tope legal (`topeMaximoIBC × smlv`, resueltos a `fecha`), el
+cálculo usa el valor capado — pero nunca sobrescribe en silencio. La salida conserva los
+cuatro valores: `escenarioIbcFuturo: {valorDeclarado, valorAplicado, origen,
+topeAplicado}`. El cálculo usa exclusivamente `valorAplicado`; `valorDeclarado` y
+`topeAplicado` quedan disponibles para que la explicación (S4-007) muestre ambos cuando el
+tope se activa.
+
+### Ventana de 3.650 días anclada a fechaReconocimiento
+
+`seleccionarPeriodosIBL.js` recibió una extensión mínima de firma: `fechaAncla` (nuevo
+parámetro opcional, default `fechaCalculo`, preserva sin cambios el comportamiento de
+S4-001B) separa el punto desde el que la ventana retrocede de la resolución de períodos
+abiertos (que sigue anclada a `fechaCalculo`, siempre hoy — nunca a una fecha futura, para
+no inventar que el IBC actual declarado se sostiene sin cambios hasta la jubilación). Un
+período sintético `{fechaDesde: fecha+1, fechaHasta: fechaReconocimiento, ibc:
+valorAplicado, diasCotizados: días del horizonte}` se antepone a la historia real antes de
+llamar al selector con `fechaAncla = fechaReconocimiento` — el mismo algoritmo de
+retroceso de S4-001B, sin modificarlo, resuelve la mezcla.
+
+### Separación estructural historia observada / escenario futuro — `esEscenarioFuturo`
+
+Hallazgo crítico de la revisión (2026-08-20, ver más abajo): clasificar el tramo
+observado/futuro comparando `fechaDesde > fecha` permitía que un período de
+`historiaCotizacion` mal fechado en el futuro perdiera su propio IBC en silencio,
+sustituido por `valorAplicado`. Corregido con dos mecanismos, no uno solo: (1) rechazo
+explícito y previo de cualquier período de `historiaCotizacion` posterior a `fecha`
+(`HISTORIA_CON_PERIODO_POSTERIOR_A_FECHA_CALCULO`, ver hallazgos abajo); (2) el período
+sintético se marca con `esEscenarioFuturo: true` — un campo opcional del `typedef
+PeriodoCotizacion`, ausente en toda historia real, preservado por
+`seleccionarPeriodosIBL.js` solo cuando el período de entrada lo trae (no-op para
+`calcularPensionRPM.js` y cualquier otro consumidor existente). La clasificación
+observado/futuro ya no compara fechas en ningún punto.
+
+El promedio final combina el tramo observado (indexado con IPC real, vía
+`calcularPromedioIBL`, sin cambios) con el tramo futuro (`valorAplicado` constante, sin
+indexar — nunca pasa por `dividirPeriodoPorAnio` ni `obtenerIPC`) mediante un promedio
+ponderado por días, calculado en el orquestador. Cuando el horizonte alcanza o supera
+3.650 días, la ventana queda 100% futura y el IBL ordinario converge exactamente a
+`valorAplicado` — verificado en los bordes exactos (3.650 y 3.649 días).
+
+### composicionVentanaOrdinaria y semanas
+
+`composicionVentanaOrdinaria: {diasObservados, diasFuturos, fraccionFutura}` expone
+objetivamente cuánto del IBL ordinario depende de historia real vs. del escenario, sin
+ningún umbral categórico de "dominado" — la lectura cualitativa queda para la explicación
+posterior.
+
+`semanasCotizadas: {observadas, futuras, total}` — `futuras` se deriva del calendario del
+horizonte (bloqueo §8.6: semanas futuras no son una variable libre). El umbral de 1.250
+semanas para la alternativa de vida laboral se evalúa contra `total`, a diferencia de
+`calcularPensionRPM.js` (lectura histórica, solo `semanasObservadas`) — decisión de
+alcance de S4-002 consistente con el Art. 21 inciso 2, que no distingue semanas ya
+cotizadas de semanas que se cotizarán según lo planeado.
+
+### Parámetros legales congelados a fecha de cálculo
+
+`obtenerSmlv`, `obtenerTopeMaximoIBC`, `obtenerParametrosTasaReemplazoRPM` y
+`obtenerSemanasHabilitanAlternativaIBL` se resuelven todos con `fecha` (hoy), nunca con
+`fechaReconocimiento` — declarado como limitación explícita
+(`PARAMETROS_LEGALES_CONGELADOS_A_FECHA_CALCULO`), para no afirmar conocer la ley vigente
+el día de la jubilación.
+
+### Hallazgos críticos de la revisión (2026-08-20) y su corrección
+
+Auditoría independiente previa al cierre encontró y verificó empíricamente dos hallazgos
+críticos, ambos corregidos antes de aprobar el Slice:
+
+1. **`fechaNacimiento` inválida o ausente lanzaba `RangeError: Invalid time value` sin
+   capturar** (`calcularFechaPorEdad.js`, vía `.toISOString()` sobre una fecha inválida).
+   Corregido guardando el propio contrato de `calcularProyeccionRPM` (Principio 11, no se
+   modificó `calcularFechaPorEdad.js`): nueva razón **`FECHA_NACIMIENTO_NO_VALIDA`**.
+2. **Un período "histórico" fechado después de `fecha` perdía su propio IBC en silencio**
+   — confirmado con una prueba definitiva (variar su IBC de 999.999.999 a 1 no cambiaba el
+   resultado). Corregido con rechazo explícito previo (nueva razón
+   **`HISTORIA_CON_PERIODO_POSTERIOR_A_FECHA_CALCULO`**) más la separación estructural
+   `esEscenarioFuturo` descrita arriba — defensa en profundidad, no solo el rechazo.
+
+La auditoría también fortaleció la cobertura de pruebas: bordes exactos (horizonte de 1
+día, exactamente 3.650 y 3.649 días, cumpleaños 29 de febrero, IBC exactamente en el
+tope), vida laboral con falta de IPC histórico en la proyección, y un test de blend con un
+período genuinamente parcial que distingue ponderación por `diasCotizados` de ponderación
+por días calendario (el original, con solo períodos completos, no podía distinguirlas).
+
+### Tests y verificación
+
+- `npm test` — **436/436** en verde (27 archivos).
+- `npm run lint` — sin errores.
+- `npm run build` — build de producción exitoso.
+
+### Fuera de alcance de este Slice
+
+- Búsqueda/bisección de `escenarioIbcFuturo.valor` para alcanzar un objetivo declarado —
+  **S4-003 todavía no ha comenzado.**
+- Reconfirmación/versionamiento de una declaración de IBC futuro entre ejecuciones —
+  irrelevante sin persistencia (§9 del Entregable 2); `fechaBaseMonetaria` queda expuesta
+  para que esa Slice futura construya su propia política.
+- Traslado de régimen (`trasladoRegimen`/`fechaTrasladoRegimen`) sigue sin efecto
+  económico — bloqueo §8.9 sin cambios.
+- `formulaIBL.js`, `formulaRPM.js` y la convención de 3.650 días permanecen intactos.

@@ -230,3 +230,45 @@ describe('diasCalendarioEnRango', () => {
     expect(diasCalendarioEnRango('2023-12-30', '2024-01-02')).toBe(4) // 30, 31, 1, 2
   })
 })
+
+// Extensión mínima de S4-002 (proyección RPM): fechaAncla separado de fechaCalculo.
+// fechaCalculo sigue resolviendo períodos abiertos (nunca cambia); fechaAncla mueve
+// únicamente el punto desde el que la ventana retrocede.
+describe('seleccionarPeriodosIBL — fechaAncla separada de fechaCalculo', () => {
+  it('sin fechaAncla, el comportamiento es idéntico al de S4-001B (default = fechaCalculo)', () => {
+    const historia = historiaDiezAniosCompleta()
+    const conAncla = seleccionarPeriodosIBL({ historiaCotizacion: historia, fechaCalculo: '2026-01-01', fechaAncla: '2026-01-01' })
+    const sinAncla = seleccionarPeriodosIBL({ historiaCotizacion: historia, fechaCalculo: '2026-01-01' })
+
+    expect(sinAncla).toEqual(conAncla)
+  })
+
+  it('un período abierto (fechaHasta: null) resuelve a fechaCalculo, no a fechaAncla, aunque fechaAncla sea futura', () => {
+    const fechaDesde = '2016-01-01'
+    const fechaCalculo = '2026-01-01'
+    const diasCotizados = diasCalendarioEnRango(fechaDesde, fechaCalculo)
+    const historia = [{ fechaDesde, fechaHasta: null, ibc: 1000000, diasCotizados }]
+    const resultado = seleccionarPeriodosIBL({
+      historiaCotizacion: historia,
+      fechaCalculo,
+      fechaAncla: '2036-01-01',
+    })
+
+    expect(resultado.evaluable).toBe(true)
+    // El tramo usado termina en fechaCalculo (2026) — si el período abierto se hubiera
+    // resuelto a fechaAncla (2036), este valor sería distinto.
+    expect(resultado.periodosOrdinario.at(-1).fechaHasta).toBe('2026-01-01')
+  })
+
+  it('fechaAncla se registra en la trazabilidad tal cual, independiente de fechaCalculo', () => {
+    const historia = historiaDiezAniosCompleta() // 2016-01-01 a 2025-12-31
+    const resultado = seleccionarPeriodosIBL({
+      historiaCotizacion: historia,
+      fechaCalculo: '2026-06-15', // sin efecto: no hay períodos abiertos en esta historia
+      fechaAncla: '2025-12-31', // ancla = fin de la historia real (horizonte futuro de 0 días, como haría S4-002)
+    })
+
+    expect(resultado.evaluable).toBe(true)
+    expect(resultado.trazabilidadVentana.fechaAncla).toBe('2025-12-31')
+  })
+})

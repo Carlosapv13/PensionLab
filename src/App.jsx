@@ -17,6 +17,7 @@ import QueDeterminaTuResultado from './pages/QueDeterminaTuResultado.jsx'
 import ExploraTuProyeccion from './pages/ExploraTuProyeccion.jsx'
 import HistoriaCotizacionRPM from './pages/HistoriaCotizacionRPM.jsx'
 import ExploraTuProyeccionRPM from './pages/ExploraTuProyeccionRPM.jsx'
+import ProyectaTuPensionRPM from './pages/ProyectaTuPensionRPM.jsx'
 import { tienePrimeraLecturaValor } from './domain/tienePrimeraLecturaValor.js'
 
 // Import estático, pero solo se monta bajo import.meta.env.DEV (ver el
@@ -519,6 +520,30 @@ function App() {
           semanasCotizadas={semanasCotizadas}
           trasladoRegimen={trasladoRegimen}
           onVolver={() => setVista('historiaCotizacionRPM')}
+          onContinuar={() => setVista('proyectaTuPensionRPM')}
+        />
+      )}
+
+      {vista === 'proyectaTuPensionRPM' && (
+        <ProyectaTuPensionRPM
+          historiaCotizacion={historiaCotizacion}
+          regimenActual={regimenActual}
+          sexo={sexo}
+          fechaNacimiento={fechaNacimiento}
+          certezaBaseCotizacion={certezaBaseCotizacion}
+          valorBaseCotizacionDeclarado={valorBaseCotizacionDeclarado}
+          tipoCotizante={tipoCotizante}
+          lugarCotizacion={lugarCotizacion}
+          salarioParaEstimarBase={salarioParaEstimarBase}
+          edadJubilacionDeseada={edadJubilacionDeseada}
+          onCambiarEdadJubilacionDeseada={setEdadJubilacionDeseada}
+          objetivoPensionMensual={objetivoPensionMensual}
+          onCambiarObjetivoPensionMensual={setObjetivoPensionMensual}
+          restriccionCostoPensionalAdicionalMaximoMensual={restriccionCostoPensionalAdicionalMaximoMensual}
+          onCambiarRestriccionCostoPensionalAdicionalMaximoMensual={
+            setRestriccionCostoPensionalAdicionalMaximoMensual
+          }
+          onVolver={() => setVista('exploraTuProyeccionRPM')}
         />
       )}
       </AppShell>

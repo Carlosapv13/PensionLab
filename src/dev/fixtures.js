@@ -165,6 +165,42 @@ export const FIXTURES = [
     },
   },
   {
+    id: 'rpm-empleado-proyecta-tu-pension',
+    nombre: 'RPM — empleado — Proyecta tu pensión, objetivo alcanzable mediante bisección (S4-003)',
+    // Misma historia de rpm-empleado-historia-con-hueco (arriba) — reutilizada a
+    // propósito para no duplicar un segundo caso de historia real, ya validado. Objetivo
+    // deliberadamente por encima de lo que el camino base (continuidad_ibc_actual)
+    // alcanza, para ejercitar la bisección de generarCaminosRPM.js con datos reales al
+    // revisar esta pantalla manualmente.
+    vistaSugerida: 'proyectaTuPensionRPM',
+    datos: {
+      objetivoSeleccionado: 'Descubrir mis opciones pensionales.',
+      lugarResidencia: 'Colombia',
+      cotizaActualmente: 'si',
+      sexo: 'Hombre',
+      fechaNacimiento: '1978-02-11',
+      regimenActual: 'RPM',
+      trasladoRegimen: 'no',
+      tipoCotizante: 'empleado',
+      lugarCotizacion: 'colombia',
+      nivelConocimientoSemanas: 'aproximado',
+      semanasCotizadas: '527',
+      anioInicioCotizacion: '2016',
+      certezaBaseCotizacion: 'conocido',
+      valorBaseCotizacionDeclarado: '2900000',
+      infoEsencialCompletada: true,
+      historiaCotizacion: [
+        { fechaDesde: '2016-01-01', fechaHasta: '2019-06-30', ibc: 2100000, diasCotizados: 1277 },
+        { fechaDesde: '2020-01-01', fechaHasta: '2026-08-10', ibc: 2900000, diasCotizados: 2414 },
+      ],
+      // 65, no 62 (el mínimo legal): a los 62 la historia + el horizonte todavía no
+      // completan las 1300 semanas mínimas (auditoría 2026-08-21) — este fixture
+      // demuestra el camino de bisección exitoso, no el rechazo por elegibilidad.
+      edadJubilacionDeseada: '65',
+      objetivoPensionMensual: '3500000',
+    },
+  },
+  {
     id: 'rpm-trasladada-indicios-transicion',
     nombre: 'RPM — trasladado de RAIS — hasta Indicios de régimen de transición (ficticio, S4-001A)',
     // Caso ficticio, representativo de la clase de validación del Entregable 2 —

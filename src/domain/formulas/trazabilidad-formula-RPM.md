@@ -316,3 +316,319 @@ mismo criterio ya usado por `calcularProyeccionRAIS`.
   cuando exista, tenga con qué construir su propia política sin rediseñar este contrato.
 - Traslado de régimen (`trasladoRegimen`/`fechaTrasladoRegimen`) sigue sin efecto
   económico — bloqueo §8.9 sin cambios, no resuelto por esta convención.
+
+## Monotonicidad de la proyección respecto de `escenarioIbcFuturo.valor` (§8.5, resuelta 2026-08-20)
+
+Prerrequisito explícito de S4-003 (Entregable 2 §10, fila S4-003: "Dependencias: S4-002 +
+validación de monotonicidad (§8.5)"), resuelto **antes** de implementar
+`generarCaminosRPM.js` — mismo criterio metodológico que el resto de este documento.
+Registra únicamente la propiedad demostrada; no implementa la bisección misma.
+
+### Propiedad demostrada dentro del dominio legal
+
+`pensionMensualProyectada` es **estrictamente creciente** respecto de
+`escenarioIbcFuturo.valor` en el intervalo `[ibcActual, topeAplicado)`, manteniendo fijos
+todos los demás parámetros (historia, `fecha`, `fechaReconocimiento`) — sin mesetas, sin
+inversiones, en ningún punto del dominio legal alcanzable.
+
+### Derivación analítica
+
+Con `s = IBL/SMLV`:
+```
+pensión(IBL) = IBL × tasaFinal(IBL) / 100
+tasaFinal(IBL) = clamp(65.5 − 0.5·s + incremento, 55, 80)   (incremento fijo: no depende de IBL)
+```
+Sin clamps, `pensión` en función de `IBL` es una parábola:
+```
+pensión(IBL) = [(65.5+incremento)·IBL − 0.5·IBL²/SMLV] / 100
+```
+con coeficiente cuadrático **negativo** — vértice en `IBL* = (65.5+incremento)×SMLV`, es
+decir `s* = 65.5+incremento` (mínimo 65.5, solo crece con `incremento`, nunca lo reduce).
+El piso de tasa (55%) se activa en `s = 21`, muy por debajo del vértice; el tope legal
+acota `s` a un máximo de 25. **El dominio alcanzable (`s ≤ 25`) queda enteramente del lado
+ascendente de la parábola** — nunca se alcanza el vértice con datos reales. Los clamps de
+piso y techo solo pueden aplanar la pendiente de `tasaFinal`, nunca invertirla; con
+`tasaFinal` constante, `pensión = IBL(x) × constante` sigue creciendo porque `IBL(x)` es
+afín estrictamente creciente en `x` (`IBL(x) = A + B·x`, con `B = díasFuturos/díasTotales
+> 0` siempre que el horizonte sea válido). El máximo entre IBL ordinario y vida laboral
+(`iblAplicable`) preserva la propiedad: el máximo de dos funciones afines crecientes es
+continuo y estrictamente creciente, sin caída en el punto de cruce.
+
+### Comportamiento antes y después del tope
+
+- **`[ibcActual, topeAplicado)`**: estrictamente creciente, sin mesetas — ni en la zona de
+  piso de tasa (55%) ni en la de techo (80%) ni al cruzar entre IBL ordinario y vida
+  laboral.
+- **`[topeAplicado, ∞)`**: **constante**, no decreciente — `valorAplicado = min(x,
+  topeAplicado)` se satura en el tope, así que `IBL(x)` y por tanto la pensión dejan de
+  cambiar. Verificado explícitamente: `pensión(tope) = pensión(tope+5.000.000) =
+  pensión(tope+50.000.000)`.
+
+### Evidencia empírica
+
+`src/domain/pensionEngine/monotonicidadProyeccionRPM.test.js` (prueba permanente, 6
+tests) — barre `calcularProyeccionRPM` con secuencias crecientes de
+`escenarioIbcFuturo.valor` y verifica cada par consecutivo, no solo los extremos:
+
+- Ventana 100% futura, barrido amplio con resolución fina alrededor de `s=21` (piso).
+- Frontera exacta del tope: estrictamente creciente antes, constante después.
+- Ventana mixta (historia real + horizonte de 2 años).
+- Horizonte extremo (1 día).
+- Historia de 40 años + IBC bajo, para forzar y confirmar el clamp de techo (80%).
+- Historia + horizonte que fuerza el cruce `esOpcionLegal` (ordinario ↔ vida laboral),
+  confirmando que la pensión sigue subiendo con normalidad a ambos lados del cruce.
+
+Búsqueda activa de contraejemplo (exploración adicional, no persistida como test — los
+resultados quedan registrados aquí): barridos de hasta 5.000 puntos alrededor de las
+zonas analíticamente más sensibles (piso de tasa, frontera del tope, cruce
+ordinario/vida laboral) — peor caída detectada: **0**, en ningún caso. Ningún par
+`IBC1 < IBC2` con `pensión(IBC1) > pensión(IBC2)` encontrado.
+
+### Consecuencia para S4-003
+
+La bisección de §7.3 queda **habilitada, acotada estrictamente a `[ibcActual,
+topeAplicado]`** — dentro de ese intervalo no hay mesetas que la puedan atascar ni
+inversiones que la puedan confundir. **Si el objetivo declarado no se alcanza evaluando
+`escenarioIbcFuturo.valor = topeAplicado`, debe tratarse como no alcanzable** (camino
+alternativo `descartado`, no como un caso a resolver ampliando el rango de búsqueda) —
+más allá del tope la función es plana por diseño (el escenario se satura), así que no
+hay nada nuevo que un rango más amplio pudiera encontrar.
+
+## Bisección de S4-003 — `generarCaminosRPM.js` (contrato aprobado 2026-08-20)
+
+Documenta el diseño **antes** del código, mismo criterio que el resto de este archivo.
+No implementa búsqueda genérica ni reabre §8.5 (ya resuelta, arriba) — solo fija el
+contrato exacto que `generarCaminosRPM.js` debe cumplir.
+
+### Reutilización — caja negra, sin duplicar lógica pensional
+
+`generarCaminosRPM.js` nunca reimplementa IBL, tasa de reemplazo, ventana ni indexación.
+Llama a `calcularProyeccionRPM` una vez para el camino base y N veces (bisección) para el
+alternativo — mismo patrón ya probado por `generarCaminosRAIS.js` con
+`calcularProyeccionRAIS`. `formulaIBL.js`, `formulaRPM.js`, `calcularProyeccionRPM.js` y
+la convención de 3.650 días permanecen intactos.
+
+### Ancla inferior de la búsqueda
+
+`ibcAplicableSimulacion` (mismo valor que S4-002 usa para `origen:
+'continuidad_ibc_actual'` en el camino base) — nunca se reconcilia ni se fuerza a
+coincidir con el último `ibc` observado en `historiaCotizacion`: son datos de naturaleza
+distinta (lo ya cotizado, un hecho pasado, vs. la declaración vigente hoy) que
+`calcularProyeccionRPM` ya trata como entradas independientes.
+
+### Rango de búsqueda
+
+Exclusivamente `[ibcAplicableSimulacion, topeAplicado]` — `topeAplicado` se obtiene del
+propio resultado del camino base (`calcularProyeccionRPM(...).escenarioIbcFuturo.topeAplicado`),
+nunca recalculado por separado. **Nunca se busca fuera de este rango** — la propiedad
+demostrada en §8.5 confirma que no hay nada que un rango más amplio pudiera encontrar
+(la función es plana más allá del tope).
+
+### Criterio de convergencia
+
+Iteraciones calculadas dinámicamente a partir del rango real de cada caso, no una
+constante hardcodeada — el resultado se expresa en pesos colombianos, sin unidad más
+fina con sentido que 1 peso:
+
+```
+rango = topeAplicado − ibcAplicableSimulacion
+iteraciones = Math.ceil(Math.log2(rango))
+```
+
+Bisección estándar sobre `escenarioIbcFuturo.valor`, evaluando
+`calcularProyeccionRPM(...).pensionMensualProyectada` en cada punto medio, acotando el
+intervalo según si el resultado queda por debajo o por encima del objetivo — válido
+porque §8.5 ya demostró que la función es estrictamente creciente en todo este rango, sin
+mesetas que puedan confundir la bisección.
+
+Al terminar las iteraciones: el IBC encontrado se **redondea hacia arriba a peso entero**
+(`Math.ceil`, acotado por `topeAplicado`) y se **reevalúa una última vez** con
+`calcularProyeccionRPM` — el camino alternativo nunca se construye a partir del punto
+medio fraccionario de la última iteración, siempre de esa reevaluación final con el valor
+ya redondeado. **Corrección durante implementación (2026-08-20):** la primera versión
+redondeaba al peso más cercano (`Math.round`), lo que podía dejar el resultado una
+fracción de peso por debajo del objetivo exacto — confirmado empíricamente en un test que
+falló con `distanciaObjetivo.cumple === false` para una búsqueda que sí había convergido.
+Una búsqueda cuyo propio resultado redondeado no alcanza el objetivo que fue a buscar
+derrota su propio propósito — se corrigió a redondeo hacia arriba, que ofrece un IBC
+como máximo 1 peso mayor al estrictamente necesario, nunca insuficiente.
+
+### Precondiciones antes de biseccionar
+
+1. Si el camino base (`origen: 'continuidad_ibc_actual'`) ya cumple el objetivo
+   (`distanciaObjetivo.cumple`), no se genera camino alternativo — no hay brecha que
+   cerrar.
+2. Si `ibcAplicableSimulacion >= topeAplicado`, no hay margen legal — camino alternativo
+   `descartado` con `razonDescartado.codigo: 'YA_EN_TOPE_LEGAL'`, sin intentar bisección.
+3. Se evalúa `calcularProyeccionRPM` con `escenarioIbcFuturo.valor = topeAplicado` antes
+   de biseccionar: si ni así se alcanza el objetivo, camino alternativo `descartado` con
+   `razonDescartado.codigo: 'OBJETIVO_NO_ALCANZABLE_NI_EN_TOPE'` — la bisección nunca se
+   ejecuta en este caso, coherente con "no extender la búsqueda más allá del tope".
+
+### `origen` del escenario encontrado
+
+`'busqueda_objetivo_rpm'` — ya aprobado, distinto de `'continuidad_ibc_actual'`.
+
+### `costoAcumuladoHastaJubilacion` — diferido, no asignado a ningún Slice
+
+El campo `esfuerzo.costoAcumuladoHastaJubilacion` que el boceto de §7.2 del Entregable 2
+anticipaba ("nuevo campo, exigido por la Regla 5 del Entregable") **queda fuera de
+S4-003**. Se investigó exhaustivamente y **"Regla 5 del Entregable" no está definida en
+ningún documento accesible del proyecto** — la frase aparece únicamente citándose a sí
+misma en §7.2/§7.3, sin una lista de "Reglas del Entregable" en ningún lugar que la
+respalde. No se inventa su contenido. **Tampoco se asigna a S4-005 ni a ningún otro
+Slice como obligación futura** — queda diferida hasta que exista una definición
+explícita de producto/arquitectura, decisión de Carlos/Atlas (2026-08-20).
+`esfuerzo.costoPensionalAdicionalMensual` sí se calcula (no depende de la Regla 5) —
+mismo criterio que `generarCaminosRAIS.js`: `aporteMensualPensionPropuesto -
+aporteMensualPensionActual`, vía `obtenerTasaCotizacion` (regime-agnóstico, sin cambios).
+
+### Contrato de entrada/salida de `generarCaminosRPM`
+
+```
+generarCaminosRPM({
+  regimenActual,
+  historiaCotizacion,
+  fechaNacimiento,
+  edadJubilacionDeseada,
+  ibcAplicableSimulacion,
+  objetivoValorMensual,
+  restriccionCostoPensionalAdicionalMaximoMensual = null,
+  fecha = hoy,
+})
+→ {
+  escenarios: [{
+    id: 'base' | 'aumentar-ibc-futuro',
+    tipo: 'base' | 'alternativo',
+    estado: 'viable' | 'descartado',
+    decision: string,
+    entradas: { escenarioIbcFuturo: {valor, origen}, edadJubilacionDeseada },
+    resultado: { valor: pensionMensualProyectada, moneda: 'COP', periodoReferencia: 'mensual' },
+    ibl, tasaReemplazo, semanasCotizadas, composicionVentanaOrdinaria, trazabilidadVentana,
+    esfuerzo: { ibcActual, ibcPropuesto, aumentoIBC, aporteMensualPensionActual,
+                aporteMensualPensionPropuesto, costoPensionalAdicionalMensual },
+    distanciaObjetivo: { valorObjetivo, delta, cumple },
+    limitaciones: [...],
+    razonDescartado: { codigo, mensaje, reglaAplicada } | null,
+  }],
+  orientacion: { caminoMasAlineadoId, codigo, razon },
+}
+```
+
+Cuando el perfil o los datos no son evaluables, mismo patrón que `generarCaminosRAIS.js`:
+`{ escenarios: [], orientacion: { caminoMasAlineadoId: null, codigo, razon } }`, con
+`codigo` uno de `PERFIL_NO_EVALUABLE` (únicamente `regimenActual !== 'RPM'` — sin
+restricción de `tipoCotizante`/`lugarCotizacion`/`trasladoRegimen`, confirmado por
+S4-001), `DATOS_INCOMPLETOS`, o `SIN_CAMINOS_VIABLES` (el camino base resulta
+`no_evaluable` vía `calcularProyeccionRPM` — se propaga, no se reinterpreta).
+
+## Corrección de auditoría — elegibilidad legal RPM y causa de la restricción (2026-08-21)
+
+Dos hallazgos de una auditoría adversarial de S4-003 (posterior al cierre de S4-002,
+`9af03c0`), que dejaron S4-003 **NO APTO PARA CIERRE** hasta resolverse. Documenta la
+corrección **antes** de implementarla, mismo criterio que el resto de este archivo.
+
+### Hallazgo 1 — proyección sin verificar elegibilidad legal RPM
+
+`generarCaminosRPM.js`/`calcularProyeccionRPM.js` no verificaban en ningún punto si
+`edadJubilacionDeseada` cumplía la edad mínima legal (Art. 33 Ley 100 de 1993) ni si la
+historia+horizonte proyectados alcanzaban las semanas mínimas — ni siquiera recibían
+`sexo`, dato indispensable para resolver ambos requisitos (diferenciados por sexo). Una
+persona podía proyectar una pensión concreta a una edad sin ningún sustento legal de
+reconocimiento bajo RPM, sin ninguna advertencia. **Decisión de producto (Carlos/Atlas,
+2026-08-21): PensionLab nunca presenta una cifra de pensión proyectada a una fecha en la
+que el usuario no cumpliría las condiciones legales de reconocimiento.**
+
+**Fuente legal reutilizada, sin hardcodear:** `obtenerEdadPension(fecha, sexo)` y
+`obtenerSemanasMinimas(fecha, sexo, 'RPM')` (`data/legal/index.js`) — ya parametrizados,
+ya usados en `evidenciaEdadPension.js`/`evidenciaSemanasMinimas.js`. Se llaman aquí
+directamente (mismo patrón que `calcularProyeccionRPM.js` ya usa con
+`obtenerSmlv`/`obtenerTopeMaximoIBC`), no a través de las funciones de evidencia de
+página — sus contratos están pensados para "hoy" (edad actual, semanas declaradas por el
+usuario), no para una fecha de reconocimiento futura ni para semanas proyectadas.
+
+**Fecha de resolución — distinción explícita, no un relajamiento del principio ya
+establecido:**
+
+- `obtenerSmlv`, `obtenerTopeMaximoIBC`, `obtenerParametrosTasaReemplazoRPM`,
+  `obtenerSemanasHabilitanAlternativaIBL` — **siguen congelados a `fecha`** (hoy). Sus
+  valores futuros son legalmente desconocidos (el SMLV lo fija el gobierno año a año,
+  sin cronograma) — proyectarlos sería inventar ley futura.
+- `obtenerEdadPension`, `obtenerSemanasMinimas` — **se resuelven a `fechaReconocimiento`**.
+  No es el mismo caso: `semanasMinimasPensionMujer` en `vigente-2026.json` es un
+  `cronograma-lineal` **ya vigente y jurídicamente parametrizado** (Sentencia C-197 de
+  2023: base 1250, decremento 25/año, piso 1000, desde 2026-01-01) — leer su valor en
+  `fechaReconocimiento` no es proyectar nada desconocido, es aplicar una regla que la ley
+  ya fijó para esa fecha. `edadPensionMujer`/`Hombre` son constantes sin cronograma (57/62,
+  `vigencia.hasta: null`), así que en la práctica de hoy esta distinción no cambia su
+  valor numérico — pero el criterio se aplica igual a ambos por consistencia, y protege
+  automáticamente el día en que exista un cronograma de edad. **No se infiere ni se
+  inventa ningún cambio legal distinto de los cronogramas ya vigentes en
+  `data/legal`** — si no hay cronograma, el valor resuelto en `fechaReconocimiento` es
+  idéntico al de `fecha`.
+
+**Dónde vive el chequeo:** enteramente en `generarCaminosRPM.js` (S4-003) — nunca en
+`calcularProyeccionRPM.js` (S4-002, ya cerrado). El chequeo de edad ocurre **antes** de
+la primera llamada a `calcularProyeccionRPM` (solo depende de `edadJubilacionDeseada` +
+`sexo` + `fechaReconocimiento`, calculable de inmediato vía `calcularFechaPorEdad`, ya
+exportado). El chequeo de semanas ocurre **después** de calcular el camino base (necesita
+`resultadoBase.semanasCotizadas.total`) — una sola vez: `semanasCotizadas.total` no
+depende de `escenarioIbcFuturo.valor` (invariante ya establecida en S4-002/S4-003), así
+que si el base cumple, cualquier alternativo de la bisección también cumple.
+
+**Nuevos códigos**, ambos vía `resultadoVacio` — `escenarios: []`, ninguna cifra de
+pensión se calcula ni se muestra:
+- `EDAD_JUBILACION_INFERIOR_A_EDAD_MINIMA_LEGAL`
+- `SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM`
+
+**`detalleElegibilidad`** — nuevo campo, opcional, en la salida de `generarCaminosRPM`
+(aditivo, no rompe ningún consumidor existente):
+```
+detalleElegibilidad: {
+  edadMinima, edadElegida, aniosFaltantes,                    // caso edad
+  semanasMinimas, semanasProyectadas, semanasFaltantes,        // caso semanas
+} | null
+```
+
+**Lenguaje de UI (decisión Carlos/Atlas):** nunca presentar la proyección como un hecho
+absoluto — distinguir explícitamente requisito legal de resultado de una proyección. Ej.:
+*"Con la historia y el escenario de cotización utilizados, a esa fecha proyectamos X
+semanas. El requisito legal aplicable es Y; faltarían Z semanas."*
+
+### Hallazgo 2 — restricción de costo no comunicada como causa
+
+El motor ya respeta correctamente la restricción de costo declarada (nunca la excede),
+pero cuando ella —no el objetivo en sí— es la causa de que un camino no cumpla, la UI
+solo mostraba "no alcanza tu objetivo", indistinguible de un objetivo genuinamente
+inalcanzable.
+
+**Corrección:** nueva limitación, `RESTRICCION_COSTO_LIMITA_RESULTADO`, agregada al
+array `limitaciones` del camino alternativo — calculable con datos que
+`generarCaminosRPM.js` ya tiene en memoria (`limiteIBCPorRestriccion < topeAplicado`,
+más `!distanciaObjetivo.cumple`), sin llamada adicional a `calcularProyeccionRPM`. Se
+renderiza automáticamente: `ProyectaTuPensionRPM.jsx` ya recorre `escenario.limitaciones`
+en la sección de notas — no requiere cambio de JSX, solo el nuevo dato.
+
+### Contrato de entrada actualizado
+
+```
+generarCaminosRPM({
+  regimenActual,
+  sexo,                    // NUEVO — 'Mujer' | 'Hombre'
+  historiaCotizacion,
+  fechaNacimiento,
+  edadJubilacionDeseada,
+  ibcAplicableSimulacion,
+  objetivoValorMensual,
+  restriccionCostoPensionalAdicionalMaximoMensual,
+  fecha,
+})
+```
+
+### Impacto sobre S4-002 y motores ya cerrados
+
+Ninguno. `calcularProyeccionRPM.js`, `formulaIBL.js`, `formulaRPM.js`,
+`seleccionarPeriodosIBL.js`, `evidenciaEdadPension.js`, `evidenciaSemanasMinimas.js`
+permanecen intactos. Límite de alcance declarado: si en el futuro algo llamara a
+`calcularProyeccionRPM` directamente sin pasar por `generarCaminosRPM` (hoy no ocurre —
+es su único consumidor real), no heredaría este gate automáticamente.

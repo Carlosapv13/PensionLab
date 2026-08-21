@@ -74,6 +74,7 @@ export const VISTAS_CONOCIDAS = [
   'exploraTuProyeccion',
   'historiaCotizacionRPM',
   'exploraTuProyeccionRPM',
+  'proyectaTuPensionRPM',
   'declaracionLibre',
   'revisionDeclaracion',
 ]
@@ -96,9 +97,24 @@ export const VISTAS_CONOCIDAS = [
 // generarCaminosRAIS.js. restriccionCostoPensionalAdicionalMaximoMensual
 // queda fuera a propósito: el dominio ya la trata como opcional (sin ella,
 // sin límite propio, no bloquea la generación de caminos).
+//
+// proyectaTuPensionRPM (S4-003): mismo criterio que exploraTuProyeccion, sin
+// saldoAcumulado (no aplica a RPM) — ver generarCaminosRPM.js. 'sexo' se agregó tras la
+// auditoría de elegibilidad (2026-08-21): indispensable para resolver edad/semanas
+// mínimas legales.
 export const CAMPOS_MINIMOS_POR_VISTA = {
   declaracionLibre: ['regimenActual', 'fechaNacimiento', 'sexo'],
   exploraTuProyeccionRPM: ['regimenActual', 'historiaCotizacion'],
+  proyectaTuPensionRPM: [
+    'regimenActual',
+    'sexo',
+    'historiaCotizacion',
+    'fechaNacimiento',
+    'edadJubilacionDeseada',
+    'certezaBaseCotizacion',
+    'valorBaseCotizacionDeclarado',
+    'objetivoPensionMensual',
+  ],
   exploraTuProyeccion: [
     'regimenActual',
     'tipoCotizante',

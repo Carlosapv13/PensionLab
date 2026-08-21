@@ -145,6 +145,9 @@ const TEXTO_DATOS_LEGALES_INSUFICIENTES =
  * @param {string} props.semanasCotizadas
  * @param {string | null} props.trasladoRegimen
  * @param {() => void} props.onVolver
+ * @param {(() => void) | undefined} [props.onContinuar] - Solo se ofrece cuando la
+ *   lectura histórica calculó (S4-003, ProyectaTuPensionRPM.jsx) — no cambia el alcance
+ *   de esta pantalla, que sigue siendo exclusivamente la lectura histórica.
  */
 function ExploraTuProyeccionRPM({
   historiaCotizacion,
@@ -153,6 +156,7 @@ function ExploraTuProyeccionRPM({
   semanasCotizadas,
   trasladoRegimen,
   onVolver,
+  onContinuar,
 }) {
   const sinHistoria = !historiaCotizacion || historiaCotizacion.length === 0
   const resultado = sinHistoria ? null : calcularPensionRPM({ historiaCotizacion })
@@ -251,6 +255,11 @@ function ExploraTuProyeccionRPM({
         <button type="button" className="btn btn-secondary" onClick={onVolver}>
           Volver
         </button>
+        {resultado && resultado.estado === 'calculado' && onContinuar && (
+          <button type="button" className="btn btn-primary" onClick={onContinuar}>
+            Proyectar hacia el futuro
+          </button>
+        )}
       </div>
     </form>
   )

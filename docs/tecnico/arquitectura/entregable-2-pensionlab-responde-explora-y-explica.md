@@ -359,10 +359,15 @@ supuestos:
    documentada y decidida para Sprint 1 (`trazabilidad-formula-RPM.md`). Se vuelve más
    visible al usuario en un camino proyectado que cruza ese umbral que en una lectura
    puramente histórica.
-5. **Monotonicidad aún no demostrada.** Que la pensión crezca de forma monótona respecto
-   al IBC futuro es razonable pero no está probado — necesario para confiar la bisección
-   de §7.3, debe validarse con casos de prueba reales antes de usarse, especialmente
-   cerca de los clamps de tasa de reemplazo y del tope de 25 SMLV.
+5. **Monotonicidad — validada (2026-08-20), contrato completo en
+   `src/domain/formulas/trazabilidad-formula-RPM.md`, sección "Monotonicidad de la
+   proyección respecto de escenarioIbcFuturo.valor (§8.5)".** Derivación analítica
+   (`pensión(IBL)` es una parábola con vértice muy por encima del tope legal alcanzable)
+   más verificación empírica exhaustiva (`monotonicidadProyeccionRPM.test.js`, barridos
+   de hasta 5.000 puntos, sin contraejemplo) confirman: estrictamente creciente en
+   `[ibcActual, topeAplicado)`, constante en `[topeAplicado, ∞)`. Habilita la bisección de
+   §7.3 dentro de `[ibcActual, topeAplicado]` — desbloquea la dependencia declarada en
+   §10 para S4-003.
 6. **Semanas futuras ligadas al calendario, no son una variable libre.** A diferencia
    del IBC (una decisión dentro de un rango legal), las semanas que se acumulan hasta el
    horizonte están determinadas por cuánto tiempo falta hasta la edad de jubilación
@@ -469,7 +474,7 @@ ningún Slice los redescubra desde cero ni los resuelva implícitamente en códi
 |---|---|---|---|---|---|---|---|
 | **S4-001** | Captura estructurada real de `historiaCotizacion` (sin Panel de Desarrollo) | Único bloqueo que impide usar hoy una capacidad **ya construida**; sin esto nada más es alcanzable por un usuario real | Ninguna | UI (+ estado en `App.jsx`) | Reutiliza tests de dominio existentes; añade tests de UI de captura/validación | **"Un usuario RPM perteneciente al perfil soportado puede introducir desde la UI una historia de cotización estructurada válida y alcanzar la lectura económica RPM existente sin utilizar fixtures ni Panel de Desarrollo."** Carlos es el primer caso real de validación, nunca una condición hardcodeada del producto. | 15% |
 | **S4-002** | `calcularProyeccionRPM.js` — camino base con horizonte futuro | Requiere resolver primero la convención económica RPM (§14.1) antes de generar alternativas | S4-001 + decisión obligatoria §14.1 | `domain/pensionEngine/` (nuevo archivo) | Casos numéricos de referencia nuevos, incl. horizonte >10 años y <10 años | Pensión proyectada verificable a mano, con limitaciones declaradas (sin IPC/SMLV futuro inventado) | 30% |
-| **S4-003** | Objetivo/restricción RPM capturables + búsqueda determinista del IBC necesario (camino base + alternativo) | La búsqueda solo evalúa la función de S4-002 repetidamente | S4-002 + validación de monotonicidad (§8.5) | `domain/pensionEngine/generarCaminosRPM.js`, UI (reusa `CampoMonetario`) | Tests de bisección (convergencia, casos límite en clamps/tope) + tests análogos a `generarCaminosRAIS.test.js` | Con un objetivo declarado, el sistema entrega camino base + alternativo viable (o explica honestamente por qué no es alcanzable) | 45% |
+| **S4-003** | Objetivo/restricción RPM capturables + búsqueda determinista del IBC necesario (camino base + alternativo) | La búsqueda solo evalúa la función de S4-002 repetidamente | S4-002 + validación de monotonicidad (§8.5) — **resuelta (2026-08-20)**, sin bloqueos pendientes para iniciar | `domain/pensionEngine/generarCaminosRPM.js`, UI (reusa `CampoMonetario`) | Tests de bisección (convergencia, casos límite en clamps/tope) + tests análogos a `generarCaminosRAIS.test.js` | Con un objetivo declarado, el sistema entrega camino base + alternativo viable (o explica honestamente por qué no es alcanzable) | 45% |
 | **S4-004** | Comparación visual esfuerzo↔resultado (2 caminos) | Requiere caminos reales ya calculados; la UI solo visualiza, no recalcula | S4-003 | UI únicamente | Prueba visual manual + test de que el componente no transforma los datos recibidos | Una persona sin explicación previa identifica cuál camino exige más esfuerzo y cuál se acerca más a la meta | 60% |
 | **S4-005** | Barrido de caminos intermedios (rejilla determinista) | Extiende densidad de datos sobre una capacidad ya demostrada, no cálculo nuevo | S4-003, S4-004 | Pequeña extensión de `generarCaminosRPM.js` | Determinismo/reproducibilidad del barrido | El gráfico muestra ≥4-5 puntos y una persona señala visualmente dónde el esfuerzo deja de rendir proporcionalmente | 72% |
 | **S4-006** | Inquietud libre → interpretación IA → confirmación → expediente | Deliberadamente al final del núcleo determinista (Regla 1, §6): nada que interpretar hacia hasta que el motor exista y sea confiable | S4-003 (el formulario que la IA pre-llena) + decisión pendiente §14.3 (servicio de IA) | Capa nueva fuera de `domain/` + pantalla de confirmación | Casos de interpretación incorrecta corregidos por el usuario → mismo resultado final que captura manual | Alex escribe su inquietud, confirma, y llega a la misma comparación visual sin guía de Carlos — Prueba Alex | 85% |

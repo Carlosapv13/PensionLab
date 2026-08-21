@@ -897,3 +897,175 @@ futuro, no bloqueante para este cierre; no se corrigió sin aprobación explíci
   Carlos/Atlas de mantenerlo simple para este Slice.
 - Explicación en lenguaje natural de por qué cada punto del barrido produce el resultado
   que produce — capacidad de S4-007 (Explicación IA), no de este Slice.
+
+---
+
+## Cierre de residuo heredado — Capacidad de reconocimiento (v1 dormida)
+
+**Estado:** ✅ Cerrada como capacidad dormida — pendiente de commit de cierre.
+
+**No es un Slice de la hoja de ruta del Entregable 2** (no lleva numeración `S4-00x`):
+es la resolución formal de un residuo del working tree heredado de Sprint 3, cuyo cierre
+había quedado explícitamente pendiente en `docs/gestion/cierre-sprint-3.md` (sección
+"Constancia: residuos del working tree deliberadamente excluidos").
+
+### Qué problema buscaba resolver esta capacidad
+
+Sucesora de la antigua "Capacidad C" (interpretar la declaración libre de
+`DeclaracionLibre.jsx`). Un análisis arquitectónico dedicado, ya cerrado en
+`cierre-sprint-3.md` ("Pausa de Sprint 3 — Redefinición de la Capacidad C y frontera de
+PerfilDecision"), concluyó que "Capacidad C" no tenía responsabilidad propia como nombre
+único, y redistribuyó el trabajo en una **capacidad de reconocimiento** (también referida,
+en ese mismo análisis, como **"zona de mediación"** entre la Capacidad B —
+`DeclaracionLibre`, captura fiel, nunca interpreta— y `PerfilDecision` — Bloque 3, contrato
+puro de decisiones ya confirmadas, nunca representa ambigüedad). Su responsabilidad es
+exclusivamente mediar entre esos dos extremos, con dos etapas internas:
+
+- **(a) Reconocimiento de aptitud** — ¿hay materia pensional operable? Autoridad exclusiva
+  del sistema, de naturaleza cercana a una validación (Principio 11) aplicada a
+  pertinencia de dominio, no a formato. **Única etapa con código hoy** (`evaluarAptitud.js`).
+- **(b) Resolución de estructura** — ¿cuántos asuntos contiene la declaración y tienen
+  precisión suficiente para formularse? Autoridad compartida (el sistema constata la
+  forma, nunca decide cuál asunto es prioritario ni rellena lo que falta — Principio 12).
+  **Sin código, sin diseñar, fuera de alcance de este cierre.**
+
+La formulación propuesta y la confirmación de la persona **no son parte de esta
+capacidad** — pertenecen conceptualmente al Bloque 3 (`PerfilDecision`), que sigue siendo
+un contrato dormido, sin desarrollo nuevo.
+
+### Estados que la capacidad puede producir hoy
+
+Únicamente, vía `evaluarDeclaracion()`:
+
+- `{ declaracionOriginal: { tipo: 'ausencia' } }` — la persona declaró explícitamente que
+  no tiene nada puntual que plantear.
+- `{ declaracionOriginal: { tipo: 'contenido', texto }, aptitud: { estado: 'no_apto', ... } }`
+  — texto reconocido como ruido/relleno inequívocamente detectable (repetición literal),
+  o un texto que no es una cadena válida.
+- `{ declaracionOriginal: { tipo: 'contenido', texto }, aptitud: { estado: 'indeterminado', ... } }`
+  — cualquier texto sustantivo, sea o no efectivamente pensional (C-v1 no tiene fundamento
+  para distinguirlas, y no lo finge).
+- `{ declaracionOriginal: null }` — entrada no reconocida (`null`, `undefined`, objeto sin
+  `tipo` válido) — ver corrección de esta ronda, abajo.
+
+**`apto` no es un valor producible en v1, deliberadamente.** Determinar con comprensión
+real si un texto es "materia pensional" requeriría una capacidad semántica (comprensión de
+lenguaje natural) que PensionLab no tiene hoy. No existe ninguna regla determinista y no
+arbitraria que lo resuelva sin caer en una lista de palabras clave — y **eso está
+explícitamente prohibido**: ninguna heurística de palabras clave pensionales existe ni se
+introdujo en este cierre. Por eso `apto` se omite del contrato en vez de declararse como un
+caso que nunca se dispara.
+
+**Historial relevante:** esta es la segunda implementación de la etapa (a). La primera
+(commit `6159389`, 2026-08-06) resolvía tres estados (incluido `apto`) mediante "léxicos
+fijos y longitud de texto" — un mecanismo de palabras clave, y fue revertida el mismo día
+(`1d86621`). La versión actual corrige exactamente ese defecto: elimina `apto` del
+contrato de v1 y cualquier heurística de palabras clave — ver el razonamiento explícito en
+el propio `evaluarAptitud.js`.
+
+### Qué queda cerrado en esta ronda
+
+**Alcance aprobado explícitamente por Carlos:** cerrar la capacidad de reconocimiento
+como **dormida**, en su alcance v1 reducido ya existente — sin tocar `App.jsx`,
+`Objetivo.jsx`, navegación, la etapa (b) de resolución de estructura, ni intentar producir
+el estado `apto`. Sin IA ni heurísticas de palabras clave nuevas.
+
+**Corrección aplicada — gap defensivo de `evaluarDeclaracion.js` (Principio 11):**
+verificado en vivo antes de esta ronda que `evaluarDeclaracion(null)`,
+`evaluarDeclaracion(undefined)` y cualquier `declaracion` con `tipo` desconocido se
+coercionaban silenciosamente a `{tipo: 'contenido', texto: ''}`, evaluando aptitud sobre
+un texto que en realidad nunca llegó — confundiendo "no hay dato" con "el usuario escribió
+ruido", dos hechos distintos. Corregido: esas tres formas ahora producen
+`{ declaracionOriginal: null }`, sin `aptitud` — mismo tratamiento que ya recibía
+`{tipo: 'ausencia'}` en cuanto a omitir el campo `aptitud`, pero distinguible de él.
+`null` reutiliza a propósito el mismo valor que el tipo del prop `declaracion` de
+`DeclaracionLibre.jsx` ya admite para "nada capturado todavía" — no se introdujo un tercer
+estado nuevo ni ninguna comprensión semántica adicional. El caso `{tipo: 'contenido',
+texto: <no-string>}` permanece sin cambios (ya defendido por `evaluarAptitud.js` desde
+antes), por seguir dentro de una forma reconocida — el gap corregido era exclusivamente
+sobre formas no reconocidas en absoluto.
+
+**Revertido — wiring de `RevisionDeclaracionTemporal.jsx`:** el cambio no comprometido de
+esta sesión que hacía a esa pantalla consumir `evaluarDeclaracion` se revirtió por
+completo (`git checkout HEAD --`), dejándola exactamente como estaba: el placeholder
+original, sin consumir la capacidad de reconocimiento. La capacidad queda **sin
+consumidor**, conforme a la decisión ya aprobada en el cierre de Sprint 3 ("Alternativa
+D" — conservar el código, sin conectarlo a ningún consumidor).
+
+### Archivos que forman parte de este cierre
+
+- `src/domain/reconocimiento/evaluarAptitud.js` — sin cambios en esta ronda (ya
+  correcto: `no_apto`/`indeterminado`, sin léxico de palabras clave, sin `apto`).
+- `src/domain/reconocimiento/evaluarAptitud.test.js` — sin cambios.
+- `src/domain/reconocimiento/evaluarDeclaracion.js` — corrección del gap defensivo
+  descrita arriba.
+- `src/domain/reconocimiento/evaluarDeclaracion.test.js` — 6 tests nuevos para `null`,
+  `undefined`, llamada sin argumento, objeto vacío, `tipo` desconocido, y el caso límite
+  de `{tipo: 'contenido'}` sin `texto` (que **no** colapsa a `null`, por seguir dentro de
+  una forma reconocida).
+
+**Explícitamente fuera de este cierre — no tocados:**
+- `src/pages/DeclaracionLibre.jsx`, `src/App.jsx`, `src/pages/Objetivo.jsx` — intactos.
+- `src/pages/RevisionDeclaracionTemporal.jsx` — revertido a su estado original (ver
+  arriba), no modificado con contenido nuevo.
+- `src/pages/InformacionPensionalEsencial.jsx` — residuo independiente, sin relación con
+  esta capacidad (ajuste de `className` ya documentado en `cierre-sprint-3.md` como
+  pendiente de su propia decisión).
+- `docs/producto/oportunidades-futuras.md` y los dos `.docx` de la Biblioteca de
+  Conocimiento — residuos sin relación con esta capacidad, sin tocar.
+
+### Estado final de la capacidad
+
+**Implementada en su alcance v1 reducido, determinista, honesto, probada y dormida** —
+preparada como frontera arquitectónica para una evolución posterior, pero **no disponible
+en la experiencia del usuario**: ningún archivo de `App.jsx`, `Objetivo.jsx` ni ninguna
+otra pantalla activa la importa o la invoca (**sin consumidor**); `DeclaracionLibre.jsx` y
+`RevisionDeclaracionTemporal.jsx` permanecen fuera de la navegación (`vista ===
+'declaracionLibre'`/`'revisionDeclaracion'` no tienen bloque de render en `App.jsx`), sin
+cambios respecto al estado ya aprobado en el cierre de Sprint 3.
+
+**Este cierre no implementa IA, ni la convierte en una obligación técnica futura.** Una
+evolución posterior podrá "despertar" esta frontera —completando la etapa (b) de
+resolución de estructura y/o un mecanismo real de promoción `indeterminado → apto`—
+**únicamente cuando exista una capacidad de interpretación suficientemente respaldada**
+(sea o no asistida por IA; ese mecanismo concreto no se elige ni se compromete aquí). Hasta
+entonces, la frontera se conserva correctamente definida y probada, sin construir nada por
+encima de lo que hoy puede respaldarse honestamente (Principio 9).
+
+**Nota sobre `docs/producto/oportunidades-futuras.md`:** ese archivo también contiene, sin
+comitear, una entrada relacionada con esta capacidad ("Comprensión semántica de texto
+libre") — pero está mezclada en un único diff con al menos otras tres oportunidades no
+relacionadas (PensionLab para profesionales, comparación/validación de caminos ya
+conocidos, estrategia pensional viva), en un solo hunk contiguo de reescritura del
+archivo completo, sin frontera limpia para separar solo lo relevante. Se deja
+**íntegramente fuera de este cierre** (ver "Explícitamente fuera de este cierre" arriba) —
+este documento es autosuficiente y no depende de esa entrada para quedar completo.
+
+### Tests y verificación
+
+- `npm test` (`src/domain/reconocimiento/`) — **28/28** en verde (22 preexistentes + 6
+  nuevos).
+- `npm test` (suite completa) — **529/529** en verde (31 archivos).
+- `npm run lint` — sin errores.
+- `npm run build` — build de producción exitoso.
+
+### Decisiones tomadas en este cierre
+
+1. La capacidad se cierra dormida, no se retoma ni se retira — mismo tratamiento
+   "conservar sin conectar" ya aprobado en Sprint 3, ahora formalizado con commit.
+2. El gap de `null`/`undefined`/tipo desconocido se resuelve con `declaracionOriginal:
+   null`, reutilizando un valor ya significativo en el tipo del prop de
+   `DeclaracionLibre.jsx`, en vez de inventar un tercer estado de aptitud o un código de
+   error nuevo — cambio mínimo, coherente con el contrato ya existente.
+3. `RevisionDeclaracionTemporal.jsx` vuelve a ser un placeholder puro — cualquier
+   wiring real a esta capacidad requiere su propia decisión y su propia revisión,
+   igual que reconectar la navegación misma.
+
+### Pendiente, si se retoma en el futuro
+
+- Etapa (b), resolución de estructura — sin diseñar, deliberadamente.
+- Mecanismo real (no léxico) de promoción `indeterminado → apto` — sin evidencia de que
+  exista todavía, no se inventa aquí (Principio 9).
+- Reconectar `DeclaracionLibre`/`RevisionDeclaracionTemporal` a `App.jsx` y una opción de
+  `Objetivo.jsx` que lleve ahí — requiere evidencia real de que alguien necesita declarar
+  texto libre, hoy inexistente (Principio 9).

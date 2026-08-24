@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Secretos locales (S4-006: OPENAI_API_KEY, OPENAI_MODEL) — .env.example queda versionado
+# a propósito, sin valores reales; ningún .env real debe comitearse jamás.
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

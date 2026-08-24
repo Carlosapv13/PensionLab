@@ -1069,3 +1069,214 @@ este documento es autosuficiente y no depende de esa entrada para quedar complet
 - Reconectar `DeclaracionLibre`/`RevisionDeclaracionTemporal` a `App.jsx` y una opción de
   `Objetivo.jsx` que lleve ahí — requiere evidencia real de que alguien necesita declarar
   texto libre, hoy inexistente (Principio 9).
+
+---
+
+## Slice S4-006 — Inquietud libre → interpretación IA → confirmación → expediente
+
+**Estado:** ✅ Cerrado y aprobado — commit de cierre de este mismo Slice en
+`sprint-3-mvp-headless` (el identificador definitivo queda registrado en el historial
+Git, ya que este documento forma parte de ese mismo commit).
+
+### Objetivo
+
+Que una persona exprese en lenguaje natural algo que le gustaría resolver sobre su
+futuro pensional, que PensionLab interprete de ahí exclusivamente los campos que el
+dominio ya sabe consumir (`objetivoPensionMensual`, `restriccionCostoPensionalAdicionalMaximoMensual`,
+`edadJubilacionDeseada`), y que la persona revise/corrija antes de que cualquier valor
+entre al expediente — sin que la IA decida nunca qué necesita el motor ni calcule nada
+ella misma (frontera IA↔dominio, §6 del Entregable 2). Reactiva la "Capacidad B"
+(`DeclaracionLibre.jsx`) que el cierre de residuo anterior (arriba) dejó deliberadamente
+dormida y sin consumidor.
+
+### Diseño final: interpretar → completar solo lo que falta → una acción → resultado
+
+Precisión de producto aprobada a mitad de este Slice sustituyó el diseño inicial de dos
+pantallas separadas (`DeclaracionLibre.jsx` → "Interpretar" → `RevisionDeclaracionTemporal.jsx`
+→ "Confirmar" → otro formulario) por un único flujo reactivo, bajo el principio "cada
+interacción debe acercar a una respuesta útil, no simplemente completar el expediente" +
+"PensionLab no debe volver a preguntar algo que ya sabe":
+
+1. **Interpretación reactiva con debounce** (800ms) dentro de la misma pantalla —
+   `interpretarDeclaracion()` (`src/ia/`) nunca escribe nada por sí sola, solo alimenta
+   un borrador local. Cada solicitud lleva un token incremental; una respuesta que ya no
+   es la vigente al resolver se descarta por completo, nunca pisa un borrador más
+   reciente (regresión reproducida y probada).
+2. **`determinarCamposFaltantesObjetivoRPM.js`** (nuevo, `domain/`) — capa determinista
+   que compara requisitos ya exigidos por `generarCaminosRPM.js` contra lo confirmado en
+   el expediente y el borrador en construcción, y decide qué falta realmente. Solo pide
+   estructuralmente lo que falta; `restriccionCostoPensionalAdicionalMaximoMensual` nunca
+   se exige (opcional por diseño del dominio).
+3. **CTA único** ("Usar estos datos y explorar mis opciones") — confirma explícitamente
+   los valores (interpretados o completados a mano) y avanza a `proyectaTuPensionRPM`,
+   la capacidad determinista que los consume.
+
+### Fuente compartida de requisitos — evita una segunda fuente de verdad
+
+Diagnóstico arquitectónico dedicado (antes de implementar) encontró que los requisitos
+de `objetivoValorMensual`/`edadJubilacionDeseada` vivían únicamente como guard clauses
+inline en `generarCaminosRPM.js`. Se extrajo el subconjunto mínimo real —dos
+predicados, no una reimplementación del motor— a
+`src/domain/pensionEngine/requisitosDatosImprescindiblesRPM.js`, consumido por
+`generarCaminosRPM.js` y por `determinarCamposFaltantesObjetivoRPM.js` desde la misma
+fuente. Sexo, IBC, régimen, elegibilidad legal, semanas e historia permanecen
+exclusivos de `generarCaminosRPM.js` — nunca generalizados (Principio 9).
+
+### Corrección de UX post-revisión visual — resultado protagonista, no un segundo formulario
+
+La primera revisión visual completa (Carlos) detectó que, al pulsar el CTA,
+`ProyectaTuPensionRPM.jsx` volvía a mostrar sus tres campos como un formulario abierto
+antes del resultado — aunque el resultado ya estaba calculado (`generarCaminosRPM` se
+ejecuta de forma síncrona en cada render, no en un submit). Corregido sin tocar
+navegación ni `generarCaminosRPM.js`: `ProyectaTuPensionRPM.jsx` colapsa su formulario
+por defecto cuando, al montar, `determinarCamposFaltantesObjetivoRPM` ya no encuentra
+nada faltante (mismo criterio compartido, nunca reimplementado), mostrando primero el
+resultado del dominio con un botón "Editar" siempre disponible para reabrirlo — la otra
+entrada real a esa pantalla (`historiaCotizacionRPM → exploraTuProyeccionRPM`, sin datos
+capturados todavía) conserva el formulario abierto exactamente como antes. Además, el
+input de restricción económica se oculta como paso principal específicamente cuando el
+resultado es `SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM` (`debeOcultarRestriccion`,
+`ProyectaTuPensionRPM.helpers.js`): el diagnóstico confirmó que ese dato no puede
+afectar ese resultado (`generarCaminosRPM.js` retorna antes de leerlo).
+
+### Bug de validación de edad — "6" mientras se escribe "62"
+
+Segunda revisión visual (Carlos) detectó que un solo dígito parcial ("6", tecleando
+"62") bastaba para declarar "ya tenemos lo necesario para explorar tu meta" y habilitar
+el CTA. Causa raíz: `edadJubilacionDeseadaEsValida` solo valida forma (dato
+sintácticamente válido — cualquier número finito), y `determinarCamposFaltantesObjetivoRPM.js`
+la usaba como si bastara para decidir "listo para avanzar". Corregido sin inventar un
+umbral arbitrario ni duplicar la regla legal de edad mínima (`obtenerEdadPension`,
+exclusiva de `generarCaminosRPM.js`): se agregó `edadJubilacionDeseadaEsUtilizable(valor,
+edadActual)` a la misma fuente compartida, componiendo el predicado sintáctico con el
+mismo criterio contextual (edad > edad actual real de la persona, <= 100 años) que ya
+usaba `ProyectaTuPensionRPM.jsx` — ahora también consumido por `DeclaracionLibre.jsx`
+(que gana `fechaNacimiento` como prop de solo lectura para resolver `edadActual`, sin
+invocar el motor). Corrección verificada visualmente por Carlos con el mismo fixture.
+
+### Semántica de edad unificada
+
+`edadJubilacionDeseada` es una edad de exploración/proyección de escenario, nunca una
+promesa de la edad real de jubilación. El copy de `DeclaracionLibre.jsx` se unificó con
+la redacción ya establecida en `ProyectaTuPensionRPM.jsx`/`generarCaminosRPM.js`
+("¿Hasta qué edad te gustaría explorar tu proyección?"), en vez de una tercera variante
+introducida a mitad de este Slice y corregida antes del cierre.
+
+### Archivos creados
+
+- `src/ia/contratos/interpretacionDeclaracion.schema.js` (+ test) — Structured Output
+  cerrado: cero texto libre del modelo, solo números/enum/códigos.
+- `src/ia/adaptadores/AdaptadorInterpretacionIA.js` — puerto único del contrato.
+- `src/ia/adaptadores/AdaptadorSimulado.js` — adaptador de tests/dev, sin red.
+- `src/ia/adaptadores/AdaptadorViaServidor.js` (+ test) — adaptador de producción, habla
+  exclusivamente con `api/interpretar-declaracion.js` propio, nunca con OpenAI desde el
+  navegador.
+- `src/ia/interpretarDeclaracion.js` (+ test) — orquestador: filtro previo determinista
+  (`evaluarAptitud.js`, ya cerrado) antes de invocar cualquier adaptador.
+- `src/ia/construirTextoConfirmacion.js` (+ test) — texto que ve la persona,
+  determinístico, nunca prosa del modelo.
+- `src/ia/validarConsistenciaInterpretacion.js` (+ test) — descarta una respuesta
+  schema-válida pero semánticamente incoherente.
+- `api/_lib/AdaptadorOpenAI.js` (+ test), `api/_lib/validarPeticion.js` (+ test),
+  `api/interpretar-declaracion.js` (+ test) — función serverless de producción; el
+  cliente nunca ve `OPENAI_API_KEY`.
+- `src/dev/adaptadorInterpretacionDesarrollo.js` (+ test) — simulador determinista
+  exclusivo de desarrollo, excluido del bundle de producción (verificado por grep sobre
+  `dist/`).
+- `src/domain/determinarCamposFaltantesObjetivoRPM.js` (+ test).
+- `src/domain/pensionEngine/requisitosDatosImprescindiblesRPM.js` (+ test).
+- `src/hooks/useDebounce.js`.
+- `src/pages/DeclaracionLibre.helpers.js` (+ test) — fusión de borrador, confirmación al
+  expediente, parseo.
+- `.env.example` — `OPENAI_API_KEY`/`OPENAI_MODEL`, sin valores reales.
+
+### Archivos modificados
+
+- `src/pages/DeclaracionLibre.jsx` — reescrita: fusiona lo que antes eran dos pantallas.
+- `src/pages/ProyectaTuPensionRPM.jsx` / `.helpers.js` (+ test) — colapso condicional del
+  formulario, supresión de restricción en el estado de semanas insuficientes.
+- `src/domain/pensionEngine/generarCaminosRPM.js` — consume la fuente compartida de
+  requisitos; sin cambio de comportamiento (mismos tests en verde).
+- `src/App.jsx` — wiring del CTA hacia `proyectaTuPensionRPM`, props nuevas
+  (`fechaNacimiento` a `DeclaracionLibre`); ya no renderiza `revisionDeclaracion`.
+- `src/dev/estadoApp.js` — `revisionDeclaracion` retirada de `VISTAS_CONOCIDAS`.
+- `src/dev/fixtures.js` — fixture de S4-006 más una segunda variante
+  (`rpm-empleado-declaracion-libre-s4-006-sin-datos-previos`) para revisar el caso de
+  "dato faltante" sin editar el expediente a mano.
+- `.gitignore` — excluye `.env`/`.env.*`, versiona `.env.example`.
+- `eslint.config.js` — globals de Node para `api/**/*.js` (serverless, nunca empaquetado
+  por Vite).
+- `src/App.css` — estilos de confirmación de interpretación; retirada la clase huérfana
+  de `RevisionDeclaracionTemporal.jsx`.
+
+### Archivo retirado
+
+- `src/pages/RevisionDeclaracionTemporal.jsx` (+ su `.helpers.js`/`.helpers.test.js`,
+  nunca comiteados) — su responsabilidad se fusionó por completo en
+  `DeclaracionLibre.jsx`; la vista `revisionDeclaracion` ya no existe en `App.jsx`.
+
+### Tests y verificación
+
+- `npm test` (específicos de S4-006: `src/ia/`, `api/`, adaptador de desarrollo,
+  `determinarCamposFaltantesObjetivoRPM`, `requisitosDatosImprescindiblesRPM`,
+  `generarCaminosRPM`, `DeclaracionLibre.helpers`, `ProyectaTuPensionRPM.helpers`) —
+  **216/216** en verde (14 archivos).
+- `npm test` (suite completa) — **718/718** en verde (45 archivos).
+- `npm run lint` — sin errores.
+- `npm run build` — build de producción exitoso; confirmado por grep sobre
+  `dist/assets/*.js` que el árbol exclusivo de desarrollo (`PanelDesarrollo`,
+  `adaptadorInterpretacionDesarrollo`) no llega al bundle.
+- Revisión visual manual de Carlos, en dos rondas, con los fixtures de desarrollo de
+  S4-006: interpretación reactiva de "Quiero pensionarme con al menos 3.500.000 al mes."
+  (objetivo detectado, edad pedida como único faltante); "6" parcial no habilita el CTA;
+  "62" completo sí; el CTA lleva a `ProyectaTuPensionRPM` mostrando el resultado del
+  dominio como contenido principal (caso validado: semanas proyectadas 1230, requisito
+  1300, faltan 70 — sin pedir restricción económica en ese estado).
+
+### Decisiones tomadas en este Slice
+
+1. La IA interpreta lenguaje natural y nunca decide qué necesita el motor ni calcula —
+   esa frontera (§6 del Entregable 2) se mantuvo sin excepciones en todo el Slice.
+2. Los requisitos de "dato imprescindible" para `objetivoValorMensual`/
+   `edadJubilacionDeseada` tienen una única fuente compartida
+   (`requisitosDatosImprescindiblesRPM.js`) entre `generarCaminosRPM.js` y
+   `determinarCamposFaltantesObjetivoRPM.js` — decisión explícita para evitar una
+   segunda fuente de verdad, tomada antes de implementar, no como limpieza posterior.
+3. La elegibilidad legal (edad mínima, semanas mínimas) permanece exclusiva de
+   `generarCaminosRPM.js` — nunca se duplicó ni se convirtió en una condición de validez
+   de entrada; sigue siendo un resultado informativo del dominio.
+4. `restriccionCostoPensionalAdicionalMaximoMensual` sigue siendo opcional en todo
+   estado salvo cuando el resultado es semanas insuficientes, donde se oculta como paso
+   principal por ser irrelevante para ese resultado — nunca se le exige a la persona.
+5. `edadJubilacionDeseada` se comunica consistentemente como edad de
+   exploración/proyección de escenario, nunca como promesa de la edad real de
+   jubilación.
+6. Sigue sin haber, a propósito, ningún botón del recorrido real que lleve HASTA
+   `declaracionLibre` — la integración a la navegación pública es una decisión de
+   producto todavía no tomada (ver diagnóstico correspondiente), fuera del alcance de
+   este cierre. Alcanzable hoy únicamente vía Panel de Desarrollo / fixtures.
+
+### Fuera de alcance de este Slice
+
+- Dónde en el recorrido real un usuario entra a `declaracionLibre` — no decidido,
+  deliberadamente (tres puntos técnicamente posibles quedaron identificados en el
+  diagnóstico previo a la implementación, sin elegir ninguno).
+- Editar la declaración después de confirmar (`confirmado === true`) — la pantalla se
+  congela en su mensaje de confirmación, mismo criterio que la versión anterior.
+- `ETIQUETA_CAMPO.edadJubilacionDeseada` en `construirTextoConfirmacion.js` conserva la
+  redacción "Edad de jubilación deseada" — inconsistencia de copy detectada pero
+  dejada sin tocar porque, hoy, ningún consumidor real renderiza ese valor
+  (`camposParaMostrar` no se consume desde ninguna pantalla activa) — no genera
+  inconsistencia visible todavía; queda señalada para una futura pasada.
+- **Prueba Alex (§12 del Entregable 2)** — la revisión visual de este cierre fue
+  realizada por Carlos; la prueba independiente de un segundo caso real, sin su guía, es
+  un criterio de aceptación a nivel de Entregable 2 completo (§11), no un bloqueo para
+  cerrar este Slice individualmente — mismo tratamiento ya dado a "Carlos como primer
+  caso real" en el cierre de S4-001.
+- S4-007 (Explicación IA de cada camino) — no iniciado.
+
+### Pendiente para el siguiente Slice
+
+- **S4-007** — Explicación IA de cada camino sobre datos ya producidos, la última
+  capacidad del Entregable 2. Depende de S4-004/S4-005 (ya cerrados) y, idealmente, de
+  S4-006 (ahora cerrado) — sin bloqueos pendientes documentados para iniciarlo.

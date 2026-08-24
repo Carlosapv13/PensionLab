@@ -18,6 +18,7 @@ import ExploraTuProyeccion from './pages/ExploraTuProyeccion.jsx'
 import HistoriaCotizacionRPM from './pages/HistoriaCotizacionRPM.jsx'
 import ExploraTuProyeccionRPM from './pages/ExploraTuProyeccionRPM.jsx'
 import ProyectaTuPensionRPM from './pages/ProyectaTuPensionRPM.jsx'
+import DeclaracionLibre from './pages/DeclaracionLibre.jsx'
 import { tienePrimeraLecturaValor } from './domain/tienePrimeraLecturaValor.js'
 
 // Import estático, pero solo se monta bajo import.meta.env.DEV (ver el
@@ -27,6 +28,13 @@ import { tienePrimeraLecturaValor } from './domain/tienePrimeraLecturaValor.js'
 // su árbol de dependencias (src/dev/**). Exclusivamente de desarrollo.
 import PanelDesarrollo from './dev/PanelDesarrollo.jsx'
 import { construirSettersEdicion } from './dev/construirSettersEdicion.js'
+import { crearAdaptadorInterpretacionDesarrollo } from './dev/adaptadorInterpretacionDesarrollo.js'
+
+// Misma instancia reutilizada en cada render — nunca sustituye el adaptador de producción
+// de DeclaracionLibre.jsx (AdaptadorViaServidor, su valor por defecto): solo se pasa como
+// prop explícita más abajo, exclusivamente dentro del árbol import.meta.env.DEV, para poder
+// revisar S4-006 en el navegador sin consumir la API real de OpenAI.
+const adaptadorInterpretacionDesarrollo = import.meta.env.DEV ? crearAdaptadorInterpretacionDesarrollo() : null
 
 function App() {
   const [vista, setVista] = useState('bienvenida')
@@ -544,6 +552,34 @@ function App() {
             setRestriccionCostoPensionalAdicionalMaximoMensual
           }
           onVolver={() => setVista('exploraTuProyeccionRPM')}
+        />
+      )}
+
+      {/* Precisión de producto S4-006 (2026-08-23): DeclaracionLibre.jsx ahora embebe
+          interpretación reactiva + revisión + solo los controles de lo que realmente falta
+          + CTA final ("Usar estos datos y explorar mis opciones") — RevisionDeclaracionTemporal.jsx
+          se retiró, su responsabilidad se fusionó aquí. onVolver conserva el mismo destino
+          que ya tenía (queDeterminaResultado). onContinuar avanza a proyectaTuPensionRPM —
+          la capacidad determinista que consume exactamente edadJubilacionDeseada/
+          objetivoPensionMensual/restricción — solo tras el clic explícito en el CTA, nunca
+          antes. Sigue sin haber, a propósito, ningún botón del recorrido real que lleve
+          HASTA declaracionLibre (ver diagnóstico previo): alcanzable hoy únicamente vía
+          Panel de Desarrollo / fixtures. */}
+      {vista === 'declaracionLibre' && (
+        <DeclaracionLibre
+          declaracion={declaracionLibre}
+          onCambiarDeclaracion={setDeclaracionLibre}
+          onVolver={() => setVista('queDeterminaResultado')}
+          onContinuar={() => setVista('proyectaTuPensionRPM')}
+          objetivoPensionMensual={objetivoPensionMensual}
+          onCambiarObjetivoPensionMensual={setObjetivoPensionMensual}
+          edadJubilacionDeseada={edadJubilacionDeseada}
+          onCambiarEdadJubilacionDeseada={setEdadJubilacionDeseada}
+          fechaNacimiento={fechaNacimiento}
+          onCambiarRestriccionCostoPensionalAdicionalMaximoMensual={
+            setRestriccionCostoPensionalAdicionalMaximoMensual
+          }
+          {...(import.meta.env.DEV ? { adaptador: adaptadorInterpretacionDesarrollo } : {})}
         />
       )}
       </AppShell>

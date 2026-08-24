@@ -19,11 +19,43 @@
 //
 // El resultado nunca se llama "tu pensión" — es una proyección bajo un escenario
 // (LIMITACION_NO_ES_TU_PENSION_FINAL, ya declarada por calcularProyeccionRPM.js).
+//
+// Precisión de producto S4-006 (2026-08-23): cuando esta pantalla se alcanza con
+// objetivoPensionMensual/edadJubilacionDeseada YA confirmados (típicamente desde
+// DeclaracionLibre.jsx), el formulario de esos dos campos empieza colapsado —
+// mostrarFormulario se inicializa una sola vez, al montar, reutilizando el mismo
+// determinarCamposFaltantesObjetivoRPM.js ya compartido con DeclaracionLibre.jsx (nunca se
+// reimplementa ese criterio aquí). El resultado ya calculado (generarCaminosRPM se sigue
+// ejecutando de forma síncrona en cada render, sin cambios) queda así como lo primero
+// relevante que se ve, sin repetir un formulario con datos que la persona acaba de dar. La
+// otra entrada real a esta pantalla (historiaCotizacionRPM → exploraTuProyeccionRPM, sin
+// nada capturado todavía) sigue viendo el formulario abierto exactamente como antes, porque
+// ahí determinarCamposFaltantesObjetivoRPM sí encuentra campos faltantes al montar. Un
+// botón "Editar" siempre disponible cuando está colapsado permite volver a abrirlo — el
+// formulario nunca se elimina, solo deja de ser lo primero que se muestra cuando no hace
+// falta. restriccionCostoPensionalAdicionalMaximoMensual además se oculta como paso
+// principal específicamente cuando el resultado es SEMANAS_INSUFICIENTES_PARA_
+// RECONOCIMIENTO_RPM (debeOcultarRestriccion, en el archivo de helpers): el diagnóstico
+// previo confirmó que ese dato no puede afectar ese resultado — sigue siendo opcional en
+// cualquier otro estado, sin cambio de comportamiento ahí.
+//
+// Corrección de bug (revisión visual de Carlos, mismo día): determinarCamposFaltantesObjetivoRPM
+// ahora exige `edadActual` para poder declarar edadJubilacionDeseada como no-faltante (ver
+// requisitosDatosImprescindiblesRPM.js#edadJubilacionDeseadaEsUtilizable) — este archivo ya
+// lo tenía calculado (variable `edadActual`, usada por validarEdadJubilacionDeseada desde
+// antes) y ahora también se lo pasa al inicializador de `mostrarFormulario`. EDAD_MAXIMA_FUNCIONAL
+// se importa desde ese mismo módulo compartido en vez de mantener una segunda constante
+// local con el mismo valor — validarEdadJubilacionDeseada (más abajo) no se modifica: su
+// validación (entero, > edadActual, <= EDAD_MAXIMA_FUNCIONAL) ya era correcta y esta
+// corrección no la duplica, solo evita que el mismo criterio quedara ausente en
+// DeclaracionLibre.jsx.
 
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { determinarBaseCotizacion } from '../domain/determinarBaseCotizacion.js'
 import { generarCaminosRPM } from '../domain/pensionEngine/generarCaminosRPM.js'
 import { calcularEdadCumplida } from '../domain/calcularEdadCumplida.js'
+import { determinarCamposFaltantesObjetivoRPM } from '../domain/determinarCamposFaltantesObjetivoRPM.js'
+import { EDAD_MAXIMA_FUNCIONAL } from '../domain/pensionEngine/requisitosDatosImprescindiblesRPM.js'
 import { useRestaurarFocoAlMontar } from '../hooks/useRestaurarFocoAlMontar.js'
 import { useCampoMonetario } from '../hooks/useCampoMonetario.js'
 import { formatearPesos } from '../format/formatearDinero.js'
@@ -36,9 +68,8 @@ import {
   textoHorizonte,
   calcularLimitacionesComunes,
   limitacionesEspecificas,
+  debeOcultarRestriccion,
 } from './ProyectaTuPensionRPM.helpers.js'
-
-const EDAD_MAXIMA_FUNCIONAL = 100
 
 const CAMINO_MAS_ALINEADO_TEXTO = 'Camino más alineado con tu objetivo y las condiciones que nos diste.'
 
@@ -133,6 +164,20 @@ function ProyectaTuPensionRPM({
   const objetivoValorMensual = validarMontoNoNegativo(objetivoPensionMensual)
   const restriccionCostoPensional = validarMontoNoNegativo(restriccionCostoPensionalAdicionalMaximoMensual)
 
+  // Se evalúa una sola vez, al montar (lazy initializer de useState — React nunca vuelve a
+  // invocar esta función en renders posteriores): si en ese momento ya no falta ningún dato
+  // imprescindible, el formulario arranca colapsado. Reutiliza el mismo criterio compartido
+  // con DeclaracionLibre.jsx (requisitosDatosImprescindiblesRPM.js, vía
+  // determinarCamposFaltantesObjetivoRPM.js) — nunca un criterio nuevo o duplicado.
+  const [mostrarFormulario, setMostrarFormulario] = useState(() => {
+    const { camposFaltantes } = determinarCamposFaltantesObjetivoRPM({
+      expedienteConfirmado: { objetivoPensionMensual: objetivoValorMensual, edadJubilacionDeseada: edadValida },
+      borradorInterpretado: { objetivoPensionMensual: null, edadJubilacionDeseada: null },
+      edadActual,
+    })
+    return camposFaltantes.length > 0
+  })
+
   const resultado =
     edadValida !== null && baseCotizacion.ibcAplicableSimulacion !== null
       ? generarCaminosRPM({
@@ -174,25 +219,43 @@ function ProyectaTuPensionRPM({
 
       <p className="screen__subtitle screen__subtitle--secundario">{TEXTO_INTRO}</p>
 
-      <p className="screen__subtitle">¿Hasta qué edad te gustaría explorar tu proyección?</p>
-      <p className="screen__subtitle screen__subtitle--secundario">
-        PensionLab verifica que, a esa edad, cumplas los requisitos legales de reconocimiento RPM (edad y semanas
-        mínimas) — si no los cumples, te lo explicamos en vez de mostrarte una cifra de pensión.
-      </p>
+      {mostrarFormulario ? (
+        <>
+          <p className="screen__subtitle">¿Hasta qué edad te gustaría explorar tu proyección?</p>
+          <p className="screen__subtitle screen__subtitle--secundario">
+            PensionLab verifica que, a esa edad, cumplas los requisitos legales de reconocimiento RPM (edad y
+            semanas mínimas) — si no los cumples, te lo explicamos en vez de mostrarte una cifra de pensión.
+          </p>
 
-      <label className="field">
-        <span className="field__label">Edad</span>
-        <input
-          type="text"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          className="field__input"
-          value={edadJubilacionDeseada}
-          onChange={(e) => onCambiarEdadJubilacionDeseada(e.target.value.replace(/\D/g, ''))}
-        />
-      </label>
+          <label className="field">
+            <span className="field__label">Edad</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              className="field__input"
+              value={edadJubilacionDeseada}
+              onChange={(e) => onCambiarEdadJubilacionDeseada(e.target.value.replace(/\D/g, ''))}
+            />
+          </label>
 
-      {mensajeError && <p className="screen__subtitle">{mensajeError}</p>}
+          {mensajeError && <p className="screen__subtitle">{mensajeError}</p>}
+        </>
+      ) : (
+        <>
+          {edadValida !== null && (
+            <p className="screen__subtitle screen__subtitle--secundario">
+              Explorando hasta los {edadValida} años
+              {objetivoValorMensual !== null ? `, con tu objetivo de ${formatearPesos(objetivoValorMensual)} al mes.` : '.'}
+            </p>
+          )}
+          <div className="screen__actions">
+            <button type="button" className="btn btn-secondary" onClick={() => setMostrarFormulario(true)}>
+              Editar tu objetivo o la edad que quieres explorar
+            </button>
+          </div>
+        </>
+      )}
 
       {edadValida !== null && baseCotizacion.ibcAplicableSimulacion === null && (
         <p className="screen__subtitle">
@@ -203,17 +266,21 @@ function ProyectaTuPensionRPM({
         </p>
       )}
 
-      {edadValida !== null && baseCotizacion.ibcAplicableSimulacion !== null && (
-        <>
-          <label className="field">
-            <span className="field__label">¿Con cuánto te gustaría pensionarte, al menos, cada mes?</span>
-            <p className="option__hint">
-              En pesos de hoy — el poder de compra que tiene ese dinero actualmente, no el número que verías
-              nominalmente en el futuro.
-            </p>
-            <CampoMonetario {...campoObjetivo} />
-          </label>
+      {mostrarFormulario && edadValida !== null && baseCotizacion.ibcAplicableSimulacion !== null && (
+        <label className="field">
+          <span className="field__label">¿Con cuánto te gustaría pensionarte, al menos, cada mes?</span>
+          <p className="option__hint">
+            En pesos de hoy — el poder de compra que tiene ese dinero actualmente, no el número que verías
+            nominalmente en el futuro.
+          </p>
+          <CampoMonetario {...campoObjetivo} />
+        </label>
+      )}
 
+      {mostrarFormulario &&
+        edadValida !== null &&
+        baseCotizacion.ibcAplicableSimulacion !== null &&
+        !debeOcultarRestriccion(resultado) && (
           <label className="field">
             <span className="field__label">
               ¿Cuánto más podrías destinar exclusivamente a tu aporte a pensión cada mes? (opcional)
@@ -224,8 +291,7 @@ function ProyectaTuPensionRPM({
             </p>
             <CampoMonetario {...campoRestriccion} />
           </label>
-        </>
-      )}
+        )}
 
       {resultado && resultado.escenarios.length === 0 && resultado.detalleElegibilidad && (
         <div className="insight">

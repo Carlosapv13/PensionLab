@@ -75,8 +75,9 @@ export const VISTAS_CONOCIDAS = [
   'historiaCotizacionRPM',
   'exploraTuProyeccionRPM',
   'proyectaTuPensionRPM',
+  // 'revisionDeclaracion' se retiró (precisión de producto S4-006, 2026-08-23): su
+  // responsabilidad se fusionó dentro de 'declaracionLibre' — ver DeclaracionLibre.jsx.
   'declaracionLibre',
-  'revisionDeclaracion',
 ]
 
 // Defensa mínima y pequeña, no un sistema de schemas: campos cuya ausencia

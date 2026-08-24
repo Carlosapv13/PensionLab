@@ -16,7 +16,35 @@ import {
   textoHorizonte,
   calcularLimitacionesComunes,
   limitacionesEspecificas,
+  debeOcultarRestriccion,
 } from './ProyectaTuPensionRPM.helpers.js'
+
+describe('debeOcultarRestriccion — EVIDENCIA: solo se oculta cuando el resultado es semanas insuficientes (precisión de producto S4-006)', () => {
+  it('código SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM → true (restricción no puede afectar ese resultado — ver generarCaminosRPM.js)', () => {
+    const resultado = { orientacion: { codigo: 'SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM' } }
+    expect(debeOcultarRestriccion(resultado)).toBe(true)
+  })
+
+  it.each([
+    'UNICO_CUMPLE',
+    'VARIOS_CUMPLEN_FALTA_PRIORIDAD',
+    'NINGUNO_CUMPLE_MAS_CERCANO',
+    'SIN_CAMINOS_VIABLES',
+    'EDAD_JUBILACION_INFERIOR_A_EDAD_MINIMA_LEGAL',
+    'DATOS_INCOMPLETOS',
+    'PERFIL_NO_EVALUABLE',
+  ])('cualquier otro código (%s) → false, restricción sigue siendo opcional y disponible', (codigo) => {
+    expect(debeOcultarRestriccion({ orientacion: { codigo } })).toBe(false)
+  })
+
+  it('resultado null (todavía no se calculó nada) → false, nunca lanza', () => {
+    expect(debeOcultarRestriccion(null)).toBe(false)
+  })
+
+  it('resultado sin orientacion (forma inesperada) → false, no lanza', () => {
+    expect(debeOcultarRestriccion({})).toBe(false)
+  })
+})
 
 describe('textoEsfuerzoAdicional', () => {
   it('camino base: siempre "sin cambios", incluso si esfuerzo trajera un costo (no debería ocurrir, pero confirma que ni se lee)', () => {

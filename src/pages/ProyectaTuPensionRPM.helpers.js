@@ -70,6 +70,23 @@ export function textoHorizonte(horizonte, edadJubilacionDeseada) {
   return `${inicio} → ${fin} · ${duracion} · hasta los ${edadJubilacionDeseada} años`
 }
 
+// Único código de generarCaminosRPM.js relevante para esta decisión de presentación
+// (precisión de producto S4-006, 2026-08-23): cuando la persona no alcanzaría las
+// semanas mínimas a la edad explorada, el diagnóstico previo confirmó que ningún valor de
+// restricciónCostoPensionalAdicionalMaximoMensual puede afectar ese resultado (el propio
+// generarCaminosRPM.js retorna antes de leer ese parámetro en este caso) — pedirlo como
+// paso principal ahí sería pedir un dato irrelevante para el problema real. No reinterpreta
+// el código: solo decide, a partir de él, si ese campo debe ocultarse como paso principal.
+const CODIGO_SEMANAS_INSUFICIENTES = 'SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM'
+
+/**
+ * @param {{orientacion: {codigo: string}} | null} resultado - salida de generarCaminosRPM.js, o null si todavía no se calculó
+ * @returns {boolean}
+ */
+export function debeOcultarRestriccion(resultado) {
+  return resultado?.orientacion?.codigo === CODIGO_SEMANAS_INSUFICIENTES
+}
+
 /**
  * @param {Array<Object>} escenariosViables
  * @returns {Array<{codigo: string, mensaje: string}>}

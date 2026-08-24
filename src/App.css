@@ -270,10 +270,6 @@
   line-height: 1.15;
 }
 
-.screen__title--revision-declaracion {
-  line-height: 1.15;
-}
-
 .screen__title--explora-tu-proyeccion-rpm {
   line-height: 1.15;
 }
@@ -1010,4 +1006,20 @@
     right: 0;
     border-right-color: var(--border);
   }
+}
+
+/* Confirmación de la interpretación IA de la declaración libre (S4-006) — reutiliza .field/
+   .field__label/.field__input y .btn* ya existentes; solo el contenedor y el resumen son
+   nuevos. */
+.revision-declaracion__confirmacion {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.revision-declaracion__resumen {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-h);
 }

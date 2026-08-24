@@ -29,6 +29,7 @@
 import { calcularProyeccionRPM } from './calcularProyeccionRPM.js'
 import { calcularFechaPorEdad } from '../calcularFechaPorEdad.js'
 import { obtenerTasaCotizacion, obtenerEdadPension, obtenerSemanasMinimas } from '../../data/legal/index.js'
+import { objetivoValorMensualEsValido, edadJubilacionDeseadaEsValida } from './requisitosDatosImprescindiblesRPM.js'
 
 function hoyISO() {
   return new Date().toISOString().slice(0, 10)
@@ -437,10 +438,10 @@ export function generarCaminosRPM({
   if (!esNumeroValido(ibcAplicableSimulacion) || ibcAplicableSimulacion <= 0) {
     return resultadoVacio('DATOS_INCOMPLETOS', 'Todavía falta una base de cotización apta para simular.')
   }
-  if (!esNumeroValido(objetivoValorMensual) || objetivoValorMensual <= 0) {
+  if (!objetivoValorMensualEsValido(objetivoValorMensual)) {
     return resultadoVacio('DATOS_INCOMPLETOS', 'Todavía falta declarar tu objetivo de pensión mensual.')
   }
-  if (!esNumeroValido(edadJubilacionDeseada)) {
+  if (!edadJubilacionDeseadaEsValida(edadJubilacionDeseada)) {
     return resultadoVacio('DATOS_INCOMPLETOS', 'Todavía falta declarar la edad hasta la que quieres explorar.')
   }
 

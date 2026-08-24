@@ -18,4 +18,12 @@ export default defineConfig([
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
   },
+  {
+    // Funciones serverless (S4-006) — Node, nunca el navegador; ver api/README implícito
+    // en el propio código: nada bajo api/ se empaqueta con Vite.
+    files: ['api/**/*.js'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
 ])

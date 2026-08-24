@@ -242,6 +242,111 @@ export const FIXTURES = [
     },
   },
   {
+    id: 'rpm-empleado-declaracion-libre-s4-006',
+    nombre: 'RPM — empleado — Declaración libre → interpretación IA (S4-006, infraestructura de desarrollo)',
+    // Infraestructura de desarrollo exclusiva de S4-006 — mismo perfil/historia real de
+    // rpm-empleado-proyecta-tu-pension, para llegar directo a 'declaracionLibre' sin
+    // recorrer las pantallas previas. En modo desarrollo (import.meta.env.DEV), App.jsx ya
+    // inyecta el adaptador simulado de src/dev/adaptadorInterpretacionDesarrollo.js en vez
+    // del adaptador de producción — ninguna llamada real a OpenAI al usar este fixture.
+    //
+    // objetivoPensionMensual/restriccionCostoPensionalAdicionalMaximoMensual/
+    // edadJubilacionDeseada quedan con valores YA existentes, deliberadamente distintos de
+    // lo que producen los casos de prueba de la revisión visual (ver más abajo) — para
+    // poder confirmar a simple vista que antes de "Confirmar" el expediente no cambia, y
+    // que después de "Confirmar" solo cambia el/los campo(s) efectivamente interpretados
+    // (los demás conservan estos mismos valores, nunca se borran).
+    //
+    // Frases recomendadas para escribir en el textarea de "Declaración libre", una a la
+    // vez (volviendo a este mismo fixture entre intento e intento si se quiere repetir
+    // desde cero):
+    //   A. "Quiero pensionarme con al menos 3.500.000 al mes."
+    //      → interpretado, solo objetivoPensionMensual (3.500.000).
+    //   B. "Quiero pensionarme a los 65 años con 3.500.000 al mes."
+    //      → interpretado, objetivoPensionMensual (3.500.000) y edadJubilacionDeseada (65).
+    //   C. "Puedo destinar 400.000 pesos adicionales a mi aporte pensional cada mes."
+    //      → interpretado, solo restriccionCostoPensionalAdicionalMaximoMensual (400.000).
+    //   D. "No sé qué hacer con mi pensión." → insuficiente (sin cifras reconocibles).
+    //      Variante ambigua: agregar literalmente "[forzar ambiguo]" al texto → ambiguo,
+    //      con objetivoPensionMensual señalado en camposAmbiguos.
+    //   E. "blablabla" o "jajajaja" → descartado por evaluarAptitud.js ANTES de invocar
+    //      cualquier adaptador (ni siquiera el simulado se ejecuta para este caso).
+    //   F. Agregar literalmente "[forzar error]" a cualquier texto → estado
+    //      error_proveedor / TIMEOUT, simula una falla del proveedor.
+    vistaSugerida: 'declaracionLibre',
+    datos: {
+      objetivoSeleccionado: 'Descubrir mis opciones pensionales.',
+      lugarResidencia: 'Colombia',
+      cotizaActualmente: 'si',
+      sexo: 'Hombre',
+      fechaNacimiento: '1978-02-11',
+      regimenActual: 'RPM',
+      trasladoRegimen: 'no',
+      tipoCotizante: 'empleado',
+      lugarCotizacion: 'colombia',
+      nivelConocimientoSemanas: 'aproximado',
+      semanasCotizadas: '527',
+      anioInicioCotizacion: '2016',
+      certezaBaseCotizacion: 'conocido',
+      valorBaseCotizacionDeclarado: '2900000',
+      infoEsencialCompletada: true,
+      historiaCotizacion: [
+        { fechaDesde: '2016-01-01', fechaHasta: '2019-06-30', ibc: 2100000, diasCotizados: 1277 },
+        { fechaDesde: '2020-01-01', fechaHasta: '2026-08-10', ibc: 2900000, diasCotizados: 2414 },
+      ],
+      edadJubilacionDeseada: '62',
+      objetivoPensionMensual: '2000000',
+      restriccionCostoPensionalAdicionalMaximoMensual: '150000',
+    },
+  },
+  {
+    id: 'rpm-empleado-declaracion-libre-s4-006-sin-datos-previos',
+    nombre:
+      'RPM — empleado — Declaración libre, sin objetivo/edad previos (precisión de producto S4-006, ' +
+      'campos faltantes)',
+    // Mismo perfil e historia real que 'rpm-empleado-declaracion-libre-s4-006', pero con
+    // edadJubilacionDeseada/objetivoPensionMensual/restricción vacíos — para poder probar a
+    // simple vista el flujo "PensionLab determina qué falta" desde cero, sin necesitar
+    // editar el expediente a mano en el Panel de Desarrollo antes de escribir la
+    // declaración.
+    //
+    // Guion recomendado para la revisión visual:
+    //   B1. Escribe "Quiero pensionarme con al menos 3.500.000 al mes." → tras el debounce,
+    //       se interpreta objetivoPensionMensual; como edadJubilacionDeseada no está en el
+    //       expediente ni se interpretó, aparece el control estructurado "¿Hasta qué edad
+    //       quieres proyectar tus aportes?" — el CTA final no aparece todavía.
+    //   B2. Completa esa edad a mano (ej. 62) → el CTA "Usar estos datos y explorar mis
+    //       opciones" aparece de inmediato (reactivo, sin volver a escribir nada).
+    //   B3. Vuelve a este fixture y escribe "Quiero pensionarme a los 65 años con 3.500.000
+    //       al mes." → los dos campos requeridos se interpretan juntos, el CTA aparece sin
+    //       pedir nada estructurado.
+    vistaSugerida: 'declaracionLibre',
+    datos: {
+      objetivoSeleccionado: 'Descubrir mis opciones pensionales.',
+      lugarResidencia: 'Colombia',
+      cotizaActualmente: 'si',
+      sexo: 'Hombre',
+      fechaNacimiento: '1978-02-11',
+      regimenActual: 'RPM',
+      trasladoRegimen: 'no',
+      tipoCotizante: 'empleado',
+      lugarCotizacion: 'colombia',
+      nivelConocimientoSemanas: 'aproximado',
+      semanasCotizadas: '527',
+      anioInicioCotizacion: '2016',
+      certezaBaseCotizacion: 'conocido',
+      valorBaseCotizacionDeclarado: '2900000',
+      infoEsencialCompletada: true,
+      historiaCotizacion: [
+        { fechaDesde: '2016-01-01', fechaHasta: '2019-06-30', ibc: 2100000, diasCotizados: 1277 },
+        { fechaDesde: '2020-01-01', fechaHasta: '2026-08-10', ibc: 2900000, diasCotizados: 2414 },
+      ],
+      edadJubilacionDeseada: '',
+      objetivoPensionMensual: '',
+      restriccionCostoPensionalAdicionalMaximoMensual: '',
+    },
+  },
+  {
     id: 'rpm-trasladada-indicios-transicion',
     nombre: 'RPM — trasladado de RAIS — hasta Indicios de régimen de transición (ficticio, S4-001A)',
     // Caso ficticio, representativo de la clase de validación del Entregable 2 —

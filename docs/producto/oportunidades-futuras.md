@@ -9,28 +9,169 @@ no perder la idea, no una promesa de construirla.
 
 ---
 
-## Ejecución temporal de un camino: pesos de hoy, valores nominales y SMMLV
+## 1. PensionLab para profesionales / gestión de casos de terceros
 
-**Origen del hallazgo:** surgió durante el cierre del Slice "Motor de
-caminos RAIS", al analizar qué significa ejecutar en el tiempo un camino
-calculado bajo la Convención Económica v1 (ver
-`trazabilidad-formula-RAIS.md`). El Motor expresa IBC, saldo, objetivo,
-restricción de costo y resultado en pesos de hoy — un nivel constante de
-poder adquisitivo, no el mismo número nominal sostenido durante todo el
-horizonte. Esa convención es correcta para la lectura de hoy, pero no debe
-leerse como una instrucción de que la persona deba mantener ese valor
-nominal exacto congelado a lo largo del camino.
+**Origen de la idea:** surgió durante la construcción de la herramienta de
+desarrollo para cargar casos de prueba (Sprint 3, `src/dev/`). Al construir
+un mecanismo para que un desarrollador cargue y modifique rápidamente el
+estado de un caso pensional con fines de prueba, se hizo evidente que un
+mecanismo conceptualmente similar podría tener valor de producto real para
+un usuario profesional — no solo para desarrollo interno.
 
-**Conclusión:** el valor nominal necesario en cada momento deberá
-actualizarse utilizando la información económica efectivamente observada y
-vigente en ese momento (IPC, SMMLV publicado del año correspondiente) —
-nunca proyectando o inventando hoy un aumento futuro del SMMLV. Mismo
-criterio de honestidad que ya rige hoy el tope legal de 25 SMMLV en el
-camino alternativo (`TOPE_IBC_CON_SMMLV_VIGENTE`): evaluar siempre con el
-dato vigente conocido, nunca con una proyección. Esta traducción periódica
-— del objetivo, y también de la restricción de costo, capturados bajo la
-misma convención — sería responsabilidad de una futura capacidad de
-seguimiento/ejecución de caminos, todavía inexistente en el producto.
+**Posible usuario profesional:** un asesor, consultor o gestor pensional que
+maneja los casos de varias personas (clientes, familiares, empleados de una
+empresa) y necesita trabajarlos y compararlos, no solo el suyo propio.
+
+**Capacidades que tendría que resolver, si se construyera:**
+- **Gestión manual de casos de terceros** — personas que no usan PensionLab
+  directamente; el profesional captura y mantiene el expediente en su nombre.
+- **Captura y modificación de datos** de cada caso, de forma equivalente a
+  como hoy lo hace la propia persona a través del recorrido normal.
+- **Comparación de escenarios** entre casos, o de un mismo caso en el tiempo.
+- **Orientación sobre caminos** — la misma capacidad ya construida en el
+  Slice RAIS, aplicada por el profesional en nombre de un tercero.
+- **Trazabilidad** — qué se calculó, con qué supuestos y en qué fecha, por
+  caso.
+- **Informe escrito**, entregable al cliente final del profesional.
+- **Posible exportación a PDF** del informe.
+
+**Decisión actual: no implementar.** No existe todavía validación de que
+este usuario profesional exista con urgencia real, ni un caso concreto que
+lo confirme — mismo Principio 9 del proyecto (generalizar solo con evidencia
+real) que ya rige el resto de PensionLab.
+
+**Condición para revisarla más adelante:** que aparezca una necesidad real y
+concreta de un usuario profesional — no solo la conveniencia técnica de
+reutilizar el mecanismo de fixtures. Mismo criterio de activación ya usado
+para otras capacidades diferidas del proyecto (ej. el Panel de Hallazgos del
+Expediente Pensional, en `docs/tecnico/arquitectura/expediente-pensional.md`:
+"se diseñará formalmente solo cuando exista una segunda evidencia real").
+
+**Relación conceptual con Caso pensional, fixtures y panel de desarrollo:**
+esta oportunidad comparte una intuición estructural con la herramienta de
+desarrollo recién construida, pero son conceptos distintos que no deben
+confundirse:
+
+- **Caso pensional** — concepto de producto, todavía sin contrato propio: la
+  situación completa de una persona real, tal como la modela el producto. No
+  existe hoy como entidad independiente; vive repartida en el estado de
+  `App.jsx`.
+- **Fixture** (`src/dev/fixtures.js`) — un ejemplo predefinido, exclusivamente
+  para desarrollo, que precarga ese mismo estado para pruebas manuales. No es
+  el modelo definitivo de Caso Pensional ni pretende serlo.
+- **Panel de desarrollo** (`src/dev/PanelDesarrollo.jsx`) — herramienta
+  exclusiva de desarrollo para cargar, inspeccionar y modificar fixtures, y
+  saltar a una pantalla. Nunca disponible en producción.
+
+Si "PensionLab para profesionales" se retoma alguna vez, probablemente
+necesite su propio contrato de Caso Pensional — más cercano a
+`ExpedientePensional`/`UserProfile` (los contratos ya dormidos descritos en
+`expediente-pensional.md`) que una extensión del mecanismo de fixtures, que
+seguirá siendo exclusivamente de desarrollo.
+
+---
+
+## 2. Objetivos sin capacidad todavía (retiro de DeclaracionLibre del MVP)
+
+**Origen de la idea:** al simplificar el recorrido principal del MVP se
+retiraron `DeclaracionLibre`/`RevisionDeclaracionTemporal` de la navegación
+activa, y `Objetivo.jsx` pasó a deshabilitar dos de sus cuatro opciones
+("Comparar caminos que ya conozco.", "Validar una estrategia que ya tengo.")
+por no tener una capacidad real detrás. Las tres oportunidades siguientes son
+lo que, si se retomara cada una, les daría contenido.
+
+### 2.1 Comprensión semántica de texto libre
+
+La capacidad de reconocimiento de `DeclaracionLibre` (C-v1,
+`src/domain/reconocimiento/`) sigue intacta pero dormida: hoy solo distingue
+`no_apto` (ruido/relleno) de `indeterminado` (cualquier contenido
+sustantivo, pensional o no) — nunca clasifica `apto`, y no existe
+`resolverEstructura.js`. Retomarla implicaría diseñar C-v2: qué significa
+realmente "apto" (materia pensional utilizable, no solo texto
+estructuralmente sustantivo — criterio ya establecido al rechazar la
+primera versión de C-v1), sin recurrir a heurísticas de palabras clave o
+conteo que simulen comprensión sin tenerla.
+
+**Decisión actual: no implementar.** No hay todavía un caso de uso concreto
+que dependa de interpretar texto libre — el MVP gobierna el flujo por
+`objetivoSeleccionado`, no por declaración libre.
+
+### 2.2 Comparación de caminos ya conocidos
+
+El objetivo "Comparar caminos que ya conozco." asume que la persona ya trae
+una o más estrategias en mente (ej. "aumentar mi IBC" vs. "trasladarme de
+régimen") y quiere verlas contrastadas entre sí, no descubiertas desde cero.
+Es distinto del Slice RAIS actual, que genera y ordena caminos — aquí el
+usuario los aportaría él mismo, y PensionLab tendría que capturarlos de
+forma estructurada (no como texto libre) para poder compararlos con el
+mismo rigor que ya aplica `generarCaminosRAIS.js`.
+
+**Decisión actual: no implementar.** Requiere definir primero cómo se
+captura un "camino ya conocido" de forma estructurada — no existe ese
+contrato todavía.
+
+### 2.3 Validación de una estrategia declarada
+
+El objetivo "Validar una estrategia que ya tengo." asume que la persona ya
+decidió un curso de acción concreto (ej. "voy a subir mi IBC a $X desde tal
+fecha") y quiere que PensionLab verifique sus supuestos y consecuencias,
+más que explorar alternativas. Distinto de comparar caminos: aquí el punto
+de partida es una única estrategia ya fija, y el trabajo es auditarla
+(¿es legalmente viable?, ¿el esfuerzo declarado es correcto?, ¿qué
+resultado produce?) en vez de generar o contrastar candidatas.
+
+**Decisión actual: no implementar.** Igual que 2.2, requiere primero un
+contrato para capturar "una estrategia ya decidida" de forma estructurada.
+
+**Condición para revisar 2.1, 2.2 o 2.3:** que aparezca evidencia real de
+que alguien las necesita, no solo la simetría de completar las cuatro
+opciones de `Objetivo.jsx` — mismo Principio 9 ya aplicado en la entrada 1.
+
+---
+
+## 3. Estrategia pensional viva y acompañamiento proactivo
+
+**Origen de la idea:** surgió durante el análisis de legibilidad monetaria y
+de la comparación de caminos de esta sesión, al notar que hoy
+`ExploraTuProyeccion` entrega una fotografía de un momento — se calcula con
+los datos vigentes cuando la persona la consulta, pero no hay manera de que
+adopte un camino y PensionLab la acompañe mientras lo sigue en el tiempo.
+
+**Principios asociados:**
+- **Estrategia viva:** los supuestos futuros de la estrategia elegida se
+  sustituyen progresivamente por datos reales a medida que ocurren, y la
+  estrategia puede recalcularse — no es una secuencia rígida de valores
+  nominales fijados de una vez.
+- **Acompañamiento proactivo:** cuando un cambio conocido pueda exigir una
+  acción para mantener la estrategia, PensionLab podría avisar a la persona
+  en vez de depender de que recuerde volver por su cuenta.
+
+**Ejemplo ilustrativo (no un compromiso de diseño):** si una estrategia
+consiste en mantener determinado nivel de IBC relativo al SMMLV, cuando se
+conozca el nuevo SMMLV de un año PensionLab podría recalcular el IBC y el
+aporte correspondientes al nuevo año, y comunicar a la persona el ajuste
+necesario para seguir alineada con su camino.
+
+**Traducción de una meta "en pesos de hoy" a valores nominales, con datos
+reales — no proyectados.** El Motor de caminos RAIS actual (Convención
+Económica v1, ver `trazabilidad-formula-RAIS.md`) expresa IBC, saldo,
+objetivo, restricción de costo y resultado en pesos de hoy — un nivel
+constante de poder adquisitivo, no el mismo número nominal sostenido
+durante 25 años. Esa convención es correcta para la lectura de hoy, pero
+no debe leerse como una instrucción de que la persona deba mantener
+congelado ese valor nominal exacto durante todo el camino: el valor
+nominal necesario en cada momento deberá actualizarse utilizando la
+información económica efectivamente observada y vigente.
+
+Cuando exista la capacidad de seguimiento/ejecución de un camino (ver
+arriba), su responsabilidad central sería traducir periódicamente ese
+objetivo — y la restricción de costo, bajo la misma convención — a un
+valor nominal vigente, usando información real ya conocida en cada
+momento (IPC observado, SMMLV publicado del año correspondiente), nunca
+proyectando o inventando hoy un aumento futuro del SMMLV. Mismo criterio
+de honestidad que ya rige hoy el tope legal de 25 SMMLV en el camino
+alternativo (`TOPE_IBC_CON_SMMLV_VIGENTE`): evaluar siempre con el dato
+vigente conocido, nunca con una proyección.
 
 **Distinción a resolver, si se retoma: meta en pesos de hoy vs. meta en
 múltiplos de SMMLV.** Son dos convenciones de "términos reales" distintas
@@ -42,22 +183,52 @@ compromiso distinto, año a año, de una persona cuyo objetivo es "el poder
 adquisitivo actual de $4.500.000" — aunque hoy, al capturar el dato, ambas
 cifras puedan coincidir numéricamente. El Motor actual no distingue entre
 ambas porque solo captura un monto en pesos; esa distinción explícita
-queda pendiente.
+queda pendiente para cuando se diseñe el seguimiento del camino.
 
 No implica ningún cambio en las fórmulas RAIS actuales — `formulaRAIS.js`
 sigue siendo correcta bajo la Convención Económica v1 tal como está; esto
 es exclusivamente sobre qué hace falta para *ejecutar* un camino elegido
 a lo largo del tiempo, responsabilidad que hoy no existe en el producto.
 
-**Decisión actual: no implementar.** No existe hoy ninguna capacidad de
-seguimiento/ejecución de caminos en el producto — esta traducción
-periódica solo tendría sentido cuando esa capacidad se construya.
+**Capacidades que tendría que resolver, si se construyera:**
+- **Actualización con datos realmente observados** — semanas cotizadas, IBC
+  efectivamente utilizado, interrupciones u otros cambios relevantes que la
+  persona reporte, sustituyendo los supuestos originales de la estrategia.
+- **Persistencia de expediente y de la estrategia elegida** — para que haya
+  algo que actualizar entre una visita y la siguiente.
+- **Revisiones periódicas** — detectar cuándo un cambio conocido (como un
+  nuevo SMMLV) afecta una estrategia ya adoptada.
+- **Mecanismos de comunicación** — cómo y cuándo avisar a la persona de que
+  su estrategia necesita un ajuste.
 
-**Condición para revisarla más adelante:** que se diseñe una capacidad
-real de seguimiento/ejecución de un camino elegido (persistencia de
-expediente y estrategia, actualización con datos observados) — mismo
-Principio 9 ya aplicado en el resto de este documento: no generalizar sin
-evidencia real.
+**Decisión actual: no implementar.** Ninguna de estas capacidades pertenece
+al MVP actual para revisión de Oscar — no se implementan cuentas,
+persistencia, notificaciones, automatizaciones ni seguimiento periódico
+ahora.
+
+**Relación con decisiones ya documentadas:** la persistencia de
+`ExpedientePensional`/estrategias/evidencia ya está registrada en
+`docs/tecnico/arquitectura/expediente-pensional.md` y en
+`docs/tecnico/arquitectura/PL-230 - Arquitectura del Motor de Decisión de
+PensionLab.md` como una decisión independiente y posterior, fuera de
+alcance de esos documentos — esta entrada no la duplica ni la redefine, solo
+registra para qué serviría esa persistencia si algún día se diseña: sostener
+una estrategia viva en el tiempo, no solo guardar un expediente.
+
+Esta idea es coherente con el principio que ya sigue el código actual —
+recalcular siempre desde los datos vigentes en vez de persistir un
+resultado derivado (ver el comentario de `ExploraTuProyeccion.jsx` sobre por
+qué `ibcAplicableSimulacion` no se guarda en `App.jsx`). Eso no implica que
+una futura implementación deba reutilizar `generarCaminosRAIS.js` tal como
+existe hoy — sería prematuro comprometer una arquitectura concreta para una
+capacidad que todavía no tiene ni caso de uso confirmado ni decisión de
+persistencia propia.
+
+**Condición para revisarla más adelante:** que exista evidencia real de que
+alguien necesita seguir una estrategia en el tiempo (no solo la coherencia
+conceptual de la idea), y que se haya tomado la decisión, todavía pendiente
+e independiente, de cómo persistir el Expediente Pensional — mismo Principio
+9 ya aplicado en las entradas 1 y 2.
 
 ---
 

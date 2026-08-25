@@ -509,6 +509,41 @@
   font-size: 16px;
 }
 
+/* "Qué podrías explorar ahora" (decisión de producto, 2026-08-24) — determinístico, nunca
+   depende de la IA. Deliberadamente SIN el color de acento de .insight (reservado para
+   "Comparando tus caminos", generado por IA) — mismo tratamiento neutral que
+   .horizonte-proyeccion, para que no se confunda visualmente con un insight de IA ni con el
+   badge "Camino más alineado". Flujo de bloque simple, sin grid — funciona igual en mobile
+   sin ninguna regla @media aparte. */
+.orientacion-exploracion {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.orientacion-exploracion__titulo {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.orientacion-exploracion__mensaje {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text-h);
+}
+
+.orientacion-exploracion__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 /* Comparación de caminos (ExploraTuProyeccion) — ver el comentario junto a
    .comparacion-caminos en el JSX para el porqué de CSS Grid en vez de
    <table>. .camino-columna usa display:contents para que sus celdas hijas
@@ -521,6 +556,15 @@
    automático las desalinearía. */
 .comparacion-caminos__contexto {
   font-size: 14px;
+  color: var(--text);
+}
+
+/* Aclaración compartida (decisión de producto, 2026-08-24) — una sola vez, nunca repetida
+   por tarjeta (mismo criterio que .comparacion-caminos__supuestos). Mismo tono que
+   .option__hint: 13px, var(--text) — un dato de contexto, no una advertencia destacada. */
+.comparacion-caminos__aclaracion {
+  margin: 0;
+  font-size: 13px;
   color: var(--text);
 }
 
@@ -555,10 +599,16 @@
   color: var(--text);
 }
 
+/* 7 filas reales (decisión de producto, 2026-08-24 — reordenamiento "esfuerzo → resultado →
+   objetivo"): encabezado, esfuerzo, pensión (+diferencia como 2ª línea interna), objetivo,
+   IBC (soporte, movido después de objetivo), notas, explicación. Declaradas explícitamente
+   — antes quedaban 2 filas (7 y 8) dependiendo del auto-sizing implícito de CSS Grid porque
+   el template nunca se actualizó al agregar la explicación de S4-007; mismo valor por
+   defecto (auto), pero ahora la estructura real queda documentada, no accidental. */
 .comparacion-caminos {
   display: grid;
   grid-template-columns: repeat(var(--comparacion-caminos-columnas), minmax(220px, 1fr));
-  grid-template-rows: repeat(6, auto);
+  grid-template-rows: repeat(7, auto);
   gap: 16px;
   width: 100%;
 }
@@ -592,23 +642,58 @@
   grid-row: 2;
 }
 
-.camino-celda--base {
+/* Lectura principal "esfuerzo → resultado → objetivo" (decisión de producto, 2026-08-24):
+   la pensión proyectada es la fila inmediatamente después del esfuerzo — "Cambio frente a
+   mantenerte como hoy" ya no es una fila propia, vive como segunda línea DENTRO de esta
+   misma celda (ver .camino-celda__valor--secundario), separada solo por el gap interno de
+   4px de .camino-celda, no por los 16px del grid. En el camino base esa segunda línea no
+   se renderiza (delta 0, ver textoDiferenciaFrenteABase) — la celda sigue existiendo, solo
+   con una línea en vez de dos. */
+.camino-celda--proyeccion {
   grid-row: 3;
 }
 
-.camino-celda--proyeccion {
+.camino-celda--objetivo {
   grid-row: 4;
 }
 
-.camino-celda--objetivo {
+/* IBC futuro del escenario — información de soporte (2026-08-24), movida deliberadamente
+   después de "Frente a tu objetivo": ya no es parte de la lectura principal esfuerzo →
+   resultado → objetivo, pero sigue visible, solo con menor prioridad de lectura. */
+.camino-celda--base {
   grid-row: 5;
 }
 
 .camino-celda--notas {
   grid-row: 6;
   padding-top: 6px;
+}
+
+/* S4-007 — "Entender este camino": nueva fila, después de las notas específicas. El
+   border-bottom que antes cerraba .camino-celda--notas se mueve aquí porque esta es ahora
+   la última fila real de la tarjeta (--notas puede o no existir según el camino). */
+.camino-celda--explicacion {
+  grid-row: 7;
+  padding-top: 6px;
   padding-bottom: 14px;
   border-bottom: 1px solid var(--border);
+}
+
+.camino-celda__explicacion {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.camino-celda__nota--pregunta {
+  font-style: italic;
+}
+
+.camino-celda__explicacion-fallo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
 }
 
 .camino-celda--descartado {
@@ -639,6 +724,16 @@
 .camino-celda__valor--enfasis {
   font-size: 20px;
   font-weight: 600;
+}
+
+/* Diferencia frente al camino base (textoDiferenciaFrenteABase, 2026-08-24) — segunda línea
+   dentro de la celda de pensión proyectada, deliberadamente MÁS chica que el valor base
+   (16px) para que la pensión siga siendo la cifra principal y la diferencia quede como
+   información secundaria. Sin color propio (hereda var(--text-h) de .camino-celda__valor)
+   — nunca verde/rojo ni ninguna señal de "mejor/peor" entre caminos. */
+.camino-celda__valor--secundario {
+  font-size: 13px;
+  font-weight: 400;
 }
 
 /* S4-004: refuerzo del hecho objetivo "alcanza tu objetivo" (distanciaObjetivo.cumple ya
@@ -750,9 +845,18 @@
   fill: var(--accent);
 }
 
+/* Jerarquía visual (2026-08-24): 'actual' ("Hoy") es protagonista y conserva opacidad
+   plena — el resto de la rejilla es contexto de la curva, no un dato a leer punto por
+   punto, así que queda visualmente secundario. Mismos datos, mismo trazo, sin tocar el
+   barrido: solo cambia cuánto "pesa" cada punto en pantalla. */
+.grafico-esfuerzo-resultado__punto--intermedio {
+  opacity: 0.4;
+}
+
 .grafico-esfuerzo-resultado__punto--extremo_superior,
 .grafico-esfuerzo-resultado__punto--referencia_superior,
 .grafico-esfuerzo-resultado__punto--limite_restriccion {
+  opacity: 0.55;
   stroke: var(--bg);
   stroke-width: 2;
 }
@@ -761,6 +865,15 @@
   font-size: 11px;
   font-weight: 600;
   fill: var(--text-h);
+}
+
+/* Etiqueta del punto extremo (dónde termina la exploración) — se conserva (sigue siendo
+   información legítima), pero con menor peso para no competir con Hoy/Tu elección/Tu
+   objetivo. */
+.grafico-esfuerzo-resultado__punto-etiqueta--secundaria {
+  font-size: 10px;
+  font-weight: 400;
+  opacity: 0.65;
 }
 
 .grafico-esfuerzo-resultado__punto-etiqueta--objetivo {
@@ -773,6 +886,18 @@
   fill: var(--bg);
   stroke: var(--accent);
   stroke-width: 2.5;
+}
+
+/* Marcador del esfuerzo personalizado ("Tu elección") — cuadrado, mismo criterio: se
+   distingue de los puntos (círculo) y del objetivo (rombo) por forma, no por color. */
+.grafico-esfuerzo-resultado__punto-eleccion {
+  fill: var(--bg);
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
+.grafico-esfuerzo-resultado__punto-etiqueta--eleccion {
+  fill: var(--accent);
 }
 
 .grafico-esfuerzo-resultado__nota {

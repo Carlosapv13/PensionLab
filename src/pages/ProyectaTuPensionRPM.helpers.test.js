@@ -13,10 +13,14 @@ import {
   textoEsfuerzoAdicional,
   textoIBCFuturo,
   textoDistancia,
+  textoDiferenciaFrenteABase,
+  textoOrientacion,
   textoHorizonte,
   calcularLimitacionesComunes,
   limitacionesEspecificas,
   debeOcultarRestriccion,
+  validarEsfuerzoAdicionalMensualDeseado,
+  ordenarCaminosParaPresentacion,
 } from './ProyectaTuPensionRPM.helpers.js'
 
 describe('debeOcultarRestriccion — EVIDENCIA: solo se oculta cuando el resultado es semanas insuficientes (precisión de producto S4-006)', () => {
@@ -113,6 +117,93 @@ describe('textoDistancia', () => {
   })
 })
 
+describe('textoDiferenciaFrenteABase — puro formato, nunca resta (decisión de producto 2026-08-24, copy revisado 2026-08-24)', () => {
+  it('delta positivo → "$X más de pensión al mes frente a mantenerte como hoy." (sin signo +)', () => {
+    expect(textoDiferenciaFrenteABase({ delta: 650795 })).toBe('$650.795 más de pensión al mes frente a mantenerte como hoy.')
+  })
+
+  it('delta negativo → "$X menos de pensión al mes frente a mantenerte como hoy." (sin signo −, valor absoluto formateado)', () => {
+    expect(textoDiferenciaFrenteABase({ delta: -650795 })).toBe('$650.795 menos de pensión al mes frente a mantenerte como hoy.')
+  })
+
+  it('delta === 0 (camino base) → null, nunca "$0 más" ni "$0 menos"', () => {
+    expect(textoDiferenciaFrenteABase({ delta: 0 })).toBeNull()
+  })
+
+  it('diferenciaFrenteABase null (escenario descartado) → null, nunca lanza', () => {
+    expect(textoDiferenciaFrenteABase(null)).toBeNull()
+  })
+
+  it('nunca usa las palabras rentabilidad/retorno/ROI/ganancia en ningún caso', () => {
+    for (const delta of [650795, -650795, 1419478]) {
+      const texto = textoDiferenciaFrenteABase({ delta })
+      expect(texto.toLowerCase()).not.toMatch(/rentabilidad|retorno|roi|ganancia/)
+    }
+  })
+
+  it('nunca usa el signo +/− delante de la cifra — "más"/"menos" ya expresan la dirección', () => {
+    expect(textoDiferenciaFrenteABase({ delta: 650795 })).not.toMatch(/[+−-]\$/)
+    expect(textoDiferenciaFrenteABase({ delta: -650795 })).not.toMatch(/[+−-]\$/)
+  })
+
+  it('EVIDENCIA (fixture real): $200.000 y $391.309 producen exactamente "$650.795 más..." y "$1.419.478 más..."', () => {
+    expect(textoDiferenciaFrenteABase({ delta: 2731318 - 2080523 })).toBe('$650.795 más de pensión al mes frente a mantenerte como hoy.')
+    expect(textoDiferenciaFrenteABase({ delta: 3500001 - 2080523 })).toBe('$1.419.478 más de pensión al mes frente a mantenerte como hoy.')
+  })
+})
+
+describe('textoOrientacion — mapeo código → copy de "Qué podrías explorar ahora" (decisión de producto 2026-08-24)', () => {
+  it('los 7 códigos de determinarOrientacionExploracion tienen texto mapeado', () => {
+    const codigos = [
+      'HOY_YA_ALCANZA_OBJETIVO',
+      'OBJETIVO_LEGALMENTE_INALCANZABLE',
+      'VARIOS_CAMINOS_CUMPLEN_FALTA_PRIORIDAD',
+      'ELECCION_YA_ALCANZA_OBJETIVO',
+      'ELECCION_NO_ALCANZA_PERO_OBJETIVO_ES_ALCANZABLE',
+      'RESTRICCION_COSTO_IMPIDE_OBJETIVO',
+      'SIN_CAMINO_PERSONALIZADO_OBJETIVO_ALCANZABLE',
+    ]
+    for (const codigo of codigos) {
+      expect(typeof textoOrientacion(codigo)).toBe('string')
+      expect(textoOrientacion(codigo).length).toBeGreaterThan(0)
+    }
+  })
+
+  it('código desconocido → null, nunca lanza', () => {
+    expect(textoOrientacion('CODIGO_INVENTADO')).toBeNull()
+  })
+
+  it('EVIDENCIA (caso real $50.000): texto exacto de ELECCION_NO_ALCANZA_PERO_OBJETIVO_ES_ALCANZABLE', () => {
+    expect(textoOrientacion('ELECCION_NO_ALCANZA_PERO_OBJETIVO_ES_ALCANZABLE')).toBe(
+      'El esfuerzo que elegiste eleva tu proyección, pero no alcanza tu objetivo. Existe otro camino evaluado, ' +
+        'con un esfuerzo mensual distinto, que sí lo alcanza.'
+    )
+  })
+
+  it('EVIDENCIA (caso real objetivo $30.000.000): texto exacto de OBJETIVO_LEGALMENTE_INALCANZABLE', () => {
+    expect(textoOrientacion('OBJETIVO_LEGALMENTE_INALCANZABLE')).toBe(
+      'Con las condiciones actuales, aumentar tu aporte no permite alcanzar tu objetivo dentro del límite legal.'
+    )
+  })
+
+  it('ningún texto usa lenguaje evaluativo/financiero prohibido (mejor, recomendado, deberías, te conviene, asequible, rentable) ni cifras', () => {
+    const codigos = [
+      'HOY_YA_ALCANZA_OBJETIVO',
+      'OBJETIVO_LEGALMENTE_INALCANZABLE',
+      'VARIOS_CAMINOS_CUMPLEN_FALTA_PRIORIDAD',
+      'ELECCION_YA_ALCANZA_OBJETIVO',
+      'ELECCION_NO_ALCANZA_PERO_OBJETIVO_ES_ALCANZABLE',
+      'RESTRICCION_COSTO_IMPIDE_OBJETIVO',
+      'SIN_CAMINO_PERSONALIZADO_OBJETIVO_ALCANZABLE',
+    ]
+    for (const codigo of codigos) {
+      const texto = textoOrientacion(codigo).toLowerCase()
+      expect(texto).not.toMatch(/mejor|recomend|deber[ií]as|te conviene|asequible|rentab/)
+      expect(texto).not.toMatch(/\d/)
+    }
+  })
+})
+
 describe('textoHorizonte', () => {
   it('fixture real rpm-empleado-proyecta-tu-pension: fechas cortas + duración calendario + edad, en el orden y separadores acordados', () => {
     const horizonte = { fechaInicio: '2026-08-22', fechaFin: '2043-02-11', diasCotizados: 6018 }
@@ -196,5 +287,63 @@ describe('limitacionesEspecificas', () => {
 
     expect(limitacionesEspecificas(base, comunes)).toEqual([])
     expect(limitacionesEspecificas(alternativo, comunes)).toEqual([RESTRICCION_LIMITA])
+  })
+})
+
+describe('validarEsfuerzoAdicionalMensualDeseado — validación UX del camino personalizado (decisión de producto 2026-08-23)', () => {
+  it('cadena vacía → sin error todavía (la persona no ha escrito nada), valorValido null', () => {
+    expect(validarEsfuerzoAdicionalMensualDeseado('')).toEqual({ valorValido: null, mensajeError: null })
+  })
+
+  it('"0" → inválido, con mensaje — no permite confirmar un esfuerzo nulo', () => {
+    const { valorValido, mensajeError } = validarEsfuerzoAdicionalMensualDeseado('0')
+    expect(valorValido).toBeNull()
+    expect(mensajeError).toBe('Ingresa un monto mayor a $0.')
+  })
+
+  it('negativo → inválido, con mensaje', () => {
+    const { valorValido, mensajeError } = validarEsfuerzoAdicionalMensualDeseado('-200000')
+    expect(valorValido).toBeNull()
+    expect(mensajeError).toBe('Ingresa un monto mayor a $0.')
+  })
+
+  it('no numérico → inválido, con mensaje', () => {
+    const { valorValido, mensajeError } = validarEsfuerzoAdicionalMensualDeseado('abc')
+    expect(valorValido).toBeNull()
+    expect(mensajeError).toBe('Ingresa un monto mayor a $0.')
+  })
+
+  it('monto positivo válido → valorValido es el número, sin mensaje de error', () => {
+    expect(validarEsfuerzoAdicionalMensualDeseado('200000')).toEqual({ valorValido: 200000, mensajeError: null })
+  })
+})
+
+describe('ordenarCaminosParaPresentacion — orden SEMÁNTICO por id, nunca por monto (decisión de producto 2026-08-23)', () => {
+  const base = { id: 'base' }
+  const alternativo = { id: 'aumentar-ibc-futuro' }
+  const personalizado = { id: 'esfuerzo-adicional-deseado' }
+
+  it('[base, alternativo] → conserva el orden (sin camino personalizado, nada cambia)', () => {
+    expect(ordenarCaminosParaPresentacion([base, alternativo])).toEqual([base, alternativo])
+  })
+
+  it('[base, alternativo, personalizado] → [base, personalizado, alternativo]', () => {
+    expect(ordenarCaminosParaPresentacion([base, alternativo, personalizado])).toEqual([base, personalizado, alternativo])
+  })
+
+  it('solo base → conserva el orden', () => {
+    expect(ordenarCaminosParaPresentacion([base])).toEqual([base])
+  })
+
+  it('nunca muta el array recibido', () => {
+    const original = [base, alternativo, personalizado]
+    const copia = [...original]
+    ordenarCaminosParaPresentacion(original)
+    expect(original).toEqual(copia)
+  })
+
+  it('devuelve un array distinto del recibido (nunca la misma referencia)', () => {
+    const original = [base, alternativo, personalizado]
+    expect(ordenarCaminosParaPresentacion(original)).not.toBe(original)
   })
 })

@@ -29,12 +29,17 @@ import { tienePrimeraLecturaValor } from './domain/tienePrimeraLecturaValor.js'
 import PanelDesarrollo from './dev/PanelDesarrollo.jsx'
 import { construirSettersEdicion } from './dev/construirSettersEdicion.js'
 import { crearAdaptadorInterpretacionDesarrollo } from './dev/adaptadorInterpretacionDesarrollo.js'
+import { crearAdaptadorExplicacionDesarrollo } from './dev/adaptadorExplicacionDesarrollo.js'
 
 // Misma instancia reutilizada en cada render — nunca sustituye el adaptador de producción
 // de DeclaracionLibre.jsx (AdaptadorViaServidor, su valor por defecto): solo se pasa como
 // prop explícita más abajo, exclusivamente dentro del árbol import.meta.env.DEV, para poder
 // revisar S4-006 en el navegador sin consumir la API real de OpenAI.
 const adaptadorInterpretacionDesarrollo = import.meta.env.DEV ? crearAdaptadorInterpretacionDesarrollo() : null
+
+// Mismo criterio, para S4-007 — nunca sustituye el adaptador de producción de
+// ProyectaTuPensionRPM.jsx (AdaptadorExplicacionViaServidor, su valor por defecto).
+const adaptadorExplicacionDesarrollo = import.meta.env.DEV ? crearAdaptadorExplicacionDesarrollo() : null
 
 function App() {
   const [vista, setVista] = useState('bienvenida')
@@ -552,6 +557,8 @@ function App() {
             setRestriccionCostoPensionalAdicionalMaximoMensual
           }
           onVolver={() => setVista('exploraTuProyeccionRPM')}
+          declaracionLibre={declaracionLibre}
+          {...(import.meta.env.DEV ? { adaptadorExplicacion: adaptadorExplicacionDesarrollo } : {})}
         />
       )}
 

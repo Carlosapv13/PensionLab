@@ -222,7 +222,7 @@ function InformacionPensionalEsencial({
       </h1>
 
       {paso === 1 && (
-        <form onSubmit={manejarEnvioPaso1} ref={formRefPaso1}>
+        <form className="screen" onSubmit={manejarEnvioPaso1} ref={formRefPaso1}>
           <p className="screen__subtitle">
             Vamos a construir juntos tu historia pensional. Solo te
             preguntaremos lo esencial y siempre te explicaremos para qué lo
@@ -286,7 +286,7 @@ function InformacionPensionalEsencial({
       )}
 
       {paso === 2 && (
-        <form onSubmit={manejarEnvioPaso2} ref={formRefPaso2}>
+        <form className="screen" onSubmit={manejarEnvioPaso2} ref={formRefPaso2}>
           <fieldset className="options">
             <legend>¿Sabes aproximadamente cuántas semanas has cotizado?</legend>
 

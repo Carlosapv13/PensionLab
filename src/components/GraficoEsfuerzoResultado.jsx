@@ -25,6 +25,18 @@
 // sin restricción de costo de por medio), el objetivo declarado deja de estirar el dominio
 // Y y de dibujarse — se reemplaza por un mensaje textual fuera del SVG, en lenguaje de
 // proyección/escenario, que usa el extremo real ya calculado por dominio.
+//
+// Marcador "Tu elección" (2026-08-23, decisión de producto): representa el escenario
+// 'esfuerzo-adicional-deseado' de generarCaminosRPM.js — un tercer camino que la persona
+// eligió explorar (ver ProyectaTuPensionRPM.jsx). Reutiliza exactamente el mismo mecanismo
+// ya usado para "Tu objetivo" (`escenario.esfuerzo.costoPensionalAdicionalMensual` /
+// `escenario.resultado.valor`, escalados con `construirPuntoSvg` — nunca recalculados, sin
+// convertir esfuerzo→IBC en la UI) — el dominio no necesita saber nada de este marcador, el
+// escenario ya trae la misma forma que `puntoObjetivo`. Independiente de si el objetivo es
+// alcanzable: siempre se dibuja cuando existe un camino personalizado, sin importar qué
+// ocurra con "Tu objetivo". Si coincide exactamente con el objetivo, ambos marcadores caen
+// en el mismo píxel — se documenta ese solapamiento (ver test correspondiente), no se
+// inventa un desplazamiento ni una regla de desempate no pedida.
 
 import {
   ANCHO_SVG,
@@ -39,10 +51,19 @@ import {
 } from './GraficoEsfuerzoResultado.helpers.js'
 import { formatearPesos } from '../format/formatearDinero.js'
 
-const RADIO_PUNTO = { actual: 6, intermedio: 4, referencia_superior: 6, limite_restriccion: 6, extremo_superior: 6 }
+// Jerarquía visual de dos niveles (decisión de producto, 2026-08-24): "Hoy" (posición
+// 'actual') es protagonista, al mismo nivel que los marcadores "Tu elección"/"Tu objetivo"
+// (radio 7 más abajo) — el resto de la rejilla (los 3 'intermedio' que solo dan forma a la
+// curva, y el punto extremo donde termina la exploración) son contexto secundario: mismo
+// dato, misma curva, mismo dominio, solo con menor peso visual (radio más chico aquí,
+// opacidad reducida en App.css) para que no compitan por atención con la historia
+// Hoy → Tu elección → Tu objetivo.
+const RADIO_PUNTO = { actual: 6, intermedio: 3, referencia_superior: 5, limite_restriccion: 5, extremo_superior: 5 }
 
 // Etiqueta corta junto al punto — deliberadamente neutral, nunca sugiere que el margen del
-// 125% sea una meta o una recomendación ("Fin de exploración", no "Objetivo superior").
+// 125% sea una meta o una recomendación ("Fin de exploración", no "Objetivo superior"). Las
+// etiquetas de posiciones secundarias (todo excepto 'actual') se renderizan con menor peso
+// tipográfico — ver ES_POSICION_SECUNDARIA y su uso más abajo.
 const ETIQUETA_POSICION = {
   actual: 'Hoy',
   intermedio: null,
@@ -51,14 +72,23 @@ const ETIQUETA_POSICION = {
   extremo_superior: 'Tope explorado',
 }
 
+function esPosicionSecundaria(posicion) {
+  return posicion !== 'actual'
+}
+
 const RADIO_PUNTO_OBJETIVO = 7
+const RADIO_PUNTO_ELECCION = 7
 
 /**
  * @param {Object} props
  * @param {Object|null} props.barrido - `resultado.barrido` de generarCaminosRPM.js
  * @param {number|null} props.objetivoValorMensual
+ * @param {Object|null} [props.escenarioPersonalizado] - escenario 'esfuerzo-adicional-deseado'
+ *   de `resultado.escenarios` (generarCaminosRPM.js), o null/undefined si la persona no
+ *   exploró ningún esfuerzo personalizado. Se ignora si no está en estado 'viable' (un
+ *   camino descartado no trae `esfuerzo`/`resultado` utilizables).
  */
-function GraficoEsfuerzoResultado({ barrido, objetivoValorMensual }) {
+function GraficoEsfuerzoResultado({ barrido, objetivoValorMensual, escenarioPersonalizado = null }) {
   if (!barrido) return null
 
   if (barrido.estado === 'objetivo_ya_alcanzado' || barrido.estado === 'sin_margen') {
@@ -72,17 +102,28 @@ function GraficoEsfuerzoResultado({ barrido, objetivoValorMensual }) {
   const { puntos, puntoObjetivo } = barrido
   const extremo = puntos[puntos.length - 1]
 
+  const puntoPersonalizado = escenarioPersonalizado?.estado === 'viable' ? escenarioPersonalizado : null
+
   const valoresX = puntos.map((p) => p.esfuerzo.costoPensionalAdicionalMensual)
   if (puntoObjetivo) valoresX.push(puntoObjetivo.esfuerzo.costoPensionalAdicionalMensual)
+  if (puntoPersonalizado) valoresX.push(puntoPersonalizado.esfuerzo.costoPensionalAdicionalMensual)
   const dominioX = calcularDominioEje(valoresX)
 
   // objetivoIncluido: el objetivo solo entra al dominio Y (y se dibuja su línea/marcador)
   // cuando el barrido realmente lo alcanzó dentro de lo explorado — ver
   // calcularDominioYConObjetivo para el porqué (hallazgo de la revisión visual, 2026-08-21).
-  const { dominioY, objetivoIncluido } = calcularDominioYConObjetivo(puntos, puntoObjetivo, objetivoValorMensual)
+  // puntoPersonalizado, en cambio, siempre entra al dominio Y cuando existe — independiente
+  // de si alcanza el objetivo (ver comentario de cabecera).
+  const { dominioY, objetivoIncluido } = calcularDominioYConObjetivo(
+    puntos,
+    puntoObjetivo,
+    objetivoValorMensual,
+    puntoPersonalizado
+  )
   const puntosSvg = construirPuntosSvg(puntos, dominioX, dominioY)
   const ruta = construirRutaLinea(puntosSvg)
   const puntoObjetivoSvg = puntoObjetivo ? construirPuntoSvg(puntoObjetivo, dominioX, dominioY) : null
+  const puntoPersonalizadoSvg = puntoPersonalizado ? construirPuntoSvg(puntoPersonalizado, dominioX, dominioY) : null
 
   const yObjetivo = objetivoIncluido ? calcularYObjetivo(objetivoValorMensual, dominioY) : null
 
@@ -176,7 +217,9 @@ function GraficoEsfuerzoResultado({ barrido, objetivoValorMensual }) {
             />
             {ETIQUETA_POSICION[p.posicion] && (
               <text
-                className="grafico-esfuerzo-resultado__punto-etiqueta"
+                className={`grafico-esfuerzo-resultado__punto-etiqueta${
+                  esPosicionSecundaria(p.posicion) ? ' grafico-esfuerzo-resultado__punto-etiqueta--secundaria' : ''
+                }`}
                 x={p.x}
                 y={p.y - RADIO_PUNTO[p.posicion] - 8}
                 textAnchor="middle"
@@ -203,6 +246,31 @@ function GraficoEsfuerzoResultado({ barrido, objetivoValorMensual }) {
               textAnchor="middle"
             >
               Tu objetivo
+            </text>
+          </g>
+        )}
+
+        {/* Marcador aparte del esfuerzo personalizado ("Tu elección") — cuadrado, para
+            distinguirse tanto de los círculos de la rejilla como del rombo del objetivo,
+            sin introducir un color nuevo (misma regla que el marcador de objetivo). Si
+            coincide exactamente con "Tu objetivo" caen en el mismo píxel — solapamiento
+            documentado (ver GraficoEsfuerzoResultado.helpers.test.js), no resuelto aquí. */}
+        {puntoPersonalizadoSvg && (
+          <g>
+            <rect
+              className="grafico-esfuerzo-resultado__punto-eleccion"
+              x={puntoPersonalizadoSvg.x - RADIO_PUNTO_ELECCION}
+              y={puntoPersonalizadoSvg.y - RADIO_PUNTO_ELECCION}
+              width={RADIO_PUNTO_ELECCION * 2}
+              height={RADIO_PUNTO_ELECCION * 2}
+            />
+            <text
+              className="grafico-esfuerzo-resultado__punto-etiqueta grafico-esfuerzo-resultado__punto-etiqueta--eleccion"
+              x={puntoPersonalizadoSvg.x}
+              y={puntoPersonalizadoSvg.y - RADIO_PUNTO_ELECCION - 8}
+              textAnchor="middle"
+            >
+              Tu elección
             </text>
           </g>
         )}

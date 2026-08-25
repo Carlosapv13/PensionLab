@@ -106,18 +106,25 @@ export function construirRutaLinea(puntosSvg) {
  * componente usa para decidir si dibuja la línea/etiqueta del objetivo o, en su lugar, un
  * mensaje textual fuera del SVG.
  *
+ * `puntoPersonalizado` (decisión de producto 2026-08-23, marcador "Tu elección") — a
+ * diferencia del objetivo, siempre se incluye en el dominio cuando existe: no depende de
+ * si alcanza ninguna meta, solo de que la persona lo haya explorado. Nunca afecta
+ * `objetivoIncluido` — ambas señales son independientes por diseño (ver GraficoEsfuerzoResultado.jsx).
+ *
  * @param {Array<{resultado: {valor: number}}>} puntos - barrido.puntos
  * @param {{resultado: {valor: number}}|null} puntoObjetivo - barrido.puntoObjetivo
  * @param {number|null} objetivoValorMensual
+ * @param {{resultado: {valor: number}}|null} [puntoPersonalizado] - escenario esfuerzo-adicional-deseado, ya calculado por dominio
  * @returns {{dominioY: {min: number, max: number}, objetivoIncluido: boolean}}
  */
-export function calcularDominioYConObjetivo(puntos, puntoObjetivo, objetivoValorMensual) {
+export function calcularDominioYConObjetivo(puntos, puntoObjetivo, objetivoValorMensual, puntoPersonalizado = null) {
   const objetivoDeclarado = objetivoValorMensual !== null && objetivoValorMensual !== undefined
   const objetivoIncluido = puntoObjetivo !== null && objetivoDeclarado
 
   const valoresY = puntos.map((p) => p.resultado.valor)
   if (puntoObjetivo) valoresY.push(puntoObjetivo.resultado.valor)
   if (objetivoIncluido) valoresY.push(objetivoValorMensual)
+  if (puntoPersonalizado) valoresY.push(puntoPersonalizado.resultado.valor)
 
   return { dominioY: calcularDominioEje(valoresY), objetivoIncluido }
 }

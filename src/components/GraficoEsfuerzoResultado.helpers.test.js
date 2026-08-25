@@ -153,6 +153,66 @@ describe('calcularDominioYConObjetivo', () => {
     expect(objetivoIncluido).toBe(false) // objetivoValorMensual ausente, no se incluye SU valor
     expect(dominioY.max).toBe(5000000) // pero puntoObjetivo.resultado.valor sí, es un punto real del barrido
   })
+
+  // A. Marcador "Tu elección" (decisión de producto 2026-08-23) — sin escenario
+  // personalizado, el 4º parámetro se omite o es null: comportamiento idéntico al ya
+  // probado arriba, ningún caso nuevo se activa.
+  it('sin puntoPersonalizado (omitido): mismo resultado que antes de esta capacidad', () => {
+    const puntoObjetivo = { resultado: { valor: 3500000 } }
+    const conDefault = calcularDominioYConObjetivo(puntos, puntoObjetivo, 3500000)
+    const conNullExplicito = calcularDominioYConObjetivo(puntos, puntoObjetivo, 3500000, null)
+    expect(conDefault).toEqual(conNullExplicito)
+    expect(conDefault.dominioY).toEqual({ min: 2000000, max: 4375000 })
+  })
+
+  // B. Con escenario personalizado presente, el dominio Y se estira para incluirlo aunque
+  // caiga fuera del rango de la curva/objetivo ya calculados.
+  it('con puntoPersonalizado fuera del rango de la curva: el dominio Y se estira para incluirlo', () => {
+    const puntoPersonalizado = { resultado: { valor: 2731318 } } // dentro del rango en este caso
+    const { dominioY } = calcularDominioYConObjetivo(puntos, null, null, puntoPersonalizado)
+    expect(dominioY).toEqual({ min: 2000000, max: 4375000 }) // ya estaba dentro, no cambia el máximo
+
+    const puntoPersonalizadoAlto = { resultado: { valor: 5200000 } } // por encima de todo lo demás
+    const { dominioY: dominioYAlto } = calcularDominioYConObjetivo(puntos, null, null, puntoPersonalizadoAlto)
+    expect(dominioYAlto.max).toBe(5200000) // el punto elegido nunca queda fuera del área visible
+  })
+
+  // C. Objetivo alcanzable + personalizado: ambos entran al dominio simultáneamente, sin
+  // que uno excluya al otro — pueden coexistir en el mismo gráfico.
+  it('objetivo alcanzable + personalizado: ambos valores entran al dominio Y, objetivoIncluido sigue true', () => {
+    const puntoObjetivo = { resultado: { valor: 3500001 } } // "Tu objetivo" ($391.309 del caso real)
+    const puntoPersonalizado = { resultado: { valor: 4900000 } } // "Tu elección", deliberadamente por encima de todo lo demás
+    const { dominioY, objetivoIncluido } = calcularDominioYConObjetivo(puntos, puntoObjetivo, 3500000, puntoPersonalizado)
+    expect(objetivoIncluido).toBe(true) // "Tu objetivo" se sigue dibujando
+    expect(dominioY.max).toBe(4900000) // y el dominio se estiró para que "Tu elección" también quepa — coexisten
+  })
+
+  // D. Objetivo NO alcanzable + personalizado: objetivoIncluido debe seguir false — el
+  // marcador de elección nunca "fabrica" un punto objetivo que el dominio no calculó.
+  it('objetivo NO alcanzable + personalizado presente: objetivoIncluido sigue false, nunca se inventa "Tu objetivo"', () => {
+    const puntoPersonalizado = { resultado: { valor: 2731318 } }
+    const { dominioY, objetivoIncluido } = calcularDominioYConObjetivo(puntos, null, 8000000, puntoPersonalizado)
+    expect(objetivoIncluido).toBe(false)
+    expect(dominioY.max).toBeGreaterThanOrEqual(2731318) // el personalizado sí entra
+    expect(dominioY.max).toBeLessThan(8000000) // el objetivo inalcanzable NO estira el dominio
+  })
+})
+
+// E. Coincidencia exacta entre "Tu elección" y "Tu objetivo": documenta que ambos marcadores
+// caen en el mismo píxel cuando representan la misma cifra — comportamiento actual, no
+// resuelto con desplazamiento ni tolerancia (decisión de producto explícita, 2026-08-23).
+describe('construirPuntoSvg — solapamiento cuando el esfuerzo personalizado coincide con el objetivo', () => {
+  it('mismo esfuerzo y mismo resultado → mismas coordenadas SVG exactas (superposición documentada, no evitada)', () => {
+    const dominioX = { min: 0, max: 500000 }
+    const dominioY = { min: 2000000, max: 3500001 }
+    const puntoObjetivo = { esfuerzo: { costoPensionalAdicionalMensual: 391309 }, resultado: { valor: 3500001 } }
+    const puntoPersonalizadoIgual = { esfuerzo: { costoPensionalAdicionalMensual: 391309 }, resultado: { valor: 3500001 } }
+
+    const svgObjetivo = construirPuntoSvg(puntoObjetivo, dominioX, dominioY)
+    const svgEleccion = construirPuntoSvg(puntoPersonalizadoIgual, dominioX, dominioY)
+
+    expect(svgEleccion).toEqual(svgObjetivo) // mismo píxel — un marcador queda visualmente encima del otro
+  })
 })
 
 describe('calcularYObjetivo', () => {

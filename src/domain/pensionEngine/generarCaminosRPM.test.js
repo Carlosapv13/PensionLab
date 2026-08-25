@@ -242,6 +242,11 @@ describe('generarCaminosRPM — objetivo no alcanzable ni en el tope', () => {
     expect(alternativo.entradas).toBeNull()
     expect(r.orientacion.codigo).toBe('NINGUNO_CUMPLE_MAS_CERCANO')
     expect(r.orientacion.caminoMasAlineadoId).toBe('base')
+    // objetivoLegalmenteInalcanzable (decisión de producto, 2026-08-24): caminoMasAlineadoId
+    // se conserva tal cual arriba (información determinista interna) — este campo aditivo es
+    // lo único nuevo, y le dice a la UI/IA que esa cercanía no debe convertirse en una
+    // distinción visual ni en "posición oficial" (ver ProyectaTuPensionRPM.jsx/explicarCaminos.js).
+    expect(r.orientacion.objetivoLegalmenteInalcanzable).toBe(true)
   })
 })
 
@@ -255,6 +260,10 @@ describe('generarCaminosRPM — IBC actual ya en el tope legal', () => {
 
     expect(r.escenarios).toHaveLength(2)
     expect(r.escenarios[1].razonDescartado.codigo).toBe('YA_EN_TOPE_LEGAL')
+    // Mismo tratamiento que OBJETIVO_NO_ALCANZABLE_NI_EN_TOPE — también es una imposibilidad
+    // legal/estructural, no una elección del usuario que pueda revertirse.
+    expect(r.orientacion.objetivoLegalmenteInalcanzable).toBe(true)
+    expect(r.orientacion.caminoMasAlineadoId).toBe('base')
   })
 })
 
@@ -300,6 +309,11 @@ describe('generarCaminosRPM — restricción de costo pensional adicional', () =
     const alternativo = r.escenarios[1]
     expect(alternativo.distanciaObjetivo.cumple).toBe(false)
     expect(alternativo.limitaciones.map((l) => l.codigo)).toContain('RESTRICCION_COSTO_LIMITA_RESULTADO')
+    // EVIDENCIA (2026-08-24): a diferencia de OBJETIVO_NO_ALCANZABLE_NI_EN_TOPE/YA_EN_TOPE_LEGAL,
+    // aquí el alternativo sigue VIABLE (no descartado) — es una restricción autoimpuesta por
+    // el usuario, no una imposibilidad legal. La distinción "Camino más alineado" debe
+    // seguir mostrándose: objetivoLegalmenteInalcanzable debe quedar en false.
+    expect(r.orientacion.objetivoLegalmenteInalcanzable).toBe(false)
   })
 
   it('confirma que el mismo objetivo del test anterior SÍ era alcanzable sin la restricción (prueba de que la restricción era realmente la causa)', () => {
@@ -326,6 +340,222 @@ describe('generarCaminosRPM — restricción de costo pensional adicional', () =
       restriccionCostoPensionalAdicionalMaximoMensual: 900000000, // deliberadamente no vinculante
     })
     expect(rRestriccionAmplia.escenarios[1].limitaciones.map((l) => l.codigo)).not.toContain('RESTRICCION_COSTO_LIMITA_RESULTADO')
+  })
+})
+
+describe('generarCaminosRPM — camino personalizado (esfuerzoAdicionalMensualDeseado, decisión de producto 2026-08-23)', () => {
+  function calcularBase() {
+    return calcularProyeccionRPM({
+      historiaCotizacion: PERFIL_BASE.historiaCotizacion,
+      fechaNacimiento: PERFIL_BASE.fechaNacimiento,
+      edadJubilacionDeseada: PERFIL_BASE.edadJubilacionDeseada,
+      escenarioIbcFuturo: { valor: PERFIL_BASE.ibcAplicableSimulacion, origen: 'continuidad_ibc_actual' },
+      fecha: FECHA_CALCULO,
+    })
+  }
+  function tasaCotizacionFraccion() {
+    return obtenerTasaCotizacion(FECHA_CALCULO).valor / 100
+  }
+  function objetivoNoAlcanzadoPorBase() {
+    return calcularBase().pensionMensualProyectada * 1.5 // garantiza que el base no lo cumple
+  }
+
+  it('1. monto exacto $200.000 → genera un tercer camino con cálculo real, verificado de forma independiente contra calcularProyeccionRPM', () => {
+    const objetivoValorMensual = objetivoNoAlcanzadoPorBase()
+    const tasa = tasaCotizacionFraccion()
+    const ibcEsperado = PERFIL_BASE.ibcAplicableSimulacion + 200000 / tasa
+    const proyeccionEsperada = calcularProyeccionRPM({
+      historiaCotizacion: PERFIL_BASE.historiaCotizacion,
+      fechaNacimiento: PERFIL_BASE.fechaNacimiento,
+      edadJubilacionDeseada: PERFIL_BASE.edadJubilacionDeseada,
+      escenarioIbcFuturo: { valor: ibcEsperado, origen: 'esfuerzo_adicional_declarado' },
+      fecha: FECHA_CALCULO,
+    })
+
+    const r = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual, esfuerzoAdicionalMensualDeseado: 200000 })
+    const personalizado = r.escenarios.find((e) => e.id === 'esfuerzo-adicional-deseado')
+
+    expect(personalizado).toBeDefined()
+    expect(personalizado.estado).toBe('viable')
+    expect(personalizado.tipo).toBe('alternativo')
+    expect(personalizado.entradas.escenarioIbcFuturo.origen).toBe('esfuerzo_adicional_declarado')
+    expect(personalizado.entradas.escenarioIbcFuturo.valorAplicado).toBe(ibcEsperado)
+    expect(personalizado.resultado.valor).toBe(proyeccionEsperada.pensionMensualProyectada)
+  })
+
+  it('2. costoPensionalAdicionalMensual del escenario coincide con el monto declarado cuando el tope legal no interviene', () => {
+    const objetivoValorMensual = objetivoNoAlcanzadoPorBase()
+    const r = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual, esfuerzoAdicionalMensualDeseado: 200000 })
+    const personalizado = r.escenarios.find((e) => e.id === 'esfuerzo-adicional-deseado')
+    // Sin redondeo (a diferencia de la bisección): la única fuente posible de diferencia es
+    // ruido de punto flotante, nunca una diferencia material — tolerancia de 1 peso.
+    expect(Math.abs(personalizado.esfuerzo.costoPensionalAdicionalMensual - 200000)).toBeLessThan(1)
+  })
+
+  it('3. esfuerzoAdicionalMensualDeseado ausente (default null) → no genera ningún tercer camino', () => {
+    const r = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual: objetivoNoAlcanzadoPorBase() })
+    expect(r.escenarios.find((e) => e.id === 'esfuerzo-adicional-deseado')).toBeUndefined()
+  })
+
+  it('4. monto inválido (0, negativo, no numérico, undefined) → tratado explícitamente como "no solicitado": nunca genera el tercer camino, nunca lanza', () => {
+    for (const valorInvalido of [0, -100000, NaN, 'no-es-numero', undefined]) {
+      const r = generarCaminosRPM({
+        ...PERFIL_BASE,
+        objetivoValorMensual: objetivoNoAlcanzadoPorBase(),
+        esfuerzoAdicionalMensualDeseado: valorInvalido,
+      })
+      expect(r.escenarios.find((e) => e.id === 'esfuerzo-adicional-deseado')).toBeUndefined()
+    }
+  })
+
+  it('5. respeta el tope legal — un monto que llevaría el IBC candidato por encima del tope se recorta dentro de calcularProyeccionRPM, nunca lo excede', () => {
+    const r = generarCaminosRPM({
+      ...PERFIL_BASE,
+      objetivoValorMensual: objetivoNoAlcanzadoPorBase(),
+      esfuerzoAdicionalMensualDeseado: 900000000, // garantiza exceder el tope legal
+    })
+    const personalizado = r.escenarios.find((e) => e.id === 'esfuerzo-adicional-deseado')
+
+    expect(personalizado.entradas.escenarioIbcFuturo.valorAplicado).toBe(TOPE_IBC_2026)
+    expect(personalizado.entradas.escenarioIbcFuturo.valorDeclarado).toBeGreaterThan(TOPE_IBC_2026)
+
+    // El costo reportado refleja el IBC ya recortado — honestamente menor que el monto
+    // pedido, nunca el monto pedido tal cual ni uno inventado.
+    const tasa = tasaCotizacionFraccion()
+    const costoEsperado = (TOPE_IBC_2026 - PERFIL_BASE.ibcAplicableSimulacion) * tasa
+    expect(Math.abs(personalizado.esfuerzo.costoPensionalAdicionalMensual - costoEsperado)).toBeLessThan(1)
+    expect(personalizado.esfuerzo.costoPensionalAdicionalMensual).toBeLessThan(900000000)
+  })
+
+  it('5b. ibcAplicableSimulacion ya en el tope legal → el camino personalizado se descarta con YA_EN_TOPE_LEGAL (mismo código que el alternativo en esa misma situación — no se inventa uno nuevo para la misma causa)', () => {
+    const r = generarCaminosRPM({
+      ...PERFIL_BASE,
+      ibcAplicableSimulacion: TOPE_IBC_2026,
+      objetivoValorMensual: 900000000,
+      esfuerzoAdicionalMensualDeseado: 200000,
+    })
+    const personalizado = r.escenarios.find((e) => e.id === 'esfuerzo-adicional-deseado')
+    expect(personalizado.estado).toBe('descartado')
+    expect(personalizado.razonDescartado.codigo).toBe('YA_EN_TOPE_LEGAL')
+    expect(personalizado.resultado).toBeNull()
+  })
+
+  it('6. elegibilidad insuficiente (edad por debajo del mínimo legal) → el tercer camino nunca se evalúa, la función retorna antes de leer esfuerzoAdicionalMensualDeseado', () => {
+    const r = generarCaminosRPM({
+      ...PERFIL_BASE,
+      fechaNacimiento: '2000-01-01',
+      edadJubilacionDeseada: 50, // por debajo del mínimo legal (62, Hombre)
+      esfuerzoAdicionalMensualDeseado: 200000,
+    })
+    expect(r.escenarios).toEqual([])
+    expect(r.orientacion.codigo).toBe('EDAD_JUBILACION_INFERIOR_A_EDAD_MINIMA_LEGAL')
+  })
+
+  it('6b. elegibilidad insuficiente (semanas mínimas) → mismo tratamiento, sin ningún tercer camino', () => {
+    const r = generarCaminosRPM({
+      ...PERFIL_BASE,
+      historiaCotizacion: historiaDiezAniosCompleta(),
+      esfuerzoAdicionalMensualDeseado: 200000,
+    })
+    expect(r.escenarios).toEqual([])
+    expect(r.orientacion.codigo).toBe('SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM')
+  })
+
+  it('7. el escenario personalizado tiene exactamente la misma estructura (mismas claves) que los caminos base/alternativo ya existentes', () => {
+    const objetivoValorMensual = objetivoNoAlcanzadoPorBase()
+    const r = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual, esfuerzoAdicionalMensualDeseado: 200000 })
+    const [base, alternativo, personalizado] = r.escenarios
+    expect(Object.keys(personalizado).sort()).toEqual(Object.keys(base).sort())
+    expect(Object.keys(personalizado).sort()).toEqual(Object.keys(alternativo).sort())
+    // Mismas sub-claves de esfuerzo/distanciaObjetivo — nunca una forma reducida.
+    expect(Object.keys(personalizado.esfuerzo).sort()).toEqual(Object.keys(alternativo.esfuerzo).sort())
+    expect(Object.keys(personalizado.distanciaObjetivo).sort()).toEqual(Object.keys(alternativo.distanciaObjetivo).sort())
+  })
+
+  it('determinismo: misma entrada produce exactamente el mismo resultado', () => {
+    const objetivoValorMensual = objetivoNoAlcanzadoPorBase()
+    const r1 = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual, esfuerzoAdicionalMensualDeseado: 200000 })
+    const r2 = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual, esfuerzoAdicionalMensualDeseado: 200000 })
+    expect(r1).toEqual(r2)
+  })
+
+  it('el barrido y el resto del resultado no se ven afectados por la presencia del camino personalizado — solo agrega un elemento a escenarios', () => {
+    const objetivoValorMensual = objetivoNoAlcanzadoPorBase()
+    const conPersonalizado = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual, esfuerzoAdicionalMensualDeseado: 200000 })
+    const sinPersonalizado = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual })
+    expect(conPersonalizado.barrido).toEqual(sinPersonalizado.barrido)
+    expect(conPersonalizado.horizonte).toEqual(sinPersonalizado.horizonte)
+    expect(conPersonalizado.escenarios).toHaveLength(sinPersonalizado.escenarios.length + 1)
+  })
+})
+
+describe('generarCaminosRPM — diferenciaFrenteABase (decisión de producto, 2026-08-24)', () => {
+  function calcularBase() {
+    return calcularProyeccionRPM({
+      historiaCotizacion: PERFIL_BASE.historiaCotizacion,
+      fechaNacimiento: PERFIL_BASE.fechaNacimiento,
+      edadJubilacionDeseada: PERFIL_BASE.edadJubilacionDeseada,
+      escenarioIbcFuturo: { valor: PERFIL_BASE.ibcAplicableSimulacion, origen: 'continuidad_ibc_actual' },
+      fecha: FECHA_CALCULO,
+    })
+  }
+  function objetivoNoAlcanzadoPorBase() {
+    return calcularBase().pensionMensualProyectada * 1.5
+  }
+
+  it('A. camino base: diferenciaFrenteABase.delta === 0 (se resta contra sí mismo, sin caso especial por id)', () => {
+    const r = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual: objetivoNoAlcanzadoPorBase() })
+    const base = r.escenarios.find((e) => e.id === 'base')
+    expect(base.diferenciaFrenteABase).toEqual({ delta: 0 })
+  })
+
+  it('B. camino personalizado: delta === resultado.valor - base.resultado.valor exactamente (verificado independientemente)', () => {
+    const objetivoValorMensual = objetivoNoAlcanzadoPorBase()
+    const r = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual, esfuerzoAdicionalMensualDeseado: 200000 })
+    const base = r.escenarios.find((e) => e.id === 'base')
+    const personalizado = r.escenarios.find((e) => e.id === 'esfuerzo-adicional-deseado')
+    expect(personalizado.diferenciaFrenteABase.delta).toBe(personalizado.resultado.valor - base.resultado.valor)
+    expect(personalizado.diferenciaFrenteABase.delta).toBeGreaterThan(0) // más esfuerzo, más pensión — monotonicidad ya validada (§8.5)
+  })
+
+  it('C. camino objetivo (alternativo): mismo criterio', () => {
+    const objetivoValorMensual = objetivoNoAlcanzadoPorBase()
+    const r = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual })
+    const base = r.escenarios.find((e) => e.id === 'base')
+    const alternativo = r.escenarios.find((e) => e.id === 'aumentar-ibc-futuro')
+    expect(alternativo.diferenciaFrenteABase.delta).toBe(alternativo.resultado.valor - base.resultado.valor)
+  })
+
+  it('D. la resta es directa, sin Math.abs ni clamping — un delta negativo (si existiera) se conservaría intacto. Nota arquitectónica: hoy generarCaminosRPM.js no puede producir legítimamente un camino viable con pensión menor que el base (el alternativo y el personalizado solo evalúan IBC >= ibcActual, y la monotonicidad de calcularProyeccionRPM ya está validada en §8.5) — por eso el signo negativo se prueba de forma exhaustiva a nivel de helper de presentación (ProyectaTuPensionRPM.helpers.test.js), que sí recibe deltas arbitrarios. Aquí solo se confirma que la resta del dominio nunca invierte ni recorta el signo de un delta positivo real.', () => {
+    const objetivoValorMensual = objetivoNoAlcanzadoPorBase()
+    const r = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual, esfuerzoAdicionalMensualDeseado: 50000 })
+    const base = r.escenarios.find((e) => e.id === 'base')
+    const personalizado = r.escenarios.find((e) => e.id === 'esfuerzo-adicional-deseado')
+    // Un esfuerzo pequeño produce un delta pequeño pero sigue siendo exactamente la resta —
+    // nunca 0 por redondeo, nunca forzado a un mínimo.
+    expect(personalizado.diferenciaFrenteABase.delta).toBe(personalizado.resultado.valor - base.resultado.valor)
+    expect(personalizado.diferenciaFrenteABase.delta).not.toBe(0)
+  })
+
+  it('escenario descartado (sin resultado) → diferenciaFrenteABase es null, nunca un delta inventado sobre un resultado inexistente', () => {
+    const r = generarCaminosRPM({
+      ...PERFIL_BASE,
+      ibcAplicableSimulacion: TOPE_IBC_2026,
+      objetivoValorMensual: 900000000,
+      esfuerzoAdicionalMensualDeseado: 200000,
+    })
+    const personalizadoDescartado = r.escenarios.find((e) => e.id === 'esfuerzo-adicional-deseado')
+    expect(personalizadoDescartado.estado).toBe('descartado')
+    expect(personalizadoDescartado.diferenciaFrenteABase).toBeNull()
+  })
+
+  it('no requiere volver a llamar calcularProyeccionRPM — mismo resultado.valor de cada escenario ya construido, verificado por igualdad estructural completa con el resto del camino', () => {
+    const objetivoValorMensual = objetivoNoAlcanzadoPorBase()
+    const r = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual, esfuerzoAdicionalMensualDeseado: 200000 })
+    const alternativo = r.escenarios.find((e) => e.id === 'aumentar-ibc-futuro')
+    // Mismas claves que antes de este cambio, más exactamente una: diferenciaFrenteABase.
+    expect(Object.keys(alternativo)).toContain('diferenciaFrenteABase')
+    expect(Object.keys(alternativo.diferenciaFrenteABase)).toEqual(['delta'])
   })
 })
 

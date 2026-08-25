@@ -11,6 +11,20 @@
 // inventa su contenido ni se asigna a ningún Slice futuro como obligación (decisión
 // Carlos/Atlas, 2026-08-20).
 //
+// Tercer camino — "esfuerzo adicional mensual deseado" (decisión de producto 2026-08-23):
+// distinto de restriccionCostoPensionalAdicionalMaximoMensual (un TECHO máximo que acota la
+// búsqueda del camino alternativo) — esfuerzoAdicionalMensualDeseado es el monto EXACTO que
+// la persona quiere EVALUAR como escenario, sin ninguna búsqueda de objetivo de por medio.
+// Nombre elegido explícitamente para no reutilizar "restriccion" (conceptos distintos, ver
+// docs/gestion/cierre-sprint-4.md) — reutiliza el vocabulario ya establecido en
+// esfuerzo.costoPensionalAdicionalMensual (el campo de salida que este parámetro pretende
+// dejar explorar de forma dirigida, en vez de solo observarlo en los 5 puntos automáticos
+// del barrido). Reutiliza, sin ninguna fórmula paralela: la misma conversión monto→IBC ya
+// usada para limiteIBCPorRestriccion (más abajo), y el mismo
+// calcularProyeccionRPM/construirCamino que ya usan el camino base y el alternativo — el
+// tope legal se aplica automáticamente dentro de calcularProyeccionRPM (Math.min interno),
+// nunca recortado a mano aquí.
+//
 // S4-005 agrega `barrido` — 5 puntos deterministas de la misma curva esfuerzo↔resultado.
 // Separado a propósito de `escenarios`: no son caminos con decisión/limitaciones/
 // trazabilidad propias, son muestras de la misma curva que `escenarios` ya evalúa —
@@ -49,7 +63,7 @@ const LIMITACION_RESTRICCION_COSTO_LIMITA_RESULTADO = {
 function resultadoVacio(codigo, razon, detalleElegibilidad = null) {
   return {
     escenarios: [],
-    orientacion: { caminoMasAlineadoId: null, codigo, razon },
+    orientacion: { caminoMasAlineadoId: null, codigo, razon, objetivoLegalmenteInalcanzable: false },
     detalleElegibilidad,
     barrido: null,
     horizonte: null,
@@ -60,6 +74,13 @@ function resultadoVacio(codigo, razon, detalleElegibilidad = null) {
 // sobre estado/distanciaObjetivo, sin nada específico de RAIS ni de RPM), mismo criterio
 // de duplicación ya usado en este proyecto para no acoplar un motor al archivo del otro
 // régimen. Si un tercer régimen la necesitara, ahí correspondería extraerla.
+// Códigos de descarte que significan "legal/estructuralmente inalcanzable, sin que ninguna
+// elección del usuario lo cambie" — distinto de RESTRICCION_COSTO_LIMITA_RESULTADO (una
+// limitación sobre un camino todavía VIABLE, causada por una restricción de costo que el
+// propio usuario declaró y podría levantar). Decisión de producto, 2026-08-24: solo estos
+// dos códigos deben apagar la distinción visual "Camino más alineado" — ver más abajo.
+const CODIGOS_OBJETIVO_LEGALMENTE_INALCANZABLE = ['OBJETIVO_NO_ALCANZABLE_NI_EN_TOPE', 'YA_EN_TOPE_LEGAL']
+
 function calcularOrientacion(escenarios) {
   const viables = escenarios.filter((e) => e.estado === 'viable')
 
@@ -68,6 +89,7 @@ function calcularOrientacion(escenarios) {
       caminoMasAlineadoId: null,
       codigo: 'SIN_CAMINOS_VIABLES',
       razon: 'Ningún camino resultó evaluable con la información actual.',
+      objetivoLegalmenteInalcanzable: false,
     }
   }
 
@@ -78,6 +100,7 @@ function calcularOrientacion(escenarios) {
       caminoMasAlineadoId: cumplen[0].id,
       codigo: 'UNICO_CUMPLE',
       razon: 'Es el único camino evaluado que alcanza tu objetivo.',
+      objetivoLegalmenteInalcanzable: false,
     }
   }
 
@@ -87,14 +110,26 @@ function calcularOrientacion(escenarios) {
       codigo: 'VARIOS_CUMPLEN_FALTA_PRIORIDAD',
       razon:
         'Más de un camino evaluado alcanza tu objetivo; falta que definas una prioridad entre ellos para elegir uno.',
+      objetivoLegalmenteInalcanzable: false,
     }
   }
 
   const masCercano = viables.reduce((a, b) => (a.distanciaObjetivo.delta <= b.distanciaObjetivo.delta ? a : b))
+
+  // Campo aditivo (decisión de producto, 2026-08-24): caminoMasAlineadoId/codigo/razon NO
+  // cambian — se sigue calculando y conservando exactamente igual que antes, como
+  // información determinista interna. Este campo solo le dice a la UI (y a la construcción
+  // del contexto de la explicación IA) si esa cercanía matemática debe convertirse en una
+  // distinción visual/de "posición oficial", o no — nunca borra ni recalcula el dato.
+  const objetivoLegalmenteInalcanzable = escenarios.some(
+    (e) => e.estado === 'descartado' && CODIGOS_OBJETIVO_LEGALMENTE_INALCANZABLE.includes(e.razonDescartado?.codigo)
+  )
+
   return {
     caminoMasAlineadoId: masCercano.id,
     codigo: 'NINGUNO_CUMPLE_MAS_CERCANO',
     razon: 'Ningún camino evaluado alcanza tu objetivo completo; este es el que más se acerca.',
+    objetivoLegalmenteInalcanzable,
   }
 }
 
@@ -394,10 +429,15 @@ function biseccionarEscenarioIbcFuturo({ construirInput, ibcActual, topeAplicado
  * @param {number|null} input.ibcAplicableSimulacion - ya resuelto y apto (determinarBaseCotizacion.js)
  * @param {number|null} input.objetivoValorMensual - en pesos de fechaBaseMonetaria
  * @param {number|null} [input.restriccionCostoPensionalAdicionalMaximoMensual]
+ * @param {number|null} [input.esfuerzoAdicionalMensualDeseado] - monto EXACTO que la
+ *   persona quiere evaluar como escenario (distinto de restriccionCostoPensionalAdicionalMaximoMensual,
+ *   que es un techo para la búsqueda del alternativo, no un punto a evaluar). Default null
+ *   — sin él, el tercer camino no se genera. Debe ser un número finito > 0; cualquier otro
+ *   valor (null, 0, negativo, no numérico) se trata como "no solicitado", nunca como error.
  * @param {string} [input.fecha]
  * @returns {{
  *   escenarios: Array<Object>,
- *   orientacion: { caminoMasAlineadoId: string|null, codigo: string, razon: string },
+ *   orientacion: { caminoMasAlineadoId: string|null, codigo: string, razon: string, objetivoLegalmenteInalcanzable: boolean },
  *   detalleElegibilidad: Object|null,
  *   barrido: {
  *     estado: 'calculado'|'sin_margen'|'objetivo_ya_alcanzado',
@@ -424,6 +464,7 @@ export function generarCaminosRPM({
   ibcAplicableSimulacion,
   objetivoValorMensual,
   restriccionCostoPensionalAdicionalMaximoMensual = null,
+  esfuerzoAdicionalMensualDeseado = null,
   fecha = hoyISO(),
 }) {
   // --- Perfil (S4-001: sin restricción de tipoCotizante/lugarCotizacion/trasladoRegimen) ---
@@ -605,6 +646,60 @@ export function generarCaminosRPM({
     }
   }
 
+  // --- Camino personalizado: esfuerzo adicional mensual EXACTO que la persona declaró
+  // querer explorar --- Independiente de lo que haya ocurrido arriba con el camino
+  // alternativo (que busca el IBC mínimo para alcanzar el objetivo): aquí no se busca
+  // nada, se EVALÚA una sola vez el monto exacto declarado — mismo criterio "sin
+  // búsqueda, una sola evaluación" ya usado por cada punto del barrido
+  // (construirPuntoBarrido). Sin margen (ibcAplicableSimulacion ya en o sobre el tope
+  // legal): mismo tratamiento y mismo código que el camino alternativo en esa situación
+  // (YA_EN_TOPE_LEGAL) — la causa real es idéntica, así que no se inventa un segundo
+  // código de descarte para ella.
+  if (esNumeroValido(esfuerzoAdicionalMensualDeseado) && esfuerzoAdicionalMensualDeseado > 0) {
+    if (ibcAplicableSimulacion >= topeAplicado) {
+      escenarios.push(
+        caminoDescartado(
+          'esfuerzo-adicional-deseado',
+          'Con el esfuerzo mensual que elegiste.',
+          {
+            codigo: 'YA_EN_TOPE_LEGAL',
+            mensaje:
+              'Ya declaraste una base actual sobre el tope máximo legal (25 SMLV) — no es posible proponer un ' +
+              'IBC futuro mayor. Este tope se evalúa con el SMLV vigente en la fecha de esta simulación; ' +
+              'PensionLab todavía no proyecta el SMLV futuro.',
+            reglaAplicada: 'tope-maximo-ibc',
+          }
+        )
+      )
+    } else {
+      // Misma conversión monto→IBC que limiteIBCPorRestriccion (arriba) — no una fórmula
+      // paralela. El tope legal se aplica dentro de calcularProyeccionRPM
+      // (escenarioIbcFuturo.valorAplicado = Math.min(valorDeclarado, topeAplicado)), nunca
+      // recortado aquí: si el monto declarado excede el margen legal disponible,
+      // construirEsfuerzo (dentro de construirCamino) calcula el costo real a partir del
+      // IBC ya recortado — el costoPensionalAdicionalMensual resultante puede entonces ser
+      // legítimamente menor que el monto pedido, nunca mayor ni inventado.
+      const ibcCandidato = ibcAplicableSimulacion + esfuerzoAdicionalMensualDeseado / tasaCotizacionFraccion
+      const resultadoPersonalizado = calcularProyeccionRPM({
+        ...escenarioBaseInput,
+        escenarioIbcFuturo: { valor: ibcCandidato, origen: 'esfuerzo_adicional_declarado' },
+      })
+
+      escenarios.push(
+        construirCamino({
+          id: 'esfuerzo-adicional-deseado',
+          tipo: 'alternativo',
+          decision: 'Con el esfuerzo mensual que elegiste.',
+          proyeccion: resultadoPersonalizado,
+          edadJubilacionDeseada,
+          ibcActual: ibcAplicableSimulacion,
+          tasaCotizacion: tasaCotizacionFraccion,
+          objetivoValorMensual,
+        })
+      )
+    }
+  }
+
   // S4-005: el barrido se construye al final, a partir de escenarios ya resuelto — su
   // rango depende de si el objetivo es alcanzable (ver construirBarridoEsfuerzoResultado),
   // así que no puede calcularse antes de saber qué encontró el camino alternativo.
@@ -632,5 +727,24 @@ export function generarCaminosRPM({
   // recalcular ni derivar nada nuevo.
   const horizonte = resultadoBase.horizonteFuturo
 
-  return { escenarios, orientacion: calcularOrientacion(escenarios), detalleElegibilidad: null, barrido, horizonte }
+  // diferenciaFrenteABase (decisión de producto, 2026-08-24) — post-proceso final, un único
+  // punto del flujo: NUNCA vuelve a llamar calcularProyeccionRPM ni reconstruye ninguna
+  // pensión, solo resta dos resultados YA calculados (mismo patrón que distanciaObjetivo.delta,
+  // arriba). Para el propio escenarioBase da 0 por construcción (se resta contra sí mismo),
+  // sin ningún caso especial por id. null para un escenario 'descartado' (resultado === null,
+  // nada que restar). Esto NO es una fórmula pensional nueva — es aritmética de presentación
+  // sobre resultados ya cerrados, deliberadamente en dominio (no en la UI) para que quede en
+  // el mismo lugar que distanciaObjetivo y no se duplique el cálculo en ningún helper.
+  const escenariosConDiferencia = escenarios.map((e) => ({
+    ...e,
+    diferenciaFrenteABase: e.resultado ? { delta: e.resultado.valor - escenarioBase.resultado.valor } : null,
+  }))
+
+  return {
+    escenarios: escenariosConDiferencia,
+    orientacion: calcularOrientacion(escenariosConDiferencia),
+    detalleElegibilidad: null,
+    barrido,
+    horizonte,
+  }
 }

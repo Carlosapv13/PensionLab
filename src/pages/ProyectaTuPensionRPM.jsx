@@ -498,7 +498,8 @@ function ProyectaTuPensionRPM({
               <p className="horizonte-proyeccion__titulo">Horizonte de esta proyección</p>
               <p className="horizonte-proyeccion__resumen">{textoHorizonte(resultado.horizonte, edadValida)}</p>
               <p className="horizonte-proyeccion__nota">
-                Los caminos comparados suponen mantener el IBC indicado durante este período.
+                Los caminos comparados suponen mantener el IBC y el esfuerzo adicional mensual indicados durante este
+                período.
               </p>
             </div>
           )}

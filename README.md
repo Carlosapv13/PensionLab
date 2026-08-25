@@ -1,87 +1,77 @@
 # PensionLab
 
-PensionLab es una plataforma para modelar, simular y explicar el sistema pensional
-colombiano (RPM y RAIS).
+PensionLab es una herramienta para **explorar y comprender escenarios pensionales**
+bajo los dos regímenes del sistema colombiano — RPM (Régimen de Prima Media) y RAIS
+(Régimen de Ahorro Individual). No dice "esto es lo que te conviene": construye
+escenarios comparables a partir de lo que la persona declara y deja que ella decida.
 
-## Estado del proyecto
+## Qué es (y qué no es) PensionLab
 
-🚧 Sprint 1 completo — arquitectura, contratos de datos y fórmulas de cálculo
-(RPM/RAIS) implementadas y probadas. Todavía sin interfaz de usuario ni motor de
-cálculo de punta a punta.
+- **El cálculo pensional es determinístico.** Cada cifra sale de fórmulas y normas
+  legales versionadas, nunca de un modelo de lenguaje — ver
+  `src/domain/formulas/trazabilidad-formula-RPM.md` y
+  `src/domain/formulas/trazabilidad-formula-RAIS.md`.
+- **La IA, donde se usa, explica resultados ya calculados — nunca los calcula ni los
+  sustituye.** Si la explicación con IA falla o no está disponible, las cifras
+  (caminos, proyección, gráfica) siguen siendo correctas y utilizables sin ella.
+- **PensionLab no es asesoría financiera, legal ni pensional oficial**, y no emite
+  recomendaciones personalizadas ("deberías", "te conviene"): compara estrategias de
+  forma neutral y dejar la decisión a la persona es un principio de producto, no un
+  vacío por completar.
 
-## Arquitectura, de un vistazo
+## Estado actual
 
-```mermaid
-flowchart LR
-    UP["UserProfile<br/><i>solo contrato</i>"]:::pending
-    RES["Resolvers<br/><i>V1 parcial — legal, no genérico</i>"]:::partial
-    PE["PensionEngine<br/><i>no implementado</i>"]:::pending
-    FOR["Fórmulas puras<br/>RPM + RAIS"]:::done
-    RESULT["Resultado / Trace"]:::pending
-    EXPL["Explanation"]:::pending
-    UI["UI"]:::pending
+- Sprint 4 (Entregable 2 — "PensionLab responde, explora y explica") con su alcance
+  funcional implementado y probado; la bitácora formal de cierre
+  (`docs/gestion/cierre-sprint-4.md`) todavía no está consolidada como documento de
+  cierre, aunque el código y la suite de tests ya reflejan ese alcance.
+- Interfaz funcional de punta a punta: desde el objetivo inicial hasta la comparación
+  de caminos, sin fixtures ni datos de desarrollo.
+- Experiencia RPM completa dentro del alcance del MVP (ver "Alcance del MVP" abajo).
+- Experiencia RAIS funcional, con un alcance deliberadamente más acotado que RPM.
+- Explicación con IA disponible bajo demanda donde corresponde (RPM).
+- Suite de **889 tests** en verde, lint sin errores, build de producción exitoso.
 
-    UP --> PE
-    RES --> PE
-    PE --> FOR
-    FOR --> PE
-    PE --> RESULT
-    RESULT --> EXPL
-    EXPL --> UI
+## Alcance del MVP
 
-    classDef done fill:#b7e4c7,stroke:#2d6a4f
-    classDef partial fill:#ffe8a1,stroke:#b08900
-    classDef pending fill:#f1f1f1,stroke:#999,stroke-dasharray: 3 3
-```
+### RPM
 
-## Filosofía del proyecto
+Recorrido completo disponible desde la UI pública, sin Panel de Desarrollo:
 
-- Un número sin explicación no sirve — cada resultado debe poder rastrearse hasta
-  la norma, el supuesto o la fórmula que lo produjo.
-- Lo legal, lo asumido y lo calculado se mantienen separados y visibles, nunca
-  mezclados.
-- Preferimos ser honestos sobre lo que no sabemos (una tasa incierta, una norma en
-  disputa) antes que mostrar una falsa precisión.
-- Se documenta antes de construir, no al revés.
+- Proyección de pensión a partir de la historia de cotización declarada.
+- Comparación de **caminos**: mantener la situación actual, un camino alternativo que
+  alcanza el objetivo declarado (cuando es legalmente posible) y un camino con el
+  **esfuerzo mensual personalizado** que la persona quiera explorar.
+- **Orientación determinística** ("Qué podrías explorar ahora") que interpreta el
+  resultado sin usar IA.
+- **Horizonte temporal explícito**: desde cuándo y hasta cuándo se supone mantener el
+  IBC y el esfuerzo adicional de cada camino, con duración aproximada.
+- Gráfica esfuerzo↔resultado con el punto elegido por la persona marcado.
+- **Explicación con IA bajo demanda** ("Entender este camino" / "Comparando tus
+  caminos"), siempre opcional y siempre después de que las cifras ya existen.
 
-## ¿Qué hace PensionLab?
+### RAIS
 
-Ayuda a una persona a simular su pensión bajo los dos regímenes del sistema
-colombiano — RPM (Régimen de Prima Media) y RAIS (Régimen de Ahorro Individual) —
-y a entender de dónde sale ese número, no solo a obtenerlo. Su arquitectura fue
-diseñada para evolucionar junto con futuras reformas y cambios normativos sin
-tener que reescribir el núcleo del sistema.
+Experiencia disponible y funcional para el perfil actualmente soportado (cotizante
+independiente, cotización en Colombia, sin traslados de régimen previos) — fuera de
+ese perfil, la app lo explica honestamente y nunca bloquea el recorrido general.
 
-## Qué funciona hoy / qué no
+Su alcance es **deliberadamente menor** que el de RPM en esta versión: no incluye
+esfuerzo personalizado, horizonte temporal explícito, gráfica ni explicación con IA.
+Esto es una decisión de alcance del MVP, no una funcionalidad rota o a medio
+terminar — la propia pantalla se lo indica brevemente a quien llega hasta ahí.
 
-| | Estado |
-|---|---|
-| Fórmulas de cálculo RPM y RAIS (puras, con 18/18 tests) | ✅ |
-| Resolución de normativa por fecha | ✅ (versión inicial, no genérica) |
-| Motor de cálculo (`pensionEngine`) | ❌ no implementado |
-| Supuestos de RAIS poblados en datos reales | ❌ pendiente |
-| Interfaz de usuario | ❌ no implementada |
-| Simulación de punta a punta | ❌ no disponible todavía |
+## Limitaciones conocidas del MVP
 
-## Arquitectura
-
-El proyecto separa estrictamente tres cosas que suelen mezclarse: la fórmula
-matemática, la norma legal que fija sus parámetros, y los supuestos de modelado
-donde la ley no llega. Cada cálculo queda trazado hasta su fuente y cada
-simulación es reproducible en el tiempo. El detalle completo vive en
-`docs/tecnico/arquitectura/`.
-
-## Estructura del proyecto
-
-```
-src/
-├── domain/       # fórmulas puras, motor de cálculo, contratos, transparencia
-├── data/         # normas legales y supuestos de modelado, versionados
-├── models/       # UserProfile, Simulation
-├── context/      # estado de React
-├── components/   # UI (formularios, resultados)
-└── pages/        # páginas del wizard
-```
+- **El estado de navegación vive en memoria del navegador.** No hay persistencia
+  entre sesiones ni recuperación automática: recargar la página reinicia el
+  recorrido desde el principio.
+- **RAIS tiene un alcance deliberadamente acotado** frente a RPM (ver arriba), no
+  una implementación incompleta de lo que sí está en alcance.
+- Algunas capacidades siguen fuera de este MVP a propósito (por ejemplo, un punto de
+  entrada público a la interpretación de una declaración libre en lenguaje natural).
+  No se documentan aquí una por una — para explorar posibles direcciones futuras, ver
+  `docs/producto/oportunidades-futuras.md` (backlog de producto, no alcance del MVP).
 
 ## Cómo correr el proyecto
 
@@ -93,40 +83,47 @@ npm run build    # build de producción
 npm run lint     # ESLint
 ```
 
+## Explicación con IA — configuración y comportamiento
+
+La explicación con IA es una capacidad **opcional**: el motor de cálculo, los
+caminos, la gráfica y toda la comparación funcionan sin ella.
+
+- **En desarrollo** (`npm run dev`), la app usa adaptadores simulados (sin red, sin
+  credenciales) para poder revisar la experiencia de principio a fin sin necesidad de
+  configurar nada. Ese código de desarrollo se elimina por completo del build de
+  producción.
+- **En producción**, la explicación con IA se resuelve en funciones de servidor bajo
+  `api/`, que requieren las variables de entorno `OPENAI_API_KEY` y `OPENAI_MODEL`
+  (ver `.env.example`). Estas variables se leen exclusivamente del lado del servidor
+  y nunca llegan al navegador.
+- **Si esa configuración falta en producción**, la capacidad de explicación con IA se
+  degrada explícitamente (mensaje de error + botón de reintento) — el motor
+  determinístico y las cifras ya calculadas siguen funcionando con normalidad.
+
 ## Documentación
 
-- [Resolver Legal Genérico](docs/tecnico/arquitectura/resolver-legal-generico.md)
-- [Plan de prerrequisitos de `pensionEngine`](docs/tecnico/arquitectura/plan-implementacion-prerrequisitos-pension-engine.md)
-- [Implementación de fórmulas RAIS](docs/tecnico/implementacion-formulas-RAIS.md)
+- [Arquitectura del motor de decisión](docs/tecnico/arquitectura/) — detalle técnico
+  completo, para quien quiera profundizar más allá de este README.
 - [Trazabilidad normativa (`data/legal`)](src/data/legal/trazabilidad-normativa.md)
 - [Trazabilidad de fórmula RPM](src/domain/formulas/trazabilidad-formula-RPM.md)
 - [Trazabilidad de fórmula RAIS](src/domain/formulas/trazabilidad-formula-RAIS.md)
-- [Cierre de Sprint 1](docs/gestion/cierre-sprint-1.md)
+- [Oportunidades futuras (backlog de producto)](docs/producto/oportunidades-futuras.md)
 
-## Advertencias
+## Estructura del proyecto
 
-- PensionLab es una herramienta de simulación y aprendizaje, no asesoría
-  financiera, legal ni pensional oficial.
-- El proyecto está en desarrollo activo: hoy tiene su arquitectura y sus fórmulas
-  de cálculo definidas, pero todavía no ofrece una simulación de punta a punta ni
-  interfaz de usuario.
-- Los supuestos, fuentes legales y limitaciones específicas de cada cálculo están
-  documentados en detalle en `docs/` — no se repiten aquí, para mantener este
-  README enfocado.
+```
+src/
+├── domain/       # fórmulas puras, motor de cálculo (RPM/RAIS), contratos
+├── data/         # normas legales y supuestos de modelado, versionados
+├── ia/           # construcción de contexto y adaptadores de explicación con IA
+├── format/       # formateo puro de fechas, dinero y duración para la UI
+├── hooks/        # hooks de React reutilizados entre pantallas
+├── components/   # UI compartida (formularios, gráfica, layout)
+├── pages/        # pantallas del recorrido
+└── dev/          # Panel de Desarrollo — eliminado del build de producción
 
-## Roadmap
-
-Sprint 2 continúa con los 10 pasos de prerrequisitos de `pensionEngine` (ver el
-[plan de implementación](docs/tecnico/arquitectura/plan-implementacion-prerrequisitos-pension-engine.md))
-hasta tener un cálculo real de punta a punta.
-
-## La documentación es parte del producto
-
-En PensionLab, la documentación no es un anexo interno — es parte de lo que el
-proyecto ofrece. Cada decisión de arquitectura, cada fuente legal, cada supuesto y
-cada limitación está documentada en `docs/` con el mismo cuidado que el código. Si
-el código responde *cuánto*, la documentación responde *por qué* — y ambas
-respuestas son parte del producto.
+api/              # funciones de servidor para la explicación con IA (fuera del bundle cliente)
+```
 
 ## Autoría
 

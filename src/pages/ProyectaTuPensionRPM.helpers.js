@@ -18,6 +18,7 @@
 import { formatearPesos } from '../format/formatearDinero.js'
 import { formatearFechaCorta } from '../format/formatearFechaCorta.js'
 import { formatearDuracionCalendario } from '../format/formatearDuracionCalendario.js'
+import { validarSemanas } from '../domain/evidenciaSemanasMinimas.js'
 
 /**
  * @param {Object} escenario
@@ -128,6 +129,34 @@ export function textoHorizonte(horizonte, edadJubilacionDeseada) {
   return `${inicio} → ${fin} · ${duracion} · hasta los ${edadJubilacionDeseada} años`
 }
 
+// UX-RPM-02A (2026-08-25) — coordina el mensaje de semanas declaradas con el de historia
+// vacía (ProyectaTuPensionRPM.jsx, condicionado a `resultado.semanas?.fuente !==
+// 'declaracion_agregada'`): esta función cubre exactamente el caso complementario, para
+// que nunca se muestren ambos ni ninguno. Reutiliza el contrato GO-B de
+// `resultado.semanas` (generarCaminosRPM.js/calcularProyeccionRPM.js) tal cual —
+// `observadas`/`futuras`/`sustentadasPorHistoria`/`declaradas`/`certeza`/`total`/`fuente`
+// — sin inventar una estructura paralela ni un campo nuevo.
+//
+// Solo dice lo que el motor ya sabe: reconoce explícitamente que SÍ se conocen las
+// semanas declaradas (nunca "desconocemos tu pasado") y, en la misma frase, que esa
+// cifra es una declaración, no una historia verificada (nunca "conocemos tu historia") —
+// sin afirmar que las semanas están verificadas, sin inventar IBC, períodos ni historia
+// detallada. `certeza` distingue conocida/aproximada con el mismo patrón ya usado en
+// BaseCotizacion.jsx (prefijo "aproximadamente " solo cuando `certeza === 'aproximado'`).
+//
+// @param {{observadas: number, futuras: number, sustentadasPorHistoria: number, declaradas: (number|null), certeza: (('conocido'|'aproximado')|null), total: number, fuente: ('declaracion_agregada'|'historia_estructurada')} | null} semanas - resultado.semanas de generarCaminosRPM.js
+// @returns {string | null}
+export function textoFuenteSemanas(semanas) {
+  if (!semanas || semanas.fuente !== 'declaracion_agregada') return null
+
+  const prefijo = semanas.certeza === 'aproximado' ? 'aproximadamente ' : ''
+  return (
+    `Conocemos las ${prefijo}${semanas.declaradas} semanas que declaraste, pero todavía no conocemos el ` +
+    'detalle de los IBC de cada período de tu historia — por eso esta proyección parte de esa cifra ' +
+    'declarada, no de una historia de cotización verificada. Completarla puede afinar el resultado.'
+  )
+}
+
 // Único código de generarCaminosRPM.js relevante para esta decisión de presentación
 // (precisión de producto S4-006, 2026-08-23): cuando la persona no alcanzaría las
 // semanas mínimas a la edad explorada, el diagnóstico previo confirmó que ningún valor de
@@ -206,4 +235,26 @@ export function ordenarCaminosParaPresentacion(escenarios) {
   const posicionInsercion = indiceBase === -1 ? 0 : indiceBase + 1
 
   return [...resto.slice(0, posicionInsercion), personalizado, ...resto.slice(posicionInsercion)]
+}
+
+/**
+ * Construye la entrada `semanasReferenciaDeclaradas` de generarCaminosRPM.js (contrato
+ * GO-B, 2026-08-25) a partir de lo que la persona YA declaró en
+ * InformacionPensionalEsencial.jsx — nunca se le vuelve a preguntar aquí. Reutiliza
+ * `validarSemanas` (evidenciaSemanasMinimas.js), el mismo validador que ya usa la Primera
+ * Lectura para este campo — ninguna regla nueva.
+ *
+ * 'desconocido' (o cualquier otro valor, incluido null) devuelve `null` — nunca se
+ * interpreta como "0 semanas": ausencia de dato declarado, no un hecho sobre la persona.
+ * Con `null`, generarCaminosRPM.js usa exclusivamente semanas sustentadas por historia
+ * (comportamiento idéntico al existente antes de este contrato).
+ * @param {('conocido'|'aproximado'|'desconocido'|null)} nivelConocimientoSemanas
+ * @param {string} semanasCotizadas
+ * @returns {{cantidad: number, certeza: ('conocido'|'aproximado')} | null}
+ */
+export function construirSemanasReferenciaDeclaradas(nivelConocimientoSemanas, semanasCotizadas) {
+  if (nivelConocimientoSemanas !== 'conocido' && nivelConocimientoSemanas !== 'aproximado') return null
+  const cantidad = validarSemanas(semanasCotizadas)
+  if (cantidad === null) return null
+  return { cantidad, certeza: nivelConocimientoSemanas }
 }

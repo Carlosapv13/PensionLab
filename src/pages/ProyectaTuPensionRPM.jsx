@@ -65,6 +65,21 @@
 // que DeclaracionLibre.jsx para descartar una respuesta que ya quedó obsoleta. Ninguna
 // cifra visible depende de esta capacidad: si la IA falla, las tarjetas ya calculadas
 // siguen exactamente igual de utilizables (ver bloque de fallo, más abajo).
+//
+// UX-RPM-02A (2026-08-25) — "Resultado primero": reordena la jerarquía de la pantalla sin
+// tocar ningún cálculo. La comparación de caminos ahora aparece inmediatamente después del
+// objetivo (y de la restricción opcional, si se abrió), en vez de después de horizonte +
+// disclaimers + nota de historia — esos tres bloques se movieron a después de la
+// comparación, junto con las demás explicaciones que no son necesarias para responder los
+// inputs. Ver también: TEXTO_INTRO ya no asume que el usuario vio ExploraTuProyeccionRPM
+// (la ruta UX-RPM-01 no pasa por ahí); el campo de restricción de costo ahora se revela
+// mediante una acción opcional en vez de ocupar espacio siempre; los mensajes de semanas
+// declaradas/historia se coordinaron para no sonar contradictorios (textoFuenteSemanas,
+// helpers.js) sin tocar calcularProyeccionRPM.js; se agregó una aclaración breve junto a la
+// comparación sobre qué SÍ y qué NO incluye el aporte pensional adicional; se suprimió la
+// repetición de orientacion.razon cuando "Qué podrías explorar ahora" ya dijo lo mismo
+// (VARIOS_CUMPLEN_FALTA_PRIORIDAD → VARIOS_CAMINOS_CUMPLEN_FALTA_PRIORIDAD, mapeo
+// verificado en determinarOrientacionExploracion.js).
 
 import { useRef, useState } from 'react'
 import { determinarBaseCotizacion } from '../domain/determinarBaseCotizacion.js'
@@ -89,11 +104,13 @@ import {
   textoDiferenciaFrenteABase,
   textoOrientacion,
   textoHorizonte,
+  textoFuenteSemanas,
   calcularLimitacionesComunes,
   limitacionesEspecificas,
   debeOcultarRestriccion,
   validarEsfuerzoAdicionalMensualDeseado,
   ordenarCaminosParaPresentacion,
+  construirSemanasReferenciaDeclaradas,
 } from './ProyectaTuPensionRPM.helpers.js'
 
 // Una sola instancia del adaptador de producción — mismo criterio ya usado en
@@ -106,10 +123,15 @@ function hoyISO() {
   return new Date().toISOString().slice(0, 10)
 }
 
+// UX-RPM-02A: reescrita para ser autónoma — la versión anterior comparaba contra "la
+// lectura anterior (que usa solo tu historia hasta hoy)", asumiendo que el usuario ya
+// había visto ExploraTuProyeccionRPM.jsx. Eso es falso en la ruta UX-RPM-01
+// (BaseCotizacion → ProyectaTuPensionRPM directo, hoy la única alcanzable para un usuario
+// real): esa pantalla nunca se recorre ahí. Esta versión explica qué hace ESTA pantalla,
+// sin referirse a ninguna otra.
 const TEXTO_INTRO =
-  'A diferencia de la lectura anterior (que usa solo tu historia hasta hoy), esta pantalla ' +
-  'proyecta hacia una edad futura que elijas, combinando tu historia real con un escenario ' +
-  'de ingreso futuro — nunca inventa inflación futura ni asume que la ley cambiará.'
+  'Proyecta tu pensión RPM hacia una edad futura que elijas, combinando tu situación actual ' +
+  'con un escenario de ingreso futuro — nunca inventa inflación futura ni asume que la ley cambiará.'
 
 // Mismo criterio de validación mínima que ExploraTuProyeccion.jsx (RAIS) — duplicado a
 // propósito, no extraído todavía a un módulo compartido (Principio 9: sin abstracción sin
@@ -173,6 +195,10 @@ function TextoExplicacionCamino({ texto }) {
  * @param {('empleado'|'independiente'|'ambos'|null)} props.tipoCotizante
  * @param {('colombia'|'exterior'|'ambos'|null)} props.lugarCotizacion
  * @param {string} props.salarioParaEstimarBase
+ * @param {('conocido'|'aproximado'|'desconocido'|null)} props.nivelConocimientoSemanas -
+ *   ya declarado en InformacionPensionalEsencial.jsx (contrato GO-B, 2026-08-25) — nunca
+ *   se le vuelve a preguntar aquí.
+ * @param {string} props.semanasCotizadas - idem, mismo origen.
  * @param {string} props.edadJubilacionDeseada
  * @param {(valor: string) => void} props.onCambiarEdadJubilacionDeseada
  * @param {string} props.objetivoPensionMensual
@@ -197,6 +223,8 @@ function ProyectaTuPensionRPM({
   tipoCotizante,
   lugarCotizacion,
   salarioParaEstimarBase,
+  nivelConocimientoSemanas,
+  semanasCotizadas,
   edadJubilacionDeseada,
   onCambiarEdadJubilacionDeseada,
   objetivoPensionMensual,
@@ -238,6 +266,15 @@ function ProyectaTuPensionRPM({
     return camposFaltantes.length > 0
   })
 
+  // UX-RPM-02A — el campo de restricción de costo (siempre opcional) ya no ocupa espacio
+  // por defecto: arranca revelado únicamente si ya tenía un valor confirmado (para no
+  // esconder un dato que la persona ya dio), igual criterio de lazy initializer que
+  // mostrarFormulario arriba. El comportamiento/estado del campo en sí no cambia — solo si
+  // se ve de entrada o hace falta un clic para revelarlo.
+  const [mostrarCampoRestriccion, setMostrarCampoRestriccion] = useState(
+    () => restriccionCostoPensionalAdicionalMaximoMensual !== ''
+  )
+
   // Camino personalizado (decisión de producto 2026-08-23) — estado LOCAL de esta pantalla,
   // deliberadamente NUNCA persistido en App.jsx/el expediente (diagnóstico previo: es una
   // exploración momentánea, no un hecho declarado que otra pantalla necesite reutilizar).
@@ -253,6 +290,12 @@ function ProyectaTuPensionRPM({
   // confirmación, abajo, ya lo impide), pero se reutiliza el mismo helper por consistencia.
   const esfuerzoAdicionalMensualDeseadoParsed = validarMontoNoNegativo(esfuerzoAdicionalMensualDeseadoConfirmado)
 
+  // Contrato GO-B (2026-08-25) — ya declaradas en InformacionPensionalEsencial.jsx, nunca
+  // vueltas a preguntar aquí. 'desconocido' (o ausente) da null: generarCaminosRPM.js cae
+  // entonces a semanas sustentadas por historia, comportamiento idéntico al existente
+  // antes de este contrato — nunca se interpreta como "0 semanas".
+  const semanasReferenciaDeclaradas = construirSemanasReferenciaDeclaradas(nivelConocimientoSemanas, semanasCotizadas)
+
   const resultado =
     edadValida !== null && baseCotizacion.ibcAplicableSimulacion !== null
       ? generarCaminosRPM({
@@ -265,6 +308,7 @@ function ProyectaTuPensionRPM({
           objetivoValorMensual,
           restriccionCostoPensionalAdicionalMaximoMensual: restriccionCostoPensional,
           esfuerzoAdicionalMensualDeseado: esfuerzoAdicionalMensualDeseadoParsed,
+          semanasReferenciaDeclaradas,
           fecha,
         })
       : null
@@ -282,6 +326,13 @@ function ProyectaTuPensionRPM({
   // cifra nueva aquí — las cifras ya están en las tarjetas.
   const orientacionExploracion = determinarOrientacionExploracion(resultado)
   const textoOrientacionActual = orientacionExploracion ? textoOrientacion(orientacionExploracion.codigo) : null
+
+  // UX-RPM-02A — mismo patrón que textoOrientacionActual arriba: se calcula una sola vez
+  // aquí (no dentro del JSX), puramente de presentación (helpers.js), sin tocar
+  // calcularProyeccionRPM.js. null cuando la fuente no es la declaración agregada — en ese
+  // caso no hay nada nuevo que decir aquí (ver la nota de historia vacía, más abajo en el
+  // JSX, que cubre el otro caso).
+  const textoSemanasDeclaradas = resultado ? textoFuenteSemanas(resultado.semanas) : null
 
   // S4-007 — "Entender este camino". identidadResultado es la clave de caché: los tres
   // únicos valores que esta pantalla puede cambiar y que producen un resultado distinto.
@@ -408,9 +459,10 @@ function ProyectaTuPensionRPM({
             semanas mínimas) — si no los cumples, te lo explicamos en vez de mostrarte una cifra de pensión.
           </p>
 
-          <label className="field">
+          <label className="field" htmlFor="edad-jubilacion-deseada">
             <span className="field__label">Edad</span>
             <input
+              id="edad-jubilacion-deseada"
               type="text"
               inputMode="numeric"
               pattern="[0-9]*"
@@ -448,13 +500,13 @@ function ProyectaTuPensionRPM({
       )}
 
       {mostrarFormulario && edadValida !== null && baseCotizacion.ibcAplicableSimulacion !== null && (
-        <label className="field">
+        <label className="field" htmlFor="objetivo-pension-mensual">
           <span className="field__label">¿Con cuánto te gustaría pensionarte, al menos, cada mes?</span>
           <p className="option__hint">
             En pesos de hoy — el poder de compra que tiene ese dinero actualmente, no el número que verías
             nominalmente en el futuro.
           </p>
-          <CampoMonetario {...campoObjetivo} />
+          <CampoMonetario id="objetivo-pension-mensual" {...campoObjetivo} />
         </label>
       )}
 
@@ -462,16 +514,30 @@ function ProyectaTuPensionRPM({
         edadValida !== null &&
         baseCotizacion.ibcAplicableSimulacion !== null &&
         !debeOcultarRestriccion(resultado) && (
-          <label className="field">
-            <span className="field__label">
-              ¿Cuánto más podrías destinar exclusivamente a tu aporte a pensión cada mes? (opcional)
-            </span>
-            <p className="option__hint">
-              Este límite considera solo el aporte pensional. Otros aportes obligatorios podrían aumentar también
-              — esta primera versión todavía no los calcula.
-            </p>
-            <CampoMonetario {...campoRestriccion} />
-          </label>
+          <>
+            {/* UX-RPM-02A: el campo ya no ocupa espacio de forma permanente — se revela
+                mediante esta acción opcional. Comportamiento/estado del campo sin cambios,
+                solo su visibilidad de entrada. */}
+            {!mostrarCampoRestriccion && (
+              <div className="screen__actions">
+                <button type="button" className="btn btn-secondary" onClick={() => setMostrarCampoRestriccion(true)}>
+                  ¿Quieres limitar tu esfuerzo máximo cada mes? (opcional)
+                </button>
+              </div>
+            )}
+            {mostrarCampoRestriccion && (
+              <label className="field" htmlFor="restriccion-costo-adicional">
+                <span className="field__label">
+                  ¿Cuánto más podrías destinar exclusivamente a tu aporte a pensión cada mes? (opcional)
+                </span>
+                <p className="option__hint">
+                  Este límite considera solo el aporte pensional. Otros aportes obligatorios podrían aumentar
+                  también — esta primera versión todavía no los calcula.
+                </p>
+                <CampoMonetario id="restriccion-costo-adicional" {...campoRestriccion} />
+              </label>
+            )}
+          </>
         )}
 
       {resultado && resultado.escenarios.length === 0 && resultado.detalleElegibilidad && (
@@ -487,23 +553,12 @@ function ProyectaTuPensionRPM({
 
       {resultado && resultado.escenarios.length > 0 && (
         <>
-          <p className="screen__subtitle screen__subtitle--secundario">
-            Cada cifra es una <strong>proyección bajo un escenario</strong>, no tu pensión definitiva — depende de
-            que sigas cotizando como se asumió aquí, de que la ley no cambie antes de tu jubilación, y del
-            escenario de ingreso futuro evaluado.
-          </p>
-
-          {resultado.horizonte && (
-            <div className="horizonte-proyeccion">
-              <p className="horizonte-proyeccion__titulo">Horizonte de esta proyección</p>
-              <p className="horizonte-proyeccion__resumen">{textoHorizonte(resultado.horizonte, edadValida)}</p>
-              <p className="horizonte-proyeccion__nota">
-                Los caminos comparados suponen mantener el IBC y el esfuerzo adicional mensual indicados durante este
-                período.
-              </p>
-            </div>
-          )}
-
+          {/* UX-RPM-02A: la comparación de caminos ahora es lo primero que aparece tras el
+              objetivo/restricción — horizonte, disclaimers generales y la nota de historia
+              se movieron a después de la grilla (ver más abajo). "Objetivo: $X al mes" se
+              conserva aquí, inmediatamente antes de la grilla: es contexto de una línea,
+              necesario para leer la columna "Frente a tu objetivo" de cada camino, no una
+              explicación que retrase el resultado. */}
           <p className="comparacion-caminos__contexto">
             Objetivo: {formatearPesos(objetivoValorMensual)} al mes, en pesos de hoy.
           </p>
@@ -611,6 +666,45 @@ function ProyectaTuPensionRPM({
             })}
           </div>
 
+          {/* UX-RPM-02A: movidos aquí, después del resultado — antes precedían a la grilla.
+              Ninguno cambió de contenido salvo la coordinación de mensajes de semanas
+              (textoSemanasDeclaradas/historia vacía, más abajo), que ahora usan
+              resultado.semanas.fuente en vez de solo historiaCotizacion.length, para
+              cubrir correctamente también el caso de historia parcial + declaración
+              (contrato GO-B) sin duplicar ni contradecir la limitación de dominio. */}
+          <p className="screen__subtitle screen__subtitle--secundario">
+            Cada cifra es una <strong>proyección bajo un escenario</strong>, no tu pensión definitiva — depende de
+            que sigas cotizando como se asumió aquí, de que la ley no cambie antes de tu jubilación, y del
+            escenario de ingreso futuro evaluado.
+          </p>
+
+          {resultado.horizonte && (
+            <div className="horizonte-proyeccion">
+              <p className="horizonte-proyeccion__titulo">Horizonte de esta proyección</p>
+              <p className="horizonte-proyeccion__resumen">{textoHorizonte(resultado.horizonte, edadValida)}</p>
+              <p className="horizonte-proyeccion__nota">
+                Los caminos comparados suponen mantener el IBC y el esfuerzo adicional mensual indicados durante este
+                período.
+              </p>
+            </div>
+          )}
+
+          {textoSemanasDeclaradas && (
+            <p className="screen__subtitle screen__subtitle--secundario">{textoSemanasDeclaradas}</p>
+          )}
+
+          {/* Cubre exclusivamente el caso en que NI la declaración ni la historia real
+              sostienen esta proyección con ningún dato propio — cuando la fuente sí es la
+              declaración (textoSemanasDeclaradas, arriba), ese mensaje ya lo cubre, sin
+              repetir esta nota. */}
+          {historiaCotizacion.length === 0 && resultado.semanas?.fuente !== 'declaracion_agregada' && (
+            <p className="screen__subtitle screen__subtitle--secundario">
+              Todavía no registraste tu historia de cotización — esta exploración parte completamente de tu
+              situación actual (IBC declarado) y del supuesto de continuidad hasta tu fecha objetivo, sin ningún
+              tramo real de cotización anterior a hoy.
+            </p>
+          )}
+
           {explicacionVigente && resultadoExplicacion.estado === 'generado' && textoExplicacion.comparacion && (
             <div className="insight">
               <p className="insight__label">Comparando tus caminos</p>
@@ -702,6 +796,22 @@ function ProyectaTuPensionRPM({
             </p>
           )}
 
+          {/* UX-RPM-02A (asunto 5 de la auditoría): aclaración breve de que el aporte
+              pensional adicional mostrado en cada tarjeta ("Aporte pensional adicional
+              mensual") es exclusivamente el aumento del aporte a pensión — nunca se afirma
+              que sea el desembolso personal total del usuario. Mismo criterio de contenido
+              que el hint ya existente en el campo de restricción opcional, reutilizado aquí
+              porque ese campo puede no llegar a verse (colapsado por defecto desde este
+              mismo slice). Sin cifra ni porcentaje legal embebido a propósito (la tasa vive
+              en data/legal, versionada — citarla como literal aquí la desincronizaría si
+              cambia). Cálculo sin ningún cambio (generarCaminosRPM.js/construirEsfuerzo). */}
+          {resultado.escenarios.length > 1 && (
+            <p className="comparacion-caminos__aclaracion">
+              El aporte pensional adicional es exclusivamente el aumento del aporte a pensión, según la tasa legal
+              vigente — no incluye salud, ARL ni otros aportes obligatorios que también podrían aumentar.
+            </p>
+          )}
+
           {limitacionesComunes.length > 0 && (
             <div className="comparacion-caminos__supuestos">
               <p className="screen__subtitle screen__subtitle--secundario comparacion-caminos__supuestos-titulo">
@@ -715,9 +825,18 @@ function ProyectaTuPensionRPM({
             </div>
           )}
 
-          {resultado.orientacion.caminoMasAlineadoId === null && (
-            <p className="screen__subtitle">{resultado.orientacion.razon}</p>
-          )}
+          {/* UX-RPM-02A (asunto 7 de la auditoría): suprimida específicamente cuando
+              "Qué podrías explorar ahora" ya comunicó el mismo mensaje — verificado en
+              determinarOrientacionExploracion.js:61-62, el único código de
+              resultado.orientacion que llega aquí con caminoMasAlineadoId === null y
+              escenarios.length > 0 es VARIOS_CUMPLEN_FALTA_PRIORIDAD, mapeado 1:1 a
+              VARIOS_CAMINOS_CUMPLEN_FALTA_PRIORIDAD arriba. Para cualquier otro código que
+              en el futuro también produjera caminoMasAlineadoId === null, esta condición
+              deja de excluirlo automáticamente — el bloque no se elimina, solo se acota. */}
+          {resultado.orientacion.caminoMasAlineadoId === null &&
+            orientacionExploracion?.codigo !== 'VARIOS_CAMINOS_CUMPLEN_FALTA_PRIORIDAD' && (
+              <p className="screen__subtitle">{resultado.orientacion.razon}</p>
+            )}
         </>
       )}
 

@@ -20,6 +20,7 @@ import ExploraTuProyeccionRPM from './pages/ExploraTuProyeccionRPM.jsx'
 import ProyectaTuPensionRPM from './pages/ProyectaTuPensionRPM.jsx'
 import DeclaracionLibre from './pages/DeclaracionLibre.jsx'
 import { tienePrimeraLecturaValor } from './domain/tienePrimeraLecturaValor.js'
+import { siguienteVistaTrasBaseCotizacion } from './navegacionRPM.js'
 
 // Import estático, pero solo se monta bajo import.meta.env.DEV (ver el
 // return más abajo) — Vite sustituye ese flag por el literal `false` en
@@ -472,7 +473,7 @@ function App() {
           salarioParaEstimarBase={salarioParaEstimarBase}
           onCambiarSalarioParaEstimarBase={setSalarioParaEstimarBase}
           onVolver={() => setVista('indiciosTransicion')}
-          onContinuar={() => setVista('queDeterminaResultado')}
+          onContinuar={() => setVista(siguienteVistaTrasBaseCotizacion(regimenActual))}
         />
       )}
 
@@ -548,6 +549,10 @@ function App() {
           tipoCotizante={tipoCotizante}
           lugarCotizacion={lugarCotizacion}
           salarioParaEstimarBase={salarioParaEstimarBase}
+          // Contrato GO-B (2026-08-25): ya declaradas en InformacionPensionalEsencial.jsx —
+          // se conectan aquí para la proyección preliminar, sin volver a preguntarlas.
+          nivelConocimientoSemanas={nivelConocimientoSemanas}
+          semanasCotizadas={semanasCotizadas}
           edadJubilacionDeseada={edadJubilacionDeseada}
           onCambiarEdadJubilacionDeseada={setEdadJubilacionDeseada}
           objetivoPensionMensual={objetivoPensionMensual}
@@ -556,7 +561,10 @@ function App() {
           onCambiarRestriccionCostoPensionalAdicionalMaximoMensual={
             setRestriccionCostoPensionalAdicionalMaximoMensual
           }
-          onVolver={() => setVista('exploraTuProyeccionRPM')}
+          // UX-RPM-01: única ruta real hoy hacia esta vista para RPM es directa desde
+          // BaseCotizacion (ver siguienteVistaTrasBaseCotizacion) — Volver debe regresar
+          // ahí, no a exploraTuProyeccionRPM, que ya no se recorrió.
+          onVolver={() => setVista('baseCotizacion')}
           declaracionLibre={declaracionLibre}
           {...(import.meta.env.DEV ? { adaptadorExplicacion: adaptadorExplicacionDesarrollo } : {})}
         />

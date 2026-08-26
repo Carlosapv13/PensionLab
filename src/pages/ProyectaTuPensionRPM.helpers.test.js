@@ -16,11 +16,13 @@ import {
   textoDiferenciaFrenteABase,
   textoOrientacion,
   textoHorizonte,
+  textoFuenteSemanas,
   calcularLimitacionesComunes,
   limitacionesEspecificas,
   debeOcultarRestriccion,
   validarEsfuerzoAdicionalMensualDeseado,
   ordenarCaminosParaPresentacion,
+  construirSemanasReferenciaDeclaradas,
 } from './ProyectaTuPensionRPM.helpers.js'
 
 describe('debeOcultarRestriccion — EVIDENCIA: solo se oculta cuando el resultado es semanas insuficientes (precisión de producto S4-006)', () => {
@@ -225,6 +227,84 @@ describe('textoHorizonte', () => {
   })
 })
 
+describe('textoFuenteSemanas — contrato GO-B (UX-RPM-02A, 2026-08-25)', () => {
+  it('declaracion_agregada + aproximado: reconoce las semanas conocidas, marca la certeza, nunca afirma verificación', () => {
+    const semanas = {
+      observadas: 0,
+      futuras: 730.4,
+      sustentadasPorHistoria: 730.4,
+      declaradas: 1100,
+      certeza: 'aproximado',
+      total: 1830.4,
+      fuente: 'declaracion_agregada',
+    }
+    const texto = textoFuenteSemanas(semanas)
+    expect(texto).toBe(
+      'Conocemos las aproximadamente 1100 semanas que declaraste, pero todavía no conocemos el detalle de ' +
+        'los IBC de cada período de tu historia — por eso esta proyección parte de esa cifra declarada, no ' +
+        'de una historia de cotización verificada. Completarla puede afinar el resultado.'
+    )
+    // Nunca afirma que las semanas están verificadas ni que se desconoce el pasado.
+    expect(texto).not.toContain('verificadas')
+    expect(texto.toLowerCase()).not.toContain('no conocemos tu pasado')
+    expect(texto.toLowerCase()).not.toContain('no sabemos nada')
+  })
+
+  it('declaracion_agregada + conocido: sin el prefijo "aproximadamente"', () => {
+    const semanas = {
+      observadas: 0,
+      futuras: 730.4,
+      sustentadasPorHistoria: 730.4,
+      declaradas: 1400,
+      certeza: 'conocido',
+      total: 2130.4,
+      fuente: 'declaracion_agregada',
+    }
+    const texto = textoFuenteSemanas(semanas)
+    expect(texto).toContain('las 1400 semanas')
+    expect(texto).not.toContain('aproximadamente')
+  })
+
+  it('historia_estructurada (sin declaración) → null — ese caso lo cubre la nota de historia vacía, no esta función', () => {
+    const semanas = {
+      observadas: 522,
+      futuras: 208.4,
+      sustentadasPorHistoria: 730.4,
+      declaradas: null,
+      certeza: null,
+      total: 730.4,
+      fuente: 'historia_estructurada',
+    }
+    expect(textoFuenteSemanas(semanas)).toBeNull()
+  })
+
+  it('ausencia de resultado.semanas (null) → null, nunca lanza', () => {
+    expect(() => textoFuenteSemanas(null)).not.toThrow()
+    expect(textoFuenteSemanas(null)).toBeNull()
+  })
+
+  it('semanas undefined → null, nunca lanza (comportamiento seguro ante dato no utilizable)', () => {
+    expect(() => textoFuenteSemanas(undefined)).not.toThrow()
+    expect(textoFuenteSemanas(undefined)).toBeNull()
+  })
+
+  it('nunca inventa IBC, períodos ni historia detallada — el texto no menciona ninguno de esos términos como si existieran', () => {
+    const semanas = {
+      observadas: 0,
+      futuras: 730.4,
+      sustentadasPorHistoria: 730.4,
+      declaradas: 1100,
+      certeza: 'aproximado',
+      total: 1830.4,
+      fuente: 'declaracion_agregada',
+    }
+    const texto = textoFuenteSemanas(semanas)
+    // "IBC" y "período" solo aparecen en el sentido de lo que TODAVÍA NO se conoce —
+    // verificado arriba por el texto exacto — nunca se afirma un IBC o período concreto.
+    expect(texto).toContain('todavía no conocemos el detalle de los IBC de cada período')
+  })
+})
+
 const NO_ES_PENSION_FINAL = { codigo: 'NO_ES_TU_PENSION_FINAL', mensaje: 'no es tu pensión final' }
 const PARAMETROS_CONGELADOS = { codigo: 'PARAMETROS_LEGALES_CONGELADOS_A_FECHA_CALCULO', mensaje: 'parámetros congelados' }
 const CONTINUIDAD_SIN_HUECOS = { codigo: 'CONTINUIDAD_FUTURA_ASUMIDA_SIN_HUECOS', mensaje: 'continuidad sin huecos' }
@@ -345,5 +425,31 @@ describe('ordenarCaminosParaPresentacion — orden SEMÁNTICO por id, nunca por 
   it('devuelve un array distinto del recibido (nunca la misma referencia)', () => {
     const original = [base, alternativo, personalizado]
     expect(ordenarCaminosParaPresentacion(original)).not.toBe(original)
+  })
+})
+
+describe('construirSemanasReferenciaDeclaradas — contrato GO-B (2026-08-25)', () => {
+  it('conocido + cantidad válida → objeto con la certeza correcta', () => {
+    expect(construirSemanasReferenciaDeclaradas('conocido', '1400')).toEqual({ cantidad: 1400, certeza: 'conocido' })
+  })
+
+  it('aproximado + cantidad válida → objeto con la certeza correcta', () => {
+    expect(construirSemanasReferenciaDeclaradas('aproximado', '1100')).toEqual({ cantidad: 1100, certeza: 'aproximado' })
+  })
+
+  it('desconocido → null, nunca "0 semanas" (ausencia de dato, no un hecho sobre la persona)', () => {
+    expect(construirSemanasReferenciaDeclaradas('desconocido', '')).toBeNull()
+    expect(construirSemanasReferenciaDeclaradas('desconocido', '1100')).toBeNull() // certeza manda, ignora cualquier residuo
+  })
+
+  it('null/ausente → null', () => {
+    expect(construirSemanasReferenciaDeclaradas(null, '1100')).toBeNull()
+    expect(construirSemanasReferenciaDeclaradas(undefined, '1100')).toBeNull()
+  })
+
+  it('certeza válida pero cantidad vacía/no numérica/negativa → null (nunca inventa un número)', () => {
+    expect(construirSemanasReferenciaDeclaradas('conocido', '')).toBeNull()
+    expect(construirSemanasReferenciaDeclaradas('aproximado', 'no-es-un-numero')).toBeNull()
+    expect(construirSemanasReferenciaDeclaradas('conocido', '-5')).toBeNull()
   })
 })

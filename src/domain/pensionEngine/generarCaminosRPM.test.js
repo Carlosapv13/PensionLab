@@ -163,6 +163,48 @@ describe('generarCaminosRPM — camino base no evaluable (historia insuficiente 
   })
 })
 
+describe('generarCaminosRPM — UX-RPM-01: historia vacía + horizonte largo → caminos viables sin ningún día real (auditoría 2026-08-24)', () => {
+  it('historiaCotizacion=[] con horizonte futuro muy por encima de 3.650 días Y de las 1.300 semanas mínimas produce el camino base viable — el tramo futuro sintético basta por sí solo', () => {
+    // fechaNacimiento/fecha heredados de PERFIL_BASE (edad actual = 62, ya cumple el
+    // mínimo legal de edad). edadJubilacionDeseada: 92 da un horizonte ≈ 30 años
+    // (~10.957 días ≈ 1.565 semanas) — no solo por encima de los 3.650 días que exige la
+    // ventana del IBL, sino también, con margen deliberado, por encima de las 1.300
+    // semanas mínimas de elegibilidad (Hombre, sin cronograma): un horizonte que sí
+    // llena el IBL pero no las semanas (ej. 75 años, ~676 semanas) sigue devolviendo
+    // SIN_CAMINOS_VIABLES vía SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM — verificado
+    // al construir este test — así que este caso necesita superar ambos umbrales, no
+    // solo el de la ventana del IBL.
+    const r = generarCaminosRPM({
+      ...PERFIL_BASE,
+      historiaCotizacion: [],
+      edadJubilacionDeseada: 92,
+    })
+    expect(r.orientacion.codigo).not.toBe('SIN_CAMINOS_VIABLES')
+    expect(r.escenarios.length).toBeGreaterThan(0)
+    expect(r.escenarios.some((e) => e.id === 'base' && e.estado === 'viable')).toBe(true)
+    expect(r.horizonte).not.toBeNull()
+  })
+
+  it('historiaCotizacion=[] con horizonte que sí llena la ventana del IBL (≥3.650 días) pero no las 1.300 semanas mínimas → SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM, con detalleElegibilidad y cifras exactas — no el mensaje genérico de SIN_CAMINOS_VIABLES', () => {
+    // Horizonte más probable en la práctica de esta ruta directa (alguien explorando su
+    // jubilación con un remanente de carrera de 10-25 años, sin haber cargado historia
+    // real todavía) — a diferencia del test anterior (30 años), aquí el motor SÍ
+    // distingue la causa exacta del descarte, con cifras (útil para verificar que la
+    // UI, línea 477-481 de ProyectaTuPensionRPM.jsx, ya la muestra de forma específica,
+    // no genérica).
+    const r = generarCaminosRPM({
+      ...PERFIL_BASE,
+      historiaCotizacion: [],
+      edadJubilacionDeseada: 75, // horizonte ≈ 13 años — cubre los 3.650 días, no las 1.300 semanas
+    })
+    expect(r.escenarios).toEqual([])
+    expect(r.orientacion.codigo).toBe('SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM')
+    expect(r.detalleElegibilidad).not.toBeNull()
+    expect(r.detalleElegibilidad.semanasMinimas).toBe(1300)
+    expect(r.detalleElegibilidad.semanasProyectadas).toBeLessThan(1300)
+  })
+})
+
 describe('generarCaminosRPM — objetivo ya cumplido con continuidad', () => {
   it('solo genera el camino base, sin inventar un alternativo', () => {
     const r = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual: 100000 })

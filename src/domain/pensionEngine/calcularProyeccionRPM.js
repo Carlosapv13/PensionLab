@@ -169,12 +169,34 @@ function promediarConFuturo({ periodosObservados, diasFuturos, valorAplicado, an
  */
 
 /**
+ * @typedef {Object} SemanasReferenciaDeclaradasEntrada
+ * @property {number} cantidad - Semanas agregadas que la persona declaró tener HOY
+ *   (no proyectadas) — mismo dato que `semanasCotizadas` en `InformacionPensionalEsencial.jsx`,
+ *   ya validado como entero >= 0 por quien llama (`validarSemanas`,
+ *   `evidenciaSemanasMinimas.js`). Nunca crea historia, períodos, días ni IBC — ver
+ *   contrato GO-B más abajo.
+ * @property {('conocido'|'aproximado')} certeza - Mismo campo que `nivelConocimientoSemanas`.
+ *   'desconocido' nunca llega aquí — para esa certeza, quien llama debe pasar `null`.
+ */
+
+/**
  * @param {Object} input
  * @param {Array<{fechaDesde: string, fechaHasta: (string|null), ibc: number, diasCotizados: number}>} [input.historiaCotizacion]
  * @param {string} input.fechaNacimiento - ISO
  * @param {(number|null|undefined)} input.edadJubilacionDeseada
  * @param {EscenarioIbcFuturoEntrada} input.escenarioIbcFuturo
  * @param {string} [input.fecha] - ISO, por defecto hoy (fechaBaseMonetaria)
+ * @param {SemanasReferenciaDeclaradasEntrada | null} [input.semanasReferenciaDeclaradas] -
+ *   Contrato GO-B (decisión de arquitectura, 2026-08-25): semanas agregadas que la
+ *   persona ya declaró en `InformacionPensionalEsencial.jsx`, reutilizadas aquí para una
+ *   PROYECCIÓN PRELIMINAR cuando la historia estructurada todavía no alcanza. Nunca se
+ *   suman a `semanasObservadas` (ambas representan el mismo pasado — sumarlas sería
+ *   doble conteo). Cuando es válida (`cantidad` finita >= 0, `certeza`
+ *   'conocido'|'aproximado'), tiene precedencia total sobre la historia para
+ *   elegibilidad/tasa de reemplazo en este slice — sin heurística de "historia
+ *   suficientemente completa" (decisión explícita: esa transición queda fuera de este
+ *   slice). Default `null` — sin este parámetro, comportamiento idéntico al existente
+ *   antes de GO-B (test de regresión dedicado).
  * @returns {{
  *   estado: 'calculado' | 'no_evaluable',
  *   razonNoEvaluable: ('EDAD_JUBILACION_NO_DECLARADA'|'FECHA_NACIMIENTO_NO_VALIDA'|'IBC_FUTURO_NO_VALIDO'|'HISTORIA_CON_PERIODO_POSTERIOR_A_FECHA_CALCULO'|'EDAD_JUBILACION_NO_POSTERIOR_A_HOY'|'HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA'|'COTIZACION_PARCIAL_EN_LIMITE_VENTANA_IBL_NO_SOPORTADA'|'PERIODOS_SUPERPUESTOS_NO_SOPORTADOS'|'INCONSISTENCIA_DIAS_COTIZADOS_INVALIDOS'|'COBERTURA_IPC_INSUFICIENTE_PARA_IBL_ORDINARIO'|null),
@@ -184,7 +206,15 @@ function promediarConFuturo({ periodosObservados, diasFuturos, valorAplicado, an
  *   escenarioIbcFuturo: {valorDeclarado: number, valorAplicado: number, origen: string, topeAplicado: number} | null,
  *   ibl: Object | null,
  *   composicionVentanaOrdinaria: {diasObservados: number, diasFuturos: number, fraccionFutura: number} | null,
- *   semanasCotizadas: {observadas: number, futuras: number, total: number} | null,
+ *   semanasCotizadas: {
+ *     observadas: number,
+ *     futuras: number,
+ *     sustentadasPorHistoria: number,
+ *     declaradas: number | null,
+ *     certeza: ('conocido'|'aproximado') | null,
+ *     total: number,
+ *     fuente: ('declaracion_agregada'|'historia_estructurada'),
+ *   } | null,
  *   tasaReemplazo: number | null,
  *   pensionMensualProyectada: number | null,
  *   limitaciones: Array<{codigo: string, mensaje: string}>,
@@ -198,6 +228,7 @@ export function calcularProyeccionRPM({
   edadJubilacionDeseada,
   escenarioIbcFuturo,
   fecha = hoyISO(),
+  semanasReferenciaDeclaradas = null,
 } = {}) {
   if (edadJubilacionDeseada === null || edadJubilacionDeseada === undefined || !Number.isFinite(edadJubilacionDeseada)) {
     return noEvaluable('EDAD_JUBILACION_NO_DECLARADA', null)
@@ -269,18 +300,58 @@ export function calcularProyeccionRPM({
   const diasObservadosTotal = sumaDias(historiaCotizacion)
   const semanasObservadas = diasObservadosTotal / 7
   const semanasFuturas = periodoFuturo.diasCotizados / 7
-  const semanasCotizadas = { observadas: semanasObservadas, futuras: semanasFuturas, total: semanasObservadas + semanasFuturas }
+  // Única magnitud sustentada por evidencia (historiaCotizacion + el mismo período futuro
+  // sintético que ya usa el IBL ordinario) — nunca incluye una declaración. Es la única
+  // que puede habilitar el IBL alternativo de vida laboral completa (contrato GO-B, más
+  // abajo) — las semanas declaradas jamás fabrican cobertura salarial que no existe.
+  const semanasSustentadasPorHistoria = semanasObservadas + semanasFuturas
+
+  // Contrato GO-B: cuando hay una declaración válida, tiene precedencia TOTAL sobre la
+  // historia para elegibilidad/tasa — nunca se suman ambas fuentes (representan el mismo
+  // pasado), y la sola presencia de historia parcial NO la reemplaza automáticamente (sin
+  // heurística de "historia suficientemente completa" — decisión explícita, fuera de
+  // alcance de este slice).
+  const declaracionValida =
+    semanasReferenciaDeclaradas !== null &&
+    Number.isFinite(semanasReferenciaDeclaradas.cantidad) &&
+    semanasReferenciaDeclaradas.cantidad >= 0 &&
+    (semanasReferenciaDeclaradas.certeza === 'conocido' || semanasReferenciaDeclaradas.certeza === 'aproximado')
+      ? semanasReferenciaDeclaradas
+      : null
+
+  const fuenteSemanas = declaracionValida !== null ? 'declaracion_agregada' : 'historia_estructurada'
+  // Semanas que efectivamente alimentan ESTA proyección (elegibilidad + tasa de
+  // reemplazo) — nunca dos cifras distintas para cada una. PROHIBIDO declaradas +
+  // observadas + futuras: cuando la fuente es la declaración, semanasObservadas ni
+  // siquiera participa de esta suma.
+  const semanasParaProyeccion =
+    declaracionValida !== null ? declaracionValida.cantidad + semanasFuturas : semanasSustentadasPorHistoria
+
+  const semanasCotizadas = {
+    observadas: semanasObservadas,
+    futuras: semanasFuturas,
+    sustentadasPorHistoria: semanasSustentadasPorHistoria,
+    declaradas: declaracionValida !== null ? declaracionValida.cantidad : null,
+    certeza: declaracionValida !== null ? declaracionValida.certeza : null,
+    total: semanasParaProyeccion,
+    fuente: fuenteSemanas,
+  }
 
   const umbralAlternativa = obtenerSemanasHabilitanAlternativaIBL(fecha)
 
-  // A diferencia de calcularPensionRPM.js (lectura histórica, umbral evaluado solo contra
-  // semanasObservadas), aquí el umbral se evalúa contra el total proyectado — decisión de
-  // alcance de S4-002, ver domain/formulas/trazabilidad-formula-RPM.md, "Semanas — total,
-  // no solo observadas". El bloqueo §8.10 (semanas declaradas vs. historia estructurada)
-  // sigue sin resolver, sin relación con esta decisión.
+  // Contrato GO-B — el gate de la alternativa de vida laboral completa SOLO puede
+  // habilitarse con semanasSustentadasPorHistoria, nunca con semanasParaProyeccion: esta
+  // alternativa promedia salarios reales (periodosVidaLaboral, sin ventana), y una
+  // declaración agregada no aporta ningún IBC histórico con qué promediar — habilitarla
+  // por una cifra sin datos detrás sería tratar un fragmento arbitrario de historia real
+  // (o ninguno) como si representara toda la vida laboral. Se distinguen dos razones de
+  // no-evaluación cuando la historia real no alcanza: la genuina insuficiencia (A) de la
+  // razón cuando tampoco la declaración ayudaría a nada, y el caso nuevo (B) — la
+  // declaración sí cruzaría el umbral, pero PensionLab todavía no tiene historia salarial
+  // sustentada para promediar esa alternativa de forma responsable.
   let iblVidaLaboral = null
   let razonVidaLaboralNoEvaluada = 'SEMANAS_TOTALES_INSUFICIENTES'
-  if (semanasCotizadas.total >= umbralAlternativa.valor) {
+  if (semanasSustentadasPorHistoria >= umbralAlternativa.valor) {
     const { observados: vlObservado, futuros: vlFuturo } = partirObservadoFuturo(seleccion.periodosVidaLaboral)
     const diasFuturosVL = sumaDias(vlFuturo)
 
@@ -297,16 +368,38 @@ export function calcularProyeccionRPM({
       iblVidaLaboral = { valor: vidaLaboral.promedio, detalle: vidaLaboral.detalle }
       razonVidaLaboralNoEvaluada = null
     }
+  } else if (fuenteSemanas === 'declaracion_agregada' && semanasParaProyeccion >= umbralAlternativa.valor) {
+    razonVidaLaboralNoEvaluada = 'VIDA_LABORAL_REQUIERE_HISTORIA_ESTRUCTURADA'
   }
 
   const esOpcionLegal = iblVidaLaboral !== null && iblVidaLaboral.valor > ordinario.promedio
   const iblAplicable = esOpcionLegal ? iblVidaLaboral.valor : ordinario.promedio
 
   const parametrosLegales = { ...obtenerParametrosTasaReemplazoRPM(fecha), smlv: smlv.valor }
+  // Misma cifra que alimentó la elegibilidad de generarCaminosRPM.js (semanasCotizadas.total)
+  // — nunca una distinta para la tasa de reemplazo (contrato GO-B).
   const datosUsuario = { ibl: iblAplicable, semanasCotizadas: semanasCotizadas.total }
 
   const tasaReemplazo = calcularTasaReemplazoRPM({ datosUsuario, parametrosLegales })
   const pensionMensualProyectada = formulaRPM({ datosUsuario, parametrosLegales })
+
+  // Limitación condicional (contrato GO-B) — solo cuando la fuente de esta proyección es
+  // la declaración agregada, nunca cuando ya viene de historia estructurada. Construida
+  // aquí (no como constante de módulo, a diferencia de las otras tres) porque necesita
+  // interpolar la cifra y la certeza reales de esta llamada — mismo criterio de "no
+  // repetir la palabra 'certificación'/prometer más precisión de la que hay" ya usado en
+  // el resto del dominio.
+  const limitaciones = [LIMITACION_NO_ES_PENSION_FINAL, LIMITACION_PARAMETROS_CONGELADOS, LIMITACION_CONTINUIDAD_FUTURA]
+  if (fuenteSemanas === 'declaracion_agregada') {
+    const prefijoCerteza = declaracionValida.certeza === 'aproximado' ? 'aproximadamente ' : ''
+    limitaciones.push({
+      codigo: 'PROYECCION_CONDICIONADA_A_SEMANAS_DECLARADAS',
+      mensaje:
+        `La elegibilidad y la tasa de reemplazo de este escenario usan las ${prefijoCerteza}${declaracionValida.cantidad} ` +
+        'semanas que declaraste, no tu historia de cotización detallada — este resultado puede cambiar cuando la ' +
+        'completes.',
+    })
+  }
 
   return {
     estado: 'calculado',
@@ -344,7 +437,7 @@ export function calcularProyeccionRPM({
     semanasCotizadas,
     tasaReemplazo,
     pensionMensualProyectada,
-    limitaciones: [LIMITACION_NO_ES_PENSION_FINAL, LIMITACION_PARAMETROS_CONGELADOS, LIMITACION_CONTINUIDAD_FUTURA],
+    limitaciones,
     trazabilidadVentana: seleccion.trazabilidadVentana,
     datosFaltantes: null,
   }

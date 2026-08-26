@@ -67,6 +67,7 @@ function resultadoVacio(codigo, razon, detalleElegibilidad = null) {
     detalleElegibilidad,
     barrido: null,
     horizonte: null,
+    semanas: null,
   }
 }
 
@@ -434,6 +435,15 @@ function biseccionarEscenarioIbcFuturo({ construirInput, ibcActual, topeAplicado
  *   que es un techo para la búsqueda del alternativo, no un punto a evaluar). Default null
  *   — sin él, el tercer camino no se genera. Debe ser un número finito > 0; cualquier otro
  *   valor (null, 0, negativo, no numérico) se trata como "no solicitado", nunca como error.
+ * @param {{cantidad: number, certeza: ('conocido'|'aproximado')} | null} [input.semanasReferenciaDeclaradas] -
+ *   Contrato GO-B (2026-08-25) — semanas agregadas ya declaradas en
+ *   `InformacionPensionalEsencial.jsx`. Se propaga sin modificación a CADA llamada
+ *   interna de `calcularProyeccionRPM` (base, bisección del alternativo, barrido,
+ *   personalizado) vía `escenarioBaseInput` — la misma fuente de semanas para todos los
+ *   caminos de una misma proyección, nunca una distinta por camino. Ver
+ *   `calcularProyeccionRPM.js` para el contrato completo (precedencia, nunca-suma,
+ *   nunca habilita el IBL alternativo). Default `null` — comportamiento idéntico al
+ *   existente antes de GO-B.
  * @param {string} [input.fecha]
  * @returns {{
  *   escenarios: Array<Object>,
@@ -453,6 +463,11 @@ function biseccionarEscenarioIbcFuturo({ construirInput, ibcActual, topeAplicado
  *     puntoObjetivo: { escenarioIbcFuturo: Object, esfuerzo: Object, resultado: Object } | null,
  *   } | null,
  *   horizonte: { fechaInicio: string, fechaFin: string, diasCotizados: number } | null,
+ *   semanas: {
+ *     observadas: number, futuras: number, sustentadasPorHistoria: number,
+ *     declaradas: number|null, certeza: ('conocido'|'aproximado')|null, total: number,
+ *     fuente: ('declaracion_agregada'|'historia_estructurada'),
+ *   } | null,
  * }}
  */
 export function generarCaminosRPM({
@@ -465,6 +480,7 @@ export function generarCaminosRPM({
   objetivoValorMensual,
   restriccionCostoPensionalAdicionalMaximoMensual = null,
   esfuerzoAdicionalMensualDeseado = null,
+  semanasReferenciaDeclaradas = null,
   fecha = hoyISO(),
 }) {
   // --- Perfil (S4-001: sin restricción de tipoCotizante/lugarCotizacion/trasladoRegimen) ---
@@ -511,6 +527,11 @@ export function generarCaminosRPM({
     edadJubilacionDeseada,
     escenarioIbcFuturo: { valor: ibcAplicableSimulacion, origen: 'continuidad_ibc_actual' },
     fecha,
+    // Contrato GO-B: misma fuente de semanas para TODOS los caminos de esta proyección —
+    // se propaga tal cual (spread de escenarioBaseInput) a la bisección del alternativo,
+    // el barrido y el esfuerzo personalizado, más abajo. Nunca una fuente distinta por
+    // camino.
+    semanasReferenciaDeclaradas,
   }
 
   const resultadoBase = calcularProyeccionRPM(escenarioBaseInput)
@@ -522,20 +543,33 @@ export function generarCaminosRPM({
   // Requisito de semanas: igual criterio de fecha que la edad (fechaReconocimiento, no
   // fecha) — semanasMinimasPensionMujer sí tiene un cronograma legal ya vigente
   // (Sentencia C-197/2023) que sería incorrecto ignorar. Se compara contra
-  // semanasCotizadas.total (historia observada + horizonte futuro completo, ya
-  // proyectado por calcularProyeccionRPM) — nunca contra la semanas declaradas hoy por
-  // el usuario en otra pantalla, que reflejan una fecha distinta. Una sola verificación
-  // basta: semanasCotizadas.total no depende de escenarioIbcFuturo.valor (invariante ya
+  // semanasCotizadas.total — que, desde el contrato GO-B, es la MISMA cifra que ya
+  // alimentó la tasa de reemplazo dentro de calcularProyeccionRPM (declaradas+futuras
+  // cuando hay una declaración agregada válida; historia+futuro en caso contrario) —
+  // nunca dos cifras distintas para elegibilidad y tasa. Una sola verificación basta:
+  // semanasCotizadas.total no depende de escenarioIbcFuturo.valor (invariante ya
   // establecida), así que si el camino base cumple, cualquier alternativo también.
   const semanasMinimas = obtenerSemanasMinimas(fechaReconocimiento, sexoResuelto, 'RPM')
   const semanasProyectadas = resultadoBase.semanasCotizadas.total
 
   if (semanasProyectadas < semanasMinimas.valor) {
     const semanasFaltantes = semanasMinimas.valor - semanasProyectadas
+    // Redacción sensible a la fuente (contrato GO-B) — "con la historia... utilizados"
+    // sería inexacto cuando la fuente real es la declaración agregada (p. ej.
+    // historiaCotizacion=[]): no hay ninguna historia detrás de esa cifra todavía.
+    const fraseFuente =
+      resultadoBase.semanasCotizadas.fuente === 'declaracion_agregada'
+        ? 'Con las semanas que declaraste y el escenario de cotización futuro utilizado'
+        : 'Con la historia y el escenario de cotización utilizados'
     return resultadoVacio(
       'SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM',
-      `Con la historia y el escenario de cotización utilizados, a esa fecha proyectamos ${semanasProyectadas.toFixed(1)} semanas. El requisito legal aplicable es ${semanasMinimas.valor}; faltarían ${semanasFaltantes.toFixed(1)} semanas.`,
-      { semanasMinimas: semanasMinimas.valor, semanasProyectadas, semanasFaltantes }
+      `${fraseFuente}, a esa fecha proyectamos ${semanasProyectadas.toFixed(1)} semanas. El requisito legal aplicable es ${semanasMinimas.valor}; faltarían ${semanasFaltantes.toFixed(1)} semanas.`,
+      {
+        semanasMinimas: semanasMinimas.valor,
+        semanasProyectadas,
+        semanasFaltantes,
+        fuenteSemanas: resultadoBase.semanasCotizadas.fuente,
+      }
     )
   }
 
@@ -727,6 +761,13 @@ export function generarCaminosRPM({
   // recalcular ni derivar nada nuevo.
   const horizonte = resultadoBase.horizonteFuturo
 
+  // Mismo criterio que horizonte, arriba (contrato GO-B, 2026-08-25): un único campo
+  // top-level, reexpuesto tal cual desde resultadoBase.semanasCotizadas — nunca uno por
+  // camino, porque semanasReferenciaDeclaradas es la misma en cada llamada interna (ver
+  // escenarioBaseInput). Le da a la UI la fuente/certeza/cifras trazables sin recalcular
+  // nada ni leer dentro de un escenario individual.
+  const semanas = resultadoBase.semanasCotizadas
+
   // diferenciaFrenteABase (decisión de producto, 2026-08-24) — post-proceso final, un único
   // punto del flujo: NUNCA vuelve a llamar calcularProyeccionRPM ni reconstruye ninguna
   // pensión, solo resta dos resultados YA calculados (mismo patrón que distanciaObjetivo.delta,
@@ -746,5 +787,6 @@ export function generarCaminosRPM({
     detalleElegibilidad: null,
     barrido,
     horizonte,
+    semanas,
   }
 }

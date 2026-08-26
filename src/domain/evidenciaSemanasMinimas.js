@@ -22,7 +22,7 @@ function hoyISO() {
  * @param {string} valor
  * @returns {number | null}
  */
-function validarSemanas(valor) {
+export function validarSemanas(valor) {
   if (valor === '' || valor === null || valor === undefined) return null
 
   const numero = Number(valor)

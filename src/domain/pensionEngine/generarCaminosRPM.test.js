@@ -902,3 +902,101 @@ describe('generarCaminosRPM — horizonte (§14 punto 9 del Entregable 2)', () =
     expect(r.horizonte).toEqual({ fechaInicio: '2026-08-22', fechaFin: '2043-02-11', diasCotizados: 6018 })
   })
 })
+
+// Contrato GO-B (decisión de arquitectura, 2026-08-25) — mismo perfil que
+// calcularProyeccionRPM.test.js ("perfilSinHistoriaParaGoB"): fechaNacimiento 1978-01-01
+// (edad actual FECHA_CALCULO = 48), edadJubilacionDeseada 62 (horizonte ≈ 730 semanas
+// futuras) — cubre la ventana IBL (3.650 días) pero no las 1.300 semanas mínimas de
+// reconocimiento por sí solo, sin historia.
+function perfilGoBSinHistoria() {
+  return {
+    regimenActual: 'RPM',
+    sexo: 'Hombre',
+    historiaCotizacion: [],
+    fechaNacimiento: '1978-01-01',
+    edadJubilacionDeseada: 62,
+    ibcAplicableSimulacion: 2500000,
+    objetivoValorMensual: 1600000,
+    fecha: FECHA_CALCULO,
+  }
+}
+
+describe('generarCaminosRPM — contrato GO-B: semanas declaradas propagadas hasta la elegibilidad y la tasa', () => {
+  it('CASO A — declaradas aproximadas + historia=[]: elegibilidad ya no bloquea, resultado.semanas trazable', () => {
+    const r = generarCaminosRPM({
+      ...perfilGoBSinHistoria(),
+      semanasReferenciaDeclaradas: { cantidad: 1100, certeza: 'aproximado' },
+    })
+
+    expect(r.orientacion.codigo).not.toBe('SIN_CAMINOS_VIABLES')
+    expect(r.escenarios.length).toBeGreaterThan(0)
+    expect(r.escenarios.some((e) => e.id === 'base' && e.estado === 'viable')).toBe(true)
+    expect(r.semanas).not.toBeNull()
+    expect(r.semanas.fuente).toBe('declaracion_agregada')
+    expect(r.semanas.declaradas).toBe(1100)
+    expect(r.semanas.certeza).toBe('aproximado')
+    expect(r.semanas.total).toBe(1100 + r.semanas.futuras)
+  })
+
+  it('CASO B — declaradas conocidas: misma coherencia, fuente y certeza correctas', () => {
+    const r = generarCaminosRPM({
+      ...perfilGoBSinHistoria(),
+      semanasReferenciaDeclaradas: { cantidad: 1400, certeza: 'conocido' },
+    })
+
+    expect(r.escenarios.length).toBeGreaterThan(0)
+    expect(r.semanas.fuente).toBe('declaracion_agregada')
+    expect(r.semanas.certeza).toBe('conocido')
+    expect(r.semanas.total).toBe(1400 + r.semanas.futuras)
+  })
+
+  it('CASO C — historia parcial + declaración: sin doble conteo también a este nivel; elegibilidad sigue usando la fuente declarada en este slice', () => {
+    const historiaParcial = [
+      { fechaDesde: '2023-01-01', fechaHasta: '2023-12-31', ibc: 1200000, diasCotizados: 365 },
+      { fechaDesde: '2024-01-01', fechaHasta: '2024-12-31', ibc: 1200000, diasCotizados: 366 },
+      { fechaDesde: '2025-01-01', fechaHasta: '2025-12-31', ibc: 1200000, diasCotizados: 365 },
+    ]
+    const r = generarCaminosRPM({
+      ...perfilGoBSinHistoria(),
+      historiaCotizacion: historiaParcial,
+      semanasReferenciaDeclaradas: { cantidad: 1100, certeza: 'aproximado' },
+    })
+
+    expect(r.semanas.observadas).toBeGreaterThan(0)
+    expect(r.semanas.fuente).toBe('declaracion_agregada')
+    const sumaProhibida = r.semanas.declaradas + r.semanas.observadas + r.semanas.futuras
+    expect(r.semanas.total).not.toBe(sumaProhibida)
+    expect(r.semanas.total).toBe(1100 + r.semanas.futuras)
+    expect(r.semanas.sustentadasPorHistoria).toBeLessThan(r.semanas.total)
+    expect(r.escenarios.length).toBeGreaterThan(0) // la elegibilidad ya no bloquea
+  })
+
+  it('CASO D — semanas desconocidas (sin declaración): comportamiento idéntico al existente antes de GO-B, mensaje sigue hablando de "historia", nunca de una declaración inexistente', () => {
+    const r = generarCaminosRPM({ ...perfilGoBSinHistoria(), semanasReferenciaDeclaradas: null })
+
+    expect(r.orientacion.codigo).toBe('SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM')
+    expect(r.detalleElegibilidad.fuenteSemanas).toBe('historia_estructurada')
+    expect(r.orientacion.razon).toContain('Con la historia y el escenario de cotización utilizados')
+    expect(r.orientacion.razon).not.toContain('declaraste')
+    expect(r.semanas).toBeNull() // resultadoVacio: sin escenario base calculado, sin semanas que exponer
+  })
+
+  it('el mensaje de SEMANAS_INSUFICIENTES cambia de redacción cuando la fuente es la declaración, sin inventar una cifra distinta', () => {
+    const r = generarCaminosRPM({
+      ...perfilGoBSinHistoria(),
+      semanasReferenciaDeclaradas: { cantidad: 50, certeza: 'aproximado' }, // insuficiente incluso declarando
+    })
+
+    expect(r.orientacion.codigo).toBe('SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM')
+    expect(r.detalleElegibilidad.fuenteSemanas).toBe('declaracion_agregada')
+    expect(r.orientacion.razon).toContain('Con las semanas que declaraste y el escenario de cotización futuro utilizado')
+  })
+
+  it('E — regresión: sin ninguna declaración, el comportamiento por defecto (PERFIL_BASE, con historia real) no cambia', () => {
+    const r = generarCaminosRPM(PERFIL_BASE)
+    expect(r.semanas).not.toBeNull()
+    expect(r.semanas.fuente).toBe('historia_estructurada')
+    expect(r.semanas.declaradas).toBeNull()
+    expect(r.semanas.total).toBe(r.semanas.sustentadasPorHistoria)
+  })
+})

@@ -578,3 +578,192 @@ describe('calcularProyeccionRPM — horizonteFuturo (§14 punto 9 del Entregable
     })
   })
 })
+
+// Contrato GO-B (decisión de arquitectura, 2026-08-25) — semanas agregadas ya declaradas
+// (nivelConocimientoSemanas/semanasCotizadas de InformacionPensionalEsencial.jsx) para una
+// PROYECCIÓN PRELIMINAR. Perfil sin historia: fechaNacimiento 1978-01-01 (edad actual
+// FECHA_CALCULO = 48), edadJubilacionDeseada 62 (fechaReconocimiento 2040-01-01,
+// horizonte ≈ 14 años ≈ 730 semanas futuras) — cubre la ventana IBL (3.650 días) pero no
+// las 1.300/1.250 semanas mínimas de reconocimiento/alternativa por sí solo. Umbral real
+// de la alternativa de vida laboral verificado en exploración previa: 1.250 semanas.
+function perfilSinHistoriaParaGoB() {
+  return {
+    historiaCotizacion: [],
+    fechaNacimiento: '1978-01-01',
+    edadJubilacionDeseada: 62,
+    escenarioIbcFuturo: escenarioContinuidad(2500000),
+    fecha: FECHA_CALCULO,
+  }
+}
+
+// Historia real pequeña (3 años, ~156 semanas) — deliberadamente insuficiente para cruzar
+// el umbral de 1.250 incluso sumada al horizonte futuro de perfilSinHistoriaParaGoB()
+// (~156+730=886), a diferencia de historiaDiezAniosCompleta() (~522 semanas), que sí lo
+// cruzaría por sí sola con este mismo horizonte — se usa aquí exactamente para NO
+// contaminar las pruebas de "la declaración no fabrica historia" con un cruce accidental
+// por datos reales.
+function historiaParcialPequena() {
+  return [periodoAnioCompleto(2023, 1200000), periodoAnioCompleto(2024, 1200000), periodoAnioCompleto(2025, 1200000)]
+}
+
+describe('calcularProyeccionRPM — contrato GO-B: semanas declaradas para proyección preliminar', () => {
+  it('CASO A — declaradas aproximadas: semanas de proyección = declaradas + futuras, nunca +observadas; fuente y certeza trazables', () => {
+    const resultado = calcularProyeccionRPM({
+      ...perfilSinHistoriaParaGoB(),
+      semanasReferenciaDeclaradas: { cantidad: 1100, certeza: 'aproximado' },
+    })
+
+    expect(resultado.estado).toBe('calculado')
+    expect(resultado.semanasCotizadas.observadas).toBe(0)
+    expect(resultado.semanasCotizadas.declaradas).toBe(1100)
+    expect(resultado.semanasCotizadas.certeza).toBe('aproximado')
+    expect(resultado.semanasCotizadas.fuente).toBe('declaracion_agregada')
+    expect(resultado.semanasCotizadas.total).toBe(1100 + resultado.semanasCotizadas.futuras)
+    expect(resultado.semanasCotizadas.sustentadasPorHistoria).toBe(resultado.semanasCotizadas.futuras) // observadas=0
+
+    const limitacionDeclarada = resultado.limitaciones.find((l) => l.codigo === 'PROYECCION_CONDICIONADA_A_SEMANAS_DECLARADAS')
+    expect(limitacionDeclarada).toBeDefined()
+    expect(limitacionDeclarada.mensaje).toContain('aproximadamente 1100')
+  })
+
+  it('CASO A (continuación) — la misma cifra que alimenta elegibilidad también mueve la tasa de reemplazo, nunca una distinta para cada una', () => {
+    const sinDeclaracion = calcularProyeccionRPM(perfilSinHistoriaParaGoB())
+    const conDeclaracion = calcularProyeccionRPM({
+      ...perfilSinHistoriaParaGoB(),
+      semanasReferenciaDeclaradas: { cantidad: 1100, certeza: 'aproximado' },
+    })
+
+    expect(conDeclaracion.semanasCotizadas.total).toBeGreaterThan(sinDeclaracion.semanasCotizadas.total)
+    // El IBL aplicable no cambia — la declaración nunca lo toca (solo semanas). Toda la
+    // diferencia de tasa/pensión viene exclusivamente de datosUsuario.semanasCotizadas.
+    expect(conDeclaracion.ibl.aplicable).toBe(sinDeclaracion.ibl.aplicable)
+    expect(conDeclaracion.tasaReemplazo).toBeGreaterThan(sinDeclaracion.tasaReemplazo)
+    expect(conDeclaracion.pensionMensualProyectada).toBeGreaterThan(sinDeclaracion.pensionMensualProyectada)
+  })
+
+  it('CASO B — declaradas conocidas: certeza trazable, sin prefijo "aproximadamente" en la limitación', () => {
+    const resultado = calcularProyeccionRPM({
+      ...perfilSinHistoriaParaGoB(),
+      semanasReferenciaDeclaradas: { cantidad: 1400, certeza: 'conocido' },
+    })
+
+    expect(resultado.semanasCotizadas.certeza).toBe('conocido')
+    expect(resultado.semanasCotizadas.fuente).toBe('declaracion_agregada')
+    expect(resultado.semanasCotizadas.total).toBe(1400 + resultado.semanasCotizadas.futuras)
+
+    const limitacionDeclarada = resultado.limitaciones.find((l) => l.codigo === 'PROYECCION_CONDICIONADA_A_SEMANAS_DECLARADAS')
+    expect(limitacionDeclarada.mensaje).toContain('1400')
+    expect(limitacionDeclarada.mensaje).not.toContain('aproximadamente')
+  })
+
+  it('CASO C — historia parcial + declaración: NO hay doble conteo, la historia parcial no reemplaza automáticamente la declaración en este slice', () => {
+    const resultado = calcularProyeccionRPM({
+      ...perfilSinHistoriaParaGoB(),
+      historiaCotizacion: historiaParcialPequena(),
+      semanasReferenciaDeclaradas: { cantidad: 1100, certeza: 'aproximado' },
+    })
+
+    expect(resultado.semanasCotizadas.observadas).toBeGreaterThan(0) // hay historia real
+    expect(resultado.semanasCotizadas.fuente).toBe('declaracion_agregada') // sigue ganando la declaración
+    // PROHIBIDO: declaradas + observadas + futuras (doble conteo del mismo pasado)
+    const sumaProhibida =
+      resultado.semanasCotizadas.declaradas + resultado.semanasCotizadas.observadas + resultado.semanasCotizadas.futuras
+    expect(resultado.semanasCotizadas.total).not.toBe(sumaProhibida)
+    expect(resultado.semanasCotizadas.total).toBe(1100 + resultado.semanasCotizadas.futuras)
+    // sustentadasPorHistoria sigue disponible aparte, sin mezclarse con la declaración
+    expect(resultado.semanasCotizadas.sustentadasPorHistoria).toBe(
+      resultado.semanasCotizadas.observadas + resultado.semanasCotizadas.futuras
+    )
+    expect(resultado.semanasCotizadas.sustentadasPorHistoria).toBeLessThan(resultado.semanasCotizadas.total)
+  })
+
+  it('CASO D — semanas desconocidas: comportamiento idéntico al existente antes de GO-B, nunca "0 semanas declaradas"', () => {
+    const conNullExplicito = calcularProyeccionRPM({ ...perfilSinHistoriaParaGoB(), semanasReferenciaDeclaradas: null })
+    const sinElParametro = calcularProyeccionRPM(perfilSinHistoriaParaGoB())
+
+    expect(conNullExplicito).toEqual(sinElParametro) // regresión: default y null explícito son idénticos
+    expect(conNullExplicito.semanasCotizadas.fuente).toBe('historia_estructurada')
+    expect(conNullExplicito.semanasCotizadas.declaradas).toBeNull()
+    expect(conNullExplicito.semanasCotizadas.certeza).toBeNull()
+    expect(conNullExplicito.semanasCotizadas.total).toBe(conNullExplicito.semanasCotizadas.sustentadasPorHistoria)
+    expect(conNullExplicito.limitaciones.some((l) => l.codigo === 'PROYECCION_CONDICIONADA_A_SEMANAS_DECLARADAS')).toBe(false)
+  })
+
+  it('certeza inválida (p. ej. "desconocido" dentro del objeto) se trata como ausencia de declaración, nunca como error', () => {
+    const resultado = calcularProyeccionRPM({
+      ...perfilSinHistoriaParaGoB(),
+      semanasReferenciaDeclaradas: { cantidad: 1100, certeza: 'desconocido' },
+    })
+    expect(resultado.semanasCotizadas.fuente).toBe('historia_estructurada')
+    expect(resultado.semanasCotizadas.declaradas).toBeNull()
+  })
+
+  it('cantidad inválida (negativa o no finita) se trata como ausencia de declaración, nunca como error', () => {
+    const conNegativa = calcularProyeccionRPM({
+      ...perfilSinHistoriaParaGoB(),
+      semanasReferenciaDeclaradas: { cantidad: -5, certeza: 'aproximado' },
+    })
+    const conNaN = calcularProyeccionRPM({
+      ...perfilSinHistoriaParaGoB(),
+      semanasReferenciaDeclaradas: { cantidad: NaN, certeza: 'conocido' },
+    })
+    expect(conNegativa.semanasCotizadas.fuente).toBe('historia_estructurada')
+    expect(conNaN.semanasCotizadas.fuente).toBe('historia_estructurada')
+  })
+})
+
+describe('calcularProyeccionRPM — contrato GO-B: el gate del IBL alternativo SOLO usa semanas sustentadas por historia', () => {
+  it('A — genuinamente insuficiente, ni con historia ni con una declaración baja: SEMANAS_TOTALES_INSUFICIENTES', () => {
+    const resultado = calcularProyeccionRPM({
+      ...perfilSinHistoriaParaGoB(),
+      semanasReferenciaDeclaradas: { cantidad: 50, certeza: 'aproximado' },
+    })
+    expect(resultado.semanasCotizadas.total).toBeLessThan(1250)
+    expect(resultado.ibl.vidaLaboral).toBeNull()
+    expect(resultado.ibl.razonVidaLaboralNoEvaluada).toBe('SEMANAS_TOTALES_INSUFICIENTES')
+  })
+
+  it('B — la declaración cruza el umbral pero no hay historia sustentada (historia=[]): VIDA_LABORAL_REQUIERE_HISTORIA_ESTRUCTURADA, nunca fabrica el IBL alternativo', () => {
+    const resultado = calcularProyeccionRPM({
+      ...perfilSinHistoriaParaGoB(),
+      semanasReferenciaDeclaradas: { cantidad: 1100, certeza: 'aproximado' },
+    })
+
+    expect(resultado.semanasCotizadas.sustentadasPorHistoria).toBeLessThan(1250)
+    expect(resultado.semanasCotizadas.total).toBeGreaterThanOrEqual(1250)
+    expect(resultado.ibl.vidaLaboral).toBeNull()
+    expect(resultado.ibl.razonVidaLaboralNoEvaluada).toBe('VIDA_LABORAL_REQUIERE_HISTORIA_ESTRUCTURADA')
+    expect(resultado.ibl.esOpcionLegal).toBe(false)
+    expect(resultado.ibl.aplicable).toBe(resultado.ibl.ordinario.valor)
+  })
+
+  it('B (con historia parcial real, no solo vacía) — la declaración sigue sin fabricar el IBL alternativo aunque exista algo de historia real', () => {
+    const resultado = calcularProyeccionRPM({
+      ...perfilSinHistoriaParaGoB(),
+      historiaCotizacion: historiaParcialPequena(),
+      semanasReferenciaDeclaradas: { cantidad: 1100, certeza: 'aproximado' },
+    })
+
+    expect(resultado.semanasCotizadas.sustentadasPorHistoria).toBeLessThan(1250) // ~156+730=886
+    expect(resultado.semanasCotizadas.total).toBeGreaterThanOrEqual(1250) // 1100+730
+    expect(resultado.ibl.vidaLaboral).toBeNull()
+    expect(resultado.ibl.razonVidaLaboralNoEvaluada).toBe('VIDA_LABORAL_REQUIERE_HISTORIA_ESTRUCTURADA')
+  })
+
+  it('E — historia real por sí sola ya alcanza el umbral: la alternativa sigue funcionando igual, con o sin semanasReferenciaDeclaradas=null explícito (sin regresión)', () => {
+    const params = {
+      historiaCotizacion: historiaDiezAniosCompleta(),
+      fechaNacimiento: '1976-01-01',
+      edadJubilacionDeseada: 65,
+      escenarioIbcFuturo: escenarioContinuidad(2000000),
+      fecha: FECHA_CALCULO,
+    }
+    const sinParametroNuevo = calcularProyeccionRPM(params)
+    const conNullExplicito = calcularProyeccionRPM({ ...params, semanasReferenciaDeclaradas: null })
+
+    expect(sinParametroNuevo.ibl.vidaLaboral).not.toBeNull()
+    expect(sinParametroNuevo.ibl.razonVidaLaboralNoEvaluada).toBeNull()
+    expect(conNullExplicito).toEqual(sinParametroNuevo)
+    expect(sinParametroNuevo.semanasCotizadas.fuente).toBe('historia_estructurada')
+  })
+})

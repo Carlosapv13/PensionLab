@@ -199,6 +199,13 @@ function TextoExplicacionCamino({ texto }) {
  *   ya declarado en InformacionPensionalEsencial.jsx (contrato GO-B, 2026-08-25) — nunca
  *   se le vuelve a preguntar aquí.
  * @param {string} props.semanasCotizadas - idem, mismo origen.
+ * @param {() => void} [props.onProfundizarHistoria] - profundización opcional (2026-08-26):
+ *   navega a HistoriaCotizacionRPM.jsx/ExploraTuProyeccionRPM.jsx para registrar historia
+ *   real y volver aquí con la proyección ya recalculada. Solo se ofrece cuando
+ *   `historiaCotizacion.length === 0` — con historia ya presente, no hay nada que
+ *   "completar" desde cero (ver JSX, más abajo). Opcional en la firma únicamente por
+ *   disciplina de props — App.jsx siempre la pasa; nunca se le pide al motor ni cambia
+ *   ningún cálculo.
  * @param {string} props.edadJubilacionDeseada
  * @param {(valor: string) => void} props.onCambiarEdadJubilacionDeseada
  * @param {string} props.objetivoPensionMensual
@@ -225,6 +232,7 @@ function ProyectaTuPensionRPM({
   salarioParaEstimarBase,
   nivelConocimientoSemanas,
   semanasCotizadas,
+  onProfundizarHistoria,
   edadJubilacionDeseada,
   onCambiarEdadJubilacionDeseada,
   objetivoPensionMensual,
@@ -703,6 +711,24 @@ function ProyectaTuPensionRPM({
               situación actual (IBC declarado) y del supuesto de continuidad hasta tu fecha objetivo, sin ningún
               tramo real de cotización anterior a hoy.
             </p>
+          )}
+
+          {/* Profundización opcional (2026-08-26) — cubre ambos mensajes de arriba (con
+              declaración agregada o sin ninguna): la proyección preliminar puede realizarse
+              con la información disponible sin exigir historia detallada; completar la
+              historia permite profundizar la evidencia utilizada por el cálculo (afecta el
+              IBL y la cifra proyectada) — el copy nunca pone en duda la proyección actual,
+              solo ofrece profundizarla. Reutiliza HistoriaCotizacionRPM.jsx/
+              ExploraTuProyeccionRPM.jsx tal cual — sin pantalla ni estado de navegación
+              nuevos (ver App.jsx). Desaparece en cuanto historiaCotizacion tiene algún
+              período (caso D): nada que "completar" desde cero cuando ya existe historia
+              real. */}
+          {historiaCotizacion.length === 0 && (
+            <div className="screen__actions">
+              <button type="button" className="btn btn-secondary" onClick={onProfundizarHistoria}>
+                Completar mi historia de cotización
+              </button>
+            </div>
           )}
 
           {explicacionVigente && resultadoExplicacion.estado === 'generado' && textoExplicacion.comparacion && (

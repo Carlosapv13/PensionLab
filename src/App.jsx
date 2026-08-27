@@ -521,7 +521,13 @@ function App() {
           nivelConocimientoSemanas={nivelConocimientoSemanas}
           semanasCotizadas={semanasCotizadas}
           trasladoRegimen={trasladoRegimen}
-          onVolver={() => setVista('queDeterminaResultado')}
+          // Profundización opcional (2026-08-26): hoy la única ruta real que llega aquí es
+          // el botón "Completar mi historia de cotización" de ProyectaTuPensionRPM (vía
+          // onProfundizarHistoria, más abajo) — la rama RPM de queDeterminaResultado.onContinuar
+          // (arriba) es alcance muerto de hecho, porque UX-RPM-01 ya no deja llegar a
+          // queDeterminaResultado para RPM. Volver debe regresar exactamente a la pantalla
+          // desde la que se entró, nunca a una que el usuario no visitó en este recorrido.
+          onVolver={() => setVista('proyectaTuPensionRPM')}
           onContinuar={() => setVista('exploraTuProyeccionRPM')}
         />
       )}
@@ -553,6 +559,11 @@ function App() {
           // se conectan aquí para la proyección preliminar, sin volver a preguntarlas.
           nivelConocimientoSemanas={nivelConocimientoSemanas}
           semanasCotizadas={semanasCotizadas}
+          // Profundización opcional (2026-08-26): reutiliza HistoriaCotizacionRPM.jsx /
+          // ExploraTuProyeccionRPM.jsx tal cual, sin ningún estado de navegación nuevo —
+          // mismo `vista` de siempre. onVolver de historiaCotizacionRPM (arriba) regresa
+          // aquí; onContinuar de exploraTuProyeccionRPM ya apuntaba aquí sin cambios.
+          onProfundizarHistoria={() => setVista('historiaCotizacionRPM')}
           edadJubilacionDeseada={edadJubilacionDeseada}
           onCambiarEdadJubilacionDeseada={setEdadJubilacionDeseada}
           objetivoPensionMensual={objetivoPensionMensual}

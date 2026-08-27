@@ -50,9 +50,12 @@ describe('determinarOrientacionExploracion — guard / null', () => {
 })
 
 describe('determinarOrientacionExploracion — los 7 estados', () => {
-  it('HOY_YA_ALCANZA_OBJETIVO: base.distanciaObjetivo.cumple === true', () => {
+  it('HOY_YA_ALCANZA_OBJETIVO: base.distanciaObjetivo.cumple === true, ofrece EXPLORAR_ESFUERZO_PERSONALIZADO (cierre mínimo POST-MVP, 2026-08-26) — nunca AJUSTAR_DATOS_BASE, no hay ningún dato base que corregir aquí', () => {
     const r = resultado([escenario('base', { distanciaObjetivo: { valorObjetivo: 1000000, delta: -500000, cumple: true } })])
-    expect(determinarOrientacionExploracion(r)).toEqual({ codigo: 'HOY_YA_ALCANZA_OBJETIVO', acciones: [] })
+    expect(determinarOrientacionExploracion(r)).toEqual({
+      codigo: 'HOY_YA_ALCANZA_OBJETIVO',
+      acciones: [{ codigo: 'EXPLORAR_ESFUERZO_PERSONALIZADO' }],
+    })
   })
 
   it('OBJETIVO_LEGALMENTE_INALCANZABLE: orientacion.objetivoLegalmenteInalcanzable === true', () => {

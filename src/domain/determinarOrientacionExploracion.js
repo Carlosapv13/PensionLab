@@ -51,7 +51,12 @@ export function determinarOrientacionExploracion(resultado) {
   if (!base || base.estado !== 'viable') return null // defensivo — no debería ocurrir si hay escenarios
 
   if (base.distanciaObjetivo.cumple) {
-    return { codigo: 'HOY_YA_ALCANZA_OBJETIVO', acciones: [] }
+    // Cierre mínimo POST-MVP (2026-08-26): ya alcanzar el objetivo hoy no significa que no
+    // haya nada más que explorar — el control de esfuerzo personalizado (arriba) sigue
+    // siendo una exploración válida (p. ej. un esfuerzo mayor, para ver el efecto). No se
+    // ofrece AJUSTAR_DATOS_BASE aquí: no hay ningún dato base "corregir", a diferencia de
+    // OBJETIVO_LEGALMENTE_INALCANZABLE.
+    return { codigo: 'HOY_YA_ALCANZA_OBJETIVO', acciones: [{ codigo: 'EXPLORAR_ESFUERZO_PERSONALIZADO' }] }
   }
 
   if (resultado.orientacion?.objetivoLegalmenteInalcanzable) {

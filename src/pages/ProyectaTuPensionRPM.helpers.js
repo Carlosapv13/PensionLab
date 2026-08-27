@@ -78,7 +78,9 @@ export function textoDiferenciaFrenteABase(diferenciaFrenteABase) {
 // lógica que determina el estado. Nunca cifras, nunca "mejor"/"recomendado"/"deberías"/
 // "te conviene"/"asequible"/"rentable" — las cifras ya están en las tarjetas.
 const TEXTO_ORIENTACION = {
-  HOY_YA_ALCANZA_OBJETIVO: 'Mantener tu situación actual ya alcanza tu objetivo declarado.',
+  HOY_YA_ALCANZA_OBJETIVO:
+    'Mantener tu situación actual ya alcanza tu objetivo declarado. Si quieres, puedes explorar un esfuerzo ' +
+    'mensual distinto para ver su efecto.',
   OBJETIVO_LEGALMENTE_INALCANZABLE:
     'Con las condiciones actuales, aumentar tu aporte no permite alcanzar tu objetivo dentro del límite legal.',
   VARIOS_CAMINOS_CUMPLEN_FALTA_PRIORIDAD:

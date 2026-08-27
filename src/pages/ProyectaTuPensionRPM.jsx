@@ -138,6 +138,19 @@ const adaptadorExplicacionProduccion = crearAdaptadorExplicacionViaServidor()
 
 const CAMINO_MAS_ALINEADO_TEXTO = 'Camino más alineado con tu objetivo y las condiciones que nos diste.'
 
+// Ajuste de alcance de publicación (decisión de producto, 2026-08-27 — ver README.md
+// "Limitaciones conocidas del MVP" y docs/qa/matriz-pruebas-funcionales-mvp.md, sección IA):
+// la explicación con IA (S4-007) existe en el código y sigue probada, pero no forma parte de
+// la experiencia publicada de este MVP para Oscar. Un solo interruptor local a esta pantalla
+// — nunca se borra la capacidad, ni su estado, ni sus handlers, ni src/ia/; solo se deja de
+// renderizar la UI que la expone. Queda POST-MVP: endurecer validarConsistenciaExplicacion.js
+// contra tokens {{...}} mal formados, reforzar el prompt con ejemplos de tokens válidos e
+// inválidos, repetir pruebas reales y validación visual, y solo entonces reevaluar
+// reasoning.effort:'minimal' (diagnóstico 2026-08-27: 3 de 4 respuestas reales dejaron
+// tokens sin resolver visibles al usuario bajo ese modo). Revertir esta decisión es cambiar
+// este único valor a true.
+const IA_EXPUESTA_EN_MVP = false
+
 function hoyISO() {
   return new Date().toISOString().slice(0, 10)
 }
@@ -692,32 +705,34 @@ function ProyectaTuPensionRPM({
                       {/* S4-007: bajo demanda, nunca automático — las cifras de arriba ya
                           son completamente utilizables sin esto (criterio de aceptación
                           explícito). No se abre modal ni otra pantalla: se expande dentro
-                          de esta misma tarjeta. */}
-                      <div className="camino-celda camino-celda--explicacion">
-                        {!explicacionVigente && (
-                          <button
-                            type="button"
-                            className="btn btn-secondary"
-                            onClick={manejarEntenderCaminos}
-                            disabled={estadoExplicacion === 'cargando'}
-                          >
-                            {estadoExplicacion === 'cargando' ? 'Generando explicación…' : 'Entender este camino'}
-                          </button>
-                        )}
-
-                        {explicacionVigente && resultadoExplicacion.estado === 'generado' && (
-                          <TextoExplicacionCamino texto={textoExplicacion.porEscenario[escenario.id]} />
-                        )}
-
-                        {explicacionVigente && resultadoExplicacion.estado === 'error_proveedor' && (
-                          <div className="camino-celda__explicacion-fallo">
-                            <p className="camino-celda__nota">No pudimos generar la explicación en este momento.</p>
-                            <button type="button" className="btn btn-secondary" onClick={manejarEntenderCaminos}>
-                              Reintentar
+                          de esta misma tarjeta. Oculto en este MVP — ver IA_EXPUESTA_EN_MVP. */}
+                      {IA_EXPUESTA_EN_MVP && (
+                        <div className="camino-celda camino-celda--explicacion">
+                          {!explicacionVigente && (
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              onClick={manejarEntenderCaminos}
+                              disabled={estadoExplicacion === 'cargando'}
+                            >
+                              {estadoExplicacion === 'cargando' ? 'Generando explicación…' : 'Entender este camino'}
                             </button>
-                          </div>
-                        )}
-                      </div>
+                          )}
+
+                          {explicacionVigente && resultadoExplicacion.estado === 'generado' && (
+                            <TextoExplicacionCamino texto={textoExplicacion.porEscenario[escenario.id]} />
+                          )}
+
+                          {explicacionVigente && resultadoExplicacion.estado === 'error_proveedor' && (
+                            <div className="camino-celda__explicacion-fallo">
+                              <p className="camino-celda__nota">No pudimos generar la explicación en este momento.</p>
+                              <button type="button" className="btn btn-secondary" onClick={manejarEntenderCaminos}>
+                                Reintentar
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
@@ -782,7 +797,8 @@ function ProyectaTuPensionRPM({
             </div>
           )}
 
-          {explicacionVigente && resultadoExplicacion.estado === 'generado' && textoExplicacion.comparacion && (
+          {/* Oculto en este MVP — ver IA_EXPUESTA_EN_MVP. */}
+          {IA_EXPUESTA_EN_MVP && explicacionVigente && resultadoExplicacion.estado === 'generado' && textoExplicacion.comparacion && (
             <div className="insight">
               <p className="insight__label">Comparando tus caminos</p>
               <p className="insight__message">{textoExplicacion.comparacion}</p>

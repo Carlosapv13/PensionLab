@@ -60,6 +60,16 @@ const LIMITACION_RESTRICCION_COSTO_LIMITA_RESULTADO = {
     'restricción, tu objetivo sí sería alcanzable dentro del tope legal.',
 }
 
+// Mismo umbral que DIAS_VENTANA_IBL_EFECTIVAMENTE_COTIZADOS de seleccionarPeriodosIBL.js
+// (convención técnica documentada en trazabilidad-normativa.md) — duplicado aquí a
+// propósito, exclusivamente para construir el mensaje/detalle de esta capa de
+// resultado/orientación cuando el camino base falla por HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA
+// (mismo criterio de duplicación ya usado por ExploraTuProyeccionRPM.jsx, Principio 9).
+// Nunca se importa de seleccionarPeriodosIBL.js: esa capa no debe tocarse ni acoplarse
+// desde aquí (decisión de producto, 2026-08-27, hallazgo de prueba manual con un caso
+// real RPM/Colpensiones).
+const DIAS_REFERENCIA_VENTANA_IBL = 3650
+
 function resultadoVacio(codigo, razon, detalleElegibilidad = null) {
   return {
     escenarios: [],
@@ -537,6 +547,27 @@ export function generarCaminosRPM({
   const resultadoBase = calcularProyeccionRPM(escenarioBaseInput)
 
   if (resultadoBase.estado !== 'calculado') {
+    // Hallazgo de prueba manual (2026-08-27, caso real RPM/Colpensiones): el contrato
+    // GO-B (semanasReferenciaDeclaradas, arriba) nunca llega a leerse aquí cuando el
+    // horizonte es corto y no hay historia real — calcularProyeccionRPM ya rechazó el
+    // escenario por HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA antes de ese punto.
+    // Se conserva y propaga esa razón específica (nunca el cálculo ni el criterio de
+    // viabilidad, solo esta capa de resultado/orientación) para que la UI pueda ofrecer
+    // de inmediato la profundización opcional ya construida (HistoriaCotizacionRPM.jsx)
+    // en vez de un mensaje genérico sin ninguna acción.
+    if (resultadoBase.razonNoEvaluable === 'HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA') {
+      const diasEfectivos = resultadoBase.trazabilidadVentana?.diasEfectivosAcumulados ?? null
+      const razon =
+        diasEfectivos !== null
+          ? `Para calcular esta proyección todavía necesitamos completar una parte de tu historia de ` +
+            `cotización — con la información disponible identificamos ${diasEfectivos} de los ` +
+            `${DIAS_REFERENCIA_VENTANA_IBL} días de cotización que esta proyección necesita.`
+          : 'Para calcular esta proyección todavía necesitamos completar una parte de tu historia de cotización.'
+      return resultadoVacio('HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA', razon, {
+        diasEfectivosAcumulados: diasEfectivos,
+        diasVentanaRequeridos: DIAS_REFERENCIA_VENTANA_IBL,
+      })
+    }
     return resultadoVacio('SIN_CAMINOS_VIABLES', 'No fue posible calcular ni siquiera el camino base con los datos actuales.')
   }
 

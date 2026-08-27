@@ -79,6 +79,14 @@ function esPosicionSecundaria(posicion) {
 const RADIO_PUNTO_OBJETIVO = 7
 const RADIO_PUNTO_ELECCION = 7
 
+// Alto de línea (unidades del viewBox, no em) entre las dos líneas de la etiqueta de "Tu
+// objetivo"/"Tu elección" (2026-08-27, ajuste tras validación visual) — coherente con el
+// tamaño de fuente ya usado por `.grafico-esfuerzo-resultado__punto-etiqueta` (11px,
+// App.css). La segunda línea (la cifra) queda exactamente donde antes vivía la única
+// línea de la etiqueta; la primera ("Tu objetivo"/"Tu elección") se agrega una línea más
+// arriba — ninguna se acerca más al punto ni a la curva que la versión de una sola línea.
+const ALTO_LINEA_ETIQUETA = 13
+
 /**
  * @param {Object} props
  * @param {Object|null} props.barrido - `resultado.barrido` de generarCaminosRPM.js
@@ -232,7 +240,19 @@ function GraficoEsfuerzoResultado({ barrido, objetivoValorMensual, escenarioPers
 
         {/* Marcador aparte del objetivo — nunca uno de los 5 puntos de la rejilla; forma
             de rombo (no un color nuevo) para distinguirlo sin romper la regla de una sola
-            serie de color. */}
+            serie de color. Etiqueta con cifra exacta, en dos líneas vía <tspan>
+            (2026-08-27, hallazgo de auditoría manual, ajustado tras validación visual): el
+            rombo cae, por coincidencia geométrica, muy cerca del cruce de las marcas
+            centrales de ambos ejes — sin una cifra propia, se prestaba a leerse contra esas
+            marcas en vez de su valor real. Solo el ESFUERZO va en esta etiqueta — la
+            pensión objetivo ya la identifica, sin repetirla, la línea horizontal
+            "Tu objetivo: $X" de más abajo (evita una etiqueta larga y redundante). La
+            segunda línea (la cifra) queda exactamente en la misma posición que ocupaba la
+            única línea anterior; la primera línea ("Tu objetivo") se agrega una línea más
+            arriba — ninguna de las dos se acerca más al punto ni a la curva que antes. El
+            valor viene tal cual de `puntoObjetivo` (bit-idéntico al camino "objetivo" ya
+            mostrado en la tarjeta, ver generarCaminosRPM.js) — nunca recalculado ni
+            derivado de los ejes. */}
         {puntoObjetivoSvg && (
           <g>
             <polygon
@@ -242,10 +262,13 @@ function GraficoEsfuerzoResultado({ barrido, objetivoValorMensual, escenarioPers
             <text
               className="grafico-esfuerzo-resultado__punto-etiqueta grafico-esfuerzo-resultado__punto-etiqueta--objetivo"
               x={puntoObjetivoSvg.x}
-              y={puntoObjetivoSvg.y - RADIO_PUNTO_OBJETIVO - 8}
+              y={puntoObjetivoSvg.y - RADIO_PUNTO_OBJETIVO - 8 - ALTO_LINEA_ETIQUETA}
               textAnchor="middle"
             >
-              Tu objetivo
+              <tspan x={puntoObjetivoSvg.x} dy={0}>Tu objetivo</tspan>
+              <tspan x={puntoObjetivoSvg.x} dy={ALTO_LINEA_ETIQUETA}>
+                {`${formatearPesos(puntoObjetivo.esfuerzo.costoPensionalAdicionalMensual)} adicionales`}
+              </tspan>
             </text>
           </g>
         )}
@@ -254,7 +277,11 @@ function GraficoEsfuerzoResultado({ barrido, objetivoValorMensual, escenarioPers
             distinguirse tanto de los círculos de la rejilla como del rombo del objetivo,
             sin introducir un color nuevo (misma regla que el marcador de objetivo). Si
             coincide exactamente con "Tu objetivo" caen en el mismo píxel — solapamiento
-            documentado (ver GraficoEsfuerzoResultado.helpers.test.js), no resuelto aquí. */}
+            documentado (ver GraficoEsfuerzoResultado.helpers.test.js), no resuelto aquí.
+            Mismo patrón de dos líneas que el rombo, mismo motivo — sin repetir aquí la
+            pensión proyectada (no hay una línea horizontal equivalente para "Tu elección",
+            pero repetirla ya volvía la etiqueta larga y difícil de leer; el valor completo
+            sigue disponible en la tarjeta correspondiente). */}
         {puntoPersonalizadoSvg && (
           <g>
             <rect
@@ -267,10 +294,13 @@ function GraficoEsfuerzoResultado({ barrido, objetivoValorMensual, escenarioPers
             <text
               className="grafico-esfuerzo-resultado__punto-etiqueta grafico-esfuerzo-resultado__punto-etiqueta--eleccion"
               x={puntoPersonalizadoSvg.x}
-              y={puntoPersonalizadoSvg.y - RADIO_PUNTO_ELECCION - 8}
+              y={puntoPersonalizadoSvg.y - RADIO_PUNTO_ELECCION - 8 - ALTO_LINEA_ETIQUETA}
               textAnchor="middle"
             >
-              Tu elección
+              <tspan x={puntoPersonalizadoSvg.x} dy={0}>Tu elección</tspan>
+              <tspan x={puntoPersonalizadoSvg.x} dy={ALTO_LINEA_ETIQUETA}>
+                {`${formatearPesos(puntoPersonalizado.esfuerzo.costoPensionalAdicionalMensual)} adicionales`}
+              </tspan>
             </text>
           </g>
         )}

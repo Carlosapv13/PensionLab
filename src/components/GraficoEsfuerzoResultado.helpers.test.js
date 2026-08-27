@@ -9,6 +9,7 @@ import {
   construirRutaLinea,
   calcularYObjetivo,
 } from './GraficoEsfuerzoResultado.helpers.js'
+import { formatearPesos } from '../format/formatearDinero.js'
 
 describe('calcularDominioEje', () => {
   it('min/max reales cuando los valores difieren', () => {
@@ -212,6 +213,72 @@ describe('construirPuntoSvg — solapamiento cuando el esfuerzo personalizado co
     const svgEleccion = construirPuntoSvg(puntoPersonalizadoIgual, dominioX, dominioY)
 
     expect(svgEleccion).toEqual(svgObjetivo) // mismo píxel — un marcador queda visualmente encima del otro
+  })
+
+  it('coordenadas iguales, pero cada punto conserva sus propios valores de esfuerzo/resultado — la etiqueta de cada marcador (construida en GraficoEsfuerzoResultado.jsx a partir de estos mismos objetos) nunca podría mostrar la cifra del otro', () => {
+    const dominioX = { min: 0, max: 500000 }
+    const dominioY = { min: 2000000, max: 3500001 }
+    const puntoObjetivo = { esfuerzo: { costoPensionalAdicionalMensual: 391309 }, resultado: { valor: 3500001 } }
+    const puntoPersonalizadoIgual = { esfuerzo: { costoPensionalAdicionalMensual: 391309 }, resultado: { valor: 3500001 } }
+
+    construirPuntoSvg(puntoObjetivo, dominioX, dominioY)
+    construirPuntoSvg(puntoPersonalizadoIgual, dominioX, dominioY)
+
+    // Mismo píxel (ya demostrado arriba) no implica mismo objeto — cada marcador lee su
+    // propio esfuerzo/resultado, nunca uno compartido ni derivado del otro.
+    expect(puntoPersonalizadoIgual).not.toBe(puntoObjetivo)
+    expect(puntoPersonalizadoIgual.esfuerzo).not.toBe(puntoObjetivo.esfuerzo)
+  })
+})
+
+// Corrección de representación/UX (2026-08-27, hallazgo de auditoría manual; ajustado el
+// mismo día tras validación visual — la primera versión, en una sola línea con esfuerzo Y
+// pensión, resultó larga y redundante). El rombo "Tu objetivo" y el cuadrado "Tu elección"
+// ahora muestran, en dos líneas vía <tspan>, únicamente su etiqueta y el esfuerzo mensual
+// exacto — nunca la pensión, que para "Tu objetivo" ya identifica sin repetirla la línea
+// horizontal "Tu objetivo: $X" (calcularYObjetivo/objetivoValorMensual, sin cambios).
+// GraficoEsfuerzoResultado.jsx no tiene infraestructura de componente para verificar el
+// <text>/<tspan> renderizado (sin jsdom/RTL) — este test ancla, al nivel disponible, las
+// mismas dos líneas de texto que la JSX construye a partir de `puntoObjetivo`/
+// `puntoPersonalizado`, usando el caso real reportado (auditoría 2026-08-27): $302.026,08
+// de aporte adicional. La validación de que las dos líneas realmente aparecen en pantalla,
+// en la posición correcta, legibles y sin taparse con la línea, queda como verificación
+// manual (ver matriz funcional).
+describe('Etiqueta de "Tu objetivo"/"Tu elección" — dos líneas, solo esfuerzo, mismo texto que construye GraficoEsfuerzoResultado.jsx', () => {
+  function lineasMarcador(etiqueta, punto) {
+    return [etiqueta, `${formatearPesos(punto.esfuerzo.costoPensionalAdicionalMensual)} adicionales`]
+  }
+
+  it('caso real (auditoría 2026-08-27): línea 1 "Tu objetivo", línea 2 "$302.026 adicionales" — nunca la pensión, nunca las marcas de eje ($336.598 / $7.151.296)', () => {
+    const puntoObjetivoCasoReal = {
+      esfuerzo: { costoPensionalAdicionalMensual: 302026.0800000001 },
+      resultado: { valor: 7000000.244372 },
+    }
+    const [linea1, linea2] = lineasMarcador('Tu objetivo', puntoObjetivoCasoReal)
+
+    expect(linea1).toBe('Tu objetivo')
+    expect(linea2).toBe('$302.026 adicionales')
+    expect(linea2).not.toContain('336.598')
+    expect(linea2).not.toContain('7.151.296')
+    expect(linea2).not.toContain('7.000.000') // la pensión no se repite aquí — la muestra la línea horizontal
+  })
+
+  it('"Tu elección" usa el mismo patrón de dos líneas, con sus propios valores — nunca los del objetivo, nunca la pensión', () => {
+    const puntoPersonalizado = {
+      esfuerzo: { costoPensionalAdicionalMensual: 150000 },
+      resultado: { valor: 6100000 },
+    }
+    const [linea1, linea2] = lineasMarcador('Tu elección', puntoPersonalizado)
+
+    expect(linea1).toBe('Tu elección')
+    expect(linea2).toBe('$150.000 adicionales')
+    expect(linea2).not.toContain('6.100.000')
+  })
+
+  it('funciona razonablemente con cifras más largas (esfuerzo de 7 dígitos)', () => {
+    const puntoEsfuerzoGrande = { esfuerzo: { costoPensionalAdicionalMensual: 1234567 }, resultado: { valor: 9000000 } }
+    const [, linea2] = lineasMarcador('Tu objetivo', puntoEsfuerzoGrande)
+    expect(linea2).toBe('$1.234.567 adicionales')
   })
 })
 

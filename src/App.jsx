@@ -86,6 +86,16 @@ function App() {
   // captura real desde la UI pública — ver HistoriaCotizacionRPM.jsx.
   const [historiaCotizacion, setHistoriaCotizacion] = useState([])
 
+  // Profundización opcional — preservar intención/origen (2026-08-27, hallazgo de prueba
+  // manual): true únicamente mientras el usuario está en la sub-jornada
+  // HistoriaCotizacionRPM/ExploraTuProyeccionRPM abierta DESDE ProyectaTuPensionRPM (vía
+  // onProfundizarHistoria, más abajo). Permite que ExploraTuProyeccionRPM ofrezca volver a
+  // la proyección original sin que eso dependa de si SU PROPIA lectura histórica (una
+  // capacidad independiente, con su propio umbral) logró calcularse — dos preguntas
+  // distintas que antes quedaban acopladas por error. No es un returnTo genérico: un solo
+  // booleano, exclusivamente para este par de pantallas.
+  const [regresarAProyeccionTrasHistoria, setRegresarAProyeccionTrasHistoria] = useState(false)
+
   function actualizarRegimenActual(valor) {
     // trasladoRegimen depende semánticamente de regimenActual (S3-009): la
     // opción "No" y su redacción están ancladas al régimen actual, así que
@@ -527,7 +537,11 @@ function App() {
           // (arriba) es alcance muerto de hecho, porque UX-RPM-01 ya no deja llegar a
           // queDeterminaResultado para RPM. Volver debe regresar exactamente a la pantalla
           // desde la que se entró, nunca a una que el usuario no visitó en este recorrido.
-          onVolver={() => setVista('proyectaTuPensionRPM')}
+          // Sale de la sub-jornada por completo → limpia el flag de origen (2026-08-27).
+          onVolver={() => {
+            setRegresarAProyeccionTrasHistoria(false)
+            setVista('proyectaTuPensionRPM')
+          }}
           onContinuar={() => setVista('exploraTuProyeccionRPM')}
         />
       )}
@@ -539,8 +553,15 @@ function App() {
           nivelConocimientoSemanas={nivelConocimientoSemanas}
           semanasCotizadas={semanasCotizadas}
           trasladoRegimen={trasladoRegimen}
+          // Preservar intención/origen (2026-08-27): permite ofrecer "Volver a tu
+          // proyección" sin que dependa de si ESTA lectura histórica independiente logró
+          // calcularse — ver comentario junto al estado, arriba.
+          permitirVolverAProyeccion={regresarAProyeccionTrasHistoria}
           onVolver={() => setVista('historiaCotizacionRPM')}
-          onContinuar={() => setVista('proyectaTuPensionRPM')}
+          onContinuar={() => {
+            setRegresarAProyeccionTrasHistoria(false)
+            setVista('proyectaTuPensionRPM')
+          }}
         />
       )}
 
@@ -563,7 +584,13 @@ function App() {
           // ExploraTuProyeccionRPM.jsx tal cual, sin ningún estado de navegación nuevo —
           // mismo `vista` de siempre. onVolver de historiaCotizacionRPM (arriba) regresa
           // aquí; onContinuar de exploraTuProyeccionRPM ya apuntaba aquí sin cambios.
-          onProfundizarHistoria={() => setVista('historiaCotizacionRPM')}
+          // Marca el origen (2026-08-27, hallazgo de prueba manual) para que
+          // ExploraTuProyeccionRPM pueda ofrecer volver aquí sin depender de su propia
+          // lectura histórica independiente.
+          onProfundizarHistoria={() => {
+            setRegresarAProyeccionTrasHistoria(true)
+            setVista('historiaCotizacionRPM')
+          }}
           edadJubilacionDeseada={edadJubilacionDeseada}
           onCambiarEdadJubilacionDeseada={setEdadJubilacionDeseada}
           objetivoPensionMensual={objetivoPensionMensual}

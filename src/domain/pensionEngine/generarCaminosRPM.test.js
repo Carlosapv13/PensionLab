@@ -151,7 +151,7 @@ describe('generarCaminosRPM — elegibilidad legal RPM (auditoría 2026-08-21): 
 })
 
 describe('generarCaminosRPM — camino base no evaluable (historia insuficiente para la ventana del IBL, no para elegibilidad)', () => {
-  it('historia insuficiente incluso con el horizonte futuro → SIN_CAMINOS_VIABLES, sin excepción — con una edad que ya cumple el mínimo legal', () => {
+  it('historia insuficiente incluso con el horizonte futuro → HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA, sin excepción — con una edad que ya cumple el mínimo legal', () => {
     const r = generarCaminosRPM({
       ...PERFIL_BASE,
       historiaCotizacion: [],
@@ -159,7 +159,12 @@ describe('generarCaminosRPM — camino base no evaluable (historia insuficiente 
       edadJubilacionDeseada: 62, // exactamente el mínimo legal — pasa la elegibilidad, horizonte de 30 días
     })
     expect(r.escenarios).toEqual([])
-    expect(r.orientacion.codigo).toBe('SIN_CAMINOS_VIABLES')
+    // Actualizado (2026-08-27, hallazgo de prueba manual): antes de este Slice, este caso
+    // colapsaba al mensaje genérico 'SIN_CAMINOS_VIABLES' — ahora conserva la razón
+    // específica que calcularProyeccionRPM ya calculaba internamente, con cifras exactas
+    // (ver describe dedicado, más abajo, para el caso real que motivó este cambio).
+    expect(r.orientacion.codigo).toBe('HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA')
+    expect(r.detalleElegibilidad).toEqual({ diasEfectivosAcumulados: 30, diasVentanaRequeridos: 3650 })
   })
 })
 
@@ -180,6 +185,10 @@ describe('generarCaminosRPM — UX-RPM-01: historia vacía + horizonte largo →
       edadJubilacionDeseada: 92,
     })
     expect(r.orientacion.codigo).not.toBe('SIN_CAMINOS_VIABLES')
+    // Regresión (2026-08-27, hallazgo de prueba manual): horizonte largo sin historia
+    // sigue produciendo la proyección preliminar, nunca cae en el gate de la ventana
+    // del IBL (ver describe dedicado más abajo para el caso contrario, horizonte corto).
+    expect(r.orientacion.codigo).not.toBe('HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA')
     expect(r.escenarios.length).toBeGreaterThan(0)
     expect(r.escenarios.some((e) => e.id === 'base' && e.estado === 'viable')).toBe(true)
     expect(r.horizonte).not.toBeNull()
@@ -1040,5 +1049,149 @@ describe('generarCaminosRPM — contrato GO-B: semanas declaradas propagadas has
     expect(r.semanas.fuente).toBe('historia_estructurada')
     expect(r.semanas.declaradas).toBeNull()
     expect(r.semanas.total).toBe(r.semanas.sustentadasPorHistoria)
+  })
+})
+
+// Hallazgo de prueba manual (2026-08-27) — caso real RPM/Colpensiones: fechaNacimiento
+// 1974-07-13, edadJubilacionDeseada 62, historiaCotizacion=[], semanas declaradas 1350
+// aproximadas, IBC actual $7.000.000 aproximado. Reproducido contra el motor real: el
+// tramo futuro sintético aporta solo 3.608 de los 3.650 días que exige la ventana del
+// IBL ordinario — calcularProyeccionRPM rechaza el escenario ANTES de leer
+// semanasReferenciaDeclaradas (el contrato GO-B nunca llega a intervenir). Antes de este
+// Slice, generarCaminosRPM colapsaba esto al mensaje genérico 'SIN_CAMINOS_VIABLES', sin
+// razón específica ni ninguna acción ofrecida en la UI. FECHA_NACIMIENTO_CASO/edad abajo
+// reproducen el mismo mes/día del caso real con un año ajustado para un resultado
+// determinista bajo FECHA_CALCULO ('2026-01-01', ya definido arriba en este archivo) —
+// verificado con el motor real: exactamente 3.645 de 3.650 días (5 días de faltante,
+// misma familia de caso límite que el reportado, nunca inventado).
+describe('generarCaminosRPM — HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA propagada hasta la orientación (hallazgo de prueba manual, caso real RPM/Colpensiones, 2026-08-27)', () => {
+  const FECHA_NACIMIENTO_CASO = '1973-12-25'
+
+  function perfilCaso(overrides = {}) {
+    return {
+      regimenActual: 'RPM',
+      sexo: 'Hombre',
+      historiaCotizacion: [],
+      fechaNacimiento: FECHA_NACIMIENTO_CASO,
+      edadJubilacionDeseada: 62,
+      ibcAplicableSimulacion: 2000000,
+      objetivoValorMensual: 1500000,
+      fecha: FECHA_CALCULO,
+      ...overrides,
+    }
+  }
+
+  it('B — historia vacía + horizonte corto (3.645 de 3.650 días): devuelve la razón específica con las cifras exactas, nunca el mensaje genérico de SIN_CAMINOS_VIABLES', () => {
+    const r = generarCaminosRPM(perfilCaso())
+
+    expect(r.escenarios).toEqual([])
+    expect(r.orientacion.codigo).toBe('HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA')
+    expect(r.orientacion.codigo).not.toBe('SIN_CAMINOS_VIABLES')
+    expect(r.orientacion.razon).toContain('3645')
+    expect(r.orientacion.razon).toContain('3650')
+    expect(r.orientacion.razon).not.toContain('No fue posible calcular ni siquiera el camino base')
+    // Nunca lenguaje de error técnico ni de cambiar edad/régimen — solo historia.
+    expect(r.orientacion.razon.toLowerCase()).not.toMatch(/error|inválid|edad objetivo|régimen/)
+    expect(r.detalleElegibilidad).toEqual({ diasEfectivosAcumulados: 3645, diasVentanaRequeridos: 3650 })
+  })
+
+  it('B (con semanas declaradas, GO-B): la declaración de semanas NO rescata este gate — el contrato GO-B nunca llega a leerse aquí', () => {
+    const r = generarCaminosRPM(perfilCaso({ semanasReferenciaDeclaradas: { cantidad: 1350, certeza: 'aproximado' } }))
+
+    expect(r.orientacion.codigo).toBe('HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA')
+    expect(r.escenarios).toEqual([])
+    expect(r.semanas).toBeNull() // resultadoVacio: sin escenario base calculado, sin semanas que exponer
+  })
+
+  it('D — al completar historia suficiente (conservando la misma declaración de semanas), el bloqueo desaparece y vuelve a calcular un camino viable', () => {
+    const historiaCompletada = [{ fechaDesde: '2024-11-01', fechaHasta: '2025-12-31', ibc: 2000000, diasCotizados: 426 }]
+    const r = generarCaminosRPM(
+      perfilCaso({
+        historiaCotizacion: historiaCompletada,
+        semanasReferenciaDeclaradas: { cantidad: 1350, certeza: 'aproximado' },
+      })
+    )
+
+    expect(r.orientacion.codigo).not.toBe('HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA')
+    expect(r.escenarios.length).toBeGreaterThan(0)
+  })
+
+  it('E — sin regresión de GO-B: en el mismo caso D, las semanas que alimentan elegibilidad/tasa siguen siendo la declaración, nunca fabricadas ni duplicadas con la historia agregada', () => {
+    const historiaCompletada = [{ fechaDesde: '2024-11-01', fechaHasta: '2025-12-31', ibc: 2000000, diasCotizados: 426 }]
+    const r = generarCaminosRPM(
+      perfilCaso({
+        historiaCotizacion: historiaCompletada,
+        semanasReferenciaDeclaradas: { cantidad: 1350, certeza: 'aproximado' },
+      })
+    )
+
+    expect(r.semanas.fuente).toBe('declaracion_agregada')
+    expect(r.semanas.declaradas).toBe(1350)
+    expect(r.semanas.observadas).toBeGreaterThan(0) // hay historia real, pero no reemplaza la declaración
+    const sumaProhibida = r.semanas.declaradas + r.semanas.observadas + r.semanas.futuras
+    expect(r.semanas.total).not.toBe(sumaProhibida) // nunca doble conteo
+    expect(r.semanas.total).toBe(1350 + r.semanas.futuras)
+  })
+})
+
+// Regresión del caso real reportado en prueba manual (2026-08-27, segunda vuelta): el
+// usuario completó 181 días reales de historia (2026-01-01 → 2026-06-30, IBC $1.800.000)
+// después de que la proyección original quedara bloqueada por
+// HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA (RPM-032) — y, por un bug de
+// navegación ajeno a este archivo (ProyectaTuPensionRPM → HistoriaCotizacionRPM →
+// ExploraTuProyeccionRPM, ya corregido en App.jsx/ExploraTuProyeccionRPM.jsx), nunca vio
+// que su pregunta original ya era calculable. `fecha` fijo (no hoyISO()) para que el caso
+// sea determinista independientemente de cuándo se ejecute la suite — reproduce
+// exactamente los mismos días (3.608 futuros) que el caso real.
+describe('generarCaminosRPM — regresión: retomar la proyección original tras completar historia suficiente (caso real, 2026-08-27)', () => {
+  const PERFIL_CASO_REAL = {
+    regimenActual: 'RPM',
+    sexo: 'Hombre',
+    fechaNacimiento: '1974-07-13',
+    edadJubilacionDeseada: 62,
+    ibcAplicableSimulacion: 7000000,
+    objetivoValorMensual: 7000000,
+    semanasReferenciaDeclaradas: { cantidad: 1350, certeza: 'aproximado' },
+    fecha: '2026-08-27',
+  }
+
+  it('sin historia: sigue bloqueado por HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA (regresión de RPM-032, línea base antes de completar historia)', () => {
+    const r = generarCaminosRPM({ ...PERFIL_CASO_REAL, historiaCotizacion: [] })
+    expect(r.orientacion.codigo).toBe('HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA')
+    expect(r.escenarios).toEqual([])
+    expect(r.detalleElegibilidad).toEqual({ diasEfectivosAcumulados: 3608, diasVentanaRequeridos: 3650 })
+  })
+
+  it('al agregar los 181 días reales del caso reportado, deja de estar bloqueado y produce los caminos viables (base + alternativo)', () => {
+    const historiaAgregada = [{ fechaDesde: '2026-01-01', fechaHasta: '2026-06-30', ibc: 1800000, diasCotizados: 181 }]
+    const r = generarCaminosRPM({ ...PERFIL_CASO_REAL, historiaCotizacion: historiaAgregada })
+
+    expect(r.orientacion.codigo).not.toBe('HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA')
+    expect(r.escenarios.length).toBeGreaterThan(0)
+    expect(r.escenarios.some((e) => e.id === 'base' && e.estado === 'viable')).toBe(true)
+    // Objetivo == IBC actual mantenido: el camino base ya alcanza el objetivo declarado.
+    expect(r.orientacion.codigo).toBe('UNICO_CUMPLE')
+    // Horizonte explícito preservado (restricción: "mantener explícito el horizonte
+    // temporal de los caminos futuros") — nunca se pierde ni se oculta al recalcular.
+    expect(r.horizonte).toEqual({ fechaInicio: '2026-08-28', fechaFin: '2036-07-13', diasCotizados: 3608 })
+    // GO-B intacto: las semanas que alimentan elegibilidad/tasa siguen siendo la
+    // declaración, nunca fabricadas a partir de los 181 días agregados.
+    expect(r.semanas.fuente).toBe('declaracion_agregada')
+    expect(r.semanas.declaradas).toBe(1350)
+    expect(r.semanas.observadas).toBeGreaterThan(0)
+    expect(r.semanas.total).toBe(1350 + r.semanas.futuras)
+  })
+
+  it('con historia agregada todavía insuficiente (20 días, no 181), el conteo se actualiza dinámicamente y el bloqueo persiste — nunca se queda "pegado" a la primera cifra identificada', () => {
+    const historiaInsuficiente = [{ fechaDesde: '2026-06-01', fechaHasta: '2026-06-20', ibc: 1800000, diasCotizados: 20 }]
+    const r = generarCaminosRPM({ ...PERFIL_CASO_REAL, historiaCotizacion: historiaInsuficiente })
+
+    expect(r.orientacion.codigo).toBe('HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA')
+    expect(r.escenarios).toEqual([])
+    // 3608 (futuro) + 20 (real agregado) = 3628 — cifra distinta de la línea base (3608),
+    // prueba de que el motor recalcula desde cero en cada intento, nunca reutiliza el
+    // primer diagnóstico.
+    expect(r.detalleElegibilidad).toEqual({ diasEfectivosAcumulados: 3628, diasVentanaRequeridos: 3650 })
+    expect(r.orientacion.razon).toContain('3628')
   })
 })

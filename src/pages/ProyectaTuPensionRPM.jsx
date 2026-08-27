@@ -548,16 +548,44 @@ function ProyectaTuPensionRPM({
           </>
         )}
 
-      {resultado && resultado.escenarios.length === 0 && resultado.detalleElegibilidad && (
-        <div className="insight">
-          <p className="insight__label">A esa edad no cumplirías los requisitos legales de reconocimiento RPM</p>
-          <p className="insight__message">{resultado.orientacion.razon}</p>
-        </div>
-      )}
+      {resultado &&
+        resultado.escenarios.length === 0 &&
+        resultado.orientacion.codigo === 'SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM' && (
+          <div className="insight">
+            <p className="insight__label">A esa edad no cumplirías los requisitos legales de reconocimiento RPM</p>
+            <p className="insight__message">{resultado.orientacion.razon}</p>
+          </div>
+        )}
 
-      {resultado && resultado.escenarios.length === 0 && !resultado.detalleElegibilidad && (
-        <p className="screen__subtitle">{resultado.orientacion.razon}</p>
-      )}
+      {/* Hallazgo de prueba manual (2026-08-27, caso real RPM/Colpensiones): esta situación
+          caía antes en el mensaje genérico de más abajo, sin razón específica ni ninguna
+          acción — la profundización opcional (HistoriaCotizacionRPM.jsx, más abajo en
+          onProfundizarHistoria) dependía exclusivamente de resultado.escenarios.length > 0,
+          así que era exactamente inalcanzable cuando la ausencia de historia es la causa de
+          que no haya ningún escenario. Este bloque ofrece la misma acción ya construida,
+          sin escenarios — nunca sugiere cambiar edad objetivo ni régimen. */}
+      {resultado &&
+        resultado.escenarios.length === 0 &&
+        resultado.orientacion.codigo === 'HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA' && (
+          <>
+            <div className="insight">
+              <p className="insight__label">Todavía falta completar tu historia de cotización</p>
+              <p className="insight__message">{resultado.orientacion.razon}</p>
+            </div>
+            <div className="screen__actions">
+              <button type="button" className="btn btn-secondary" onClick={onProfundizarHistoria}>
+                Completar mi historia de cotización
+              </button>
+            </div>
+          </>
+        )}
+
+      {resultado &&
+        resultado.escenarios.length === 0 &&
+        resultado.orientacion.codigo !== 'SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM' &&
+        resultado.orientacion.codigo !== 'HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA' && (
+          <p className="screen__subtitle">{resultado.orientacion.razon}</p>
+        )}
 
       {resultado && resultado.escenarios.length > 0 && (
         <>

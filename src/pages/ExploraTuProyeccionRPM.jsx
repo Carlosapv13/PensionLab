@@ -145,9 +145,18 @@ const TEXTO_DATOS_LEGALES_INSUFICIENTES =
  * @param {string} props.semanasCotizadas
  * @param {string | null} props.trasladoRegimen
  * @param {() => void} props.onVolver
- * @param {(() => void) | undefined} [props.onContinuar] - Solo se ofrece cuando la
- *   lectura histórica calculó (S4-003, ProyectaTuPensionRPM.jsx) — no cambia el alcance
- *   de esta pantalla, que sigue siendo exclusivamente la lectura histórica.
+ * @param {(() => void) | undefined} [props.onContinuar] - Avanza hacia ProyectaTuPensionRPM.
+ *   Se ofrece en dos situaciones independientes, nunca confundidas en el botón (S4-003;
+ *   ampliado 2026-08-27, hallazgo de prueba manual): (1) esta lectura histórica calculó
+ *   (`resultado.estado === 'calculado'`) — comportamiento original, sin cambios; (2)
+ *   `permitirVolverAProyeccion` es true — el usuario llegó aquí desde la profundización
+ *   opcional de ProyectaTuPensionRPM y quiere retomar SU pregunta original, sin que eso
+ *   dependa de si esta OTRA lectura (más estricta, un umbral independiente) calculó. No
+ *   cambia el alcance de esta pantalla, que sigue siendo exclusivamente la lectura
+ *   histórica — el botón solo cambia de etiqueta según cuál de las dos situaciones aplica.
+ * @param {boolean} [props.permitirVolverAProyeccion] - true cuando esta pantalla se abrió
+ *   desde "Completar mi historia de cotización" en ProyectaTuPensionRPM (ver App.jsx) —
+ *   nunca se infiere aquí, viene ya decidido de arriba.
  */
 function ExploraTuProyeccionRPM({
   historiaCotizacion,
@@ -157,6 +166,7 @@ function ExploraTuProyeccionRPM({
   trasladoRegimen,
   onVolver,
   onContinuar,
+  permitirVolverAProyeccion = false,
 }) {
   const sinHistoria = !historiaCotizacion || historiaCotizacion.length === 0
   const resultado = sinHistoria ? null : calcularPensionRPM({ historiaCotizacion })
@@ -255,9 +265,14 @@ function ExploraTuProyeccionRPM({
         <button type="button" className="btn btn-secondary" onClick={onVolver}>
           Volver
         </button>
-        {resultado && resultado.estado === 'calculado' && onContinuar && (
+        {/* Dos situaciones independientes que nunca se confunden en el texto del botón
+            (2026-08-27): si ESTA lectura calculó, "Proyectar hacia el futuro" (sin
+            cambios). Si no calculó pero el origen es la profundización opcional,
+            "Volver a tu proyección" — nunca afirma que esta lectura calculó algo que no
+            calculó; solo permite retomar la pregunta original de ProyectaTuPensionRPM. */}
+        {onContinuar && (resultado?.estado === 'calculado' || permitirVolverAProyeccion) && (
           <button type="button" className="btn btn-primary" onClick={onContinuar}>
-            Proyectar hacia el futuro
+            {resultado?.estado === 'calculado' ? 'Proyectar hacia el futuro' : 'Volver a tu proyección'}
           </button>
         )}
       </div>

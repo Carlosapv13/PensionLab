@@ -70,7 +70,7 @@ funciona porque "se ve bien" o porque otra sesión lo mencionó.
 | RPM-021 | Horizonte temporal | Proyección calculada | Ver bloque "Horizonte de esta proyección" | Fechas + duración calendario + edad, en el orden acordado | Horizonte temporal explícito | ✅ VALIDADO | Automatizado | `generarCaminosRPM.test.js` (`horizonte (§14 punto 9)`); `ProyectaTuPensionRPM.helpers.test.js` (`textoHorizonte`) | — | MVP Oscar | — |
 | RPM-022 | Gráfica/barrido | Objetivo alcanzable o no | Ver `GraficoEsfuerzoResultado` | Rango depende de si el objetivo es alcanzable (`×1.25` acotado por tope, o tope directo); eje Y no se estira con un objetivo inalcanzable | Barrido de caminos intermedios + gráfico esfuerzo↔resultado | 🟡 PARCIAL/LIMITADO | Automatizado (lógica pura) | `generarCaminosRPM.test.js` (`barrido esfuerzo↔resultado`); `GraficoEsfuerzoResultado.helpers.test.js` (`calcularDominioEje`, `calcularDominioYConObjetivo`, `construirPuntosSvg`) | Render SVG real: manual pendiente (sin infraestructura de test de DOM, decisión documentada) | MVP Oscar | Lógica de escalado/dominio validada al 100%; solo el render SVG final queda sin cobertura automática. Proyecto sin `jsdom`/RTL — decisión explícita, ver `oportunidades-futuras.md` ("Formateo monetario en vivo"). |
 | RPM-023 | Orientación determinista | Cualquiera de los 7 estados de `determinarOrientacionExploracion` | Ver "Qué podrías explorar ahora" | Mapeo código→acción→copy, sin vocabulario evaluativo prohibido | Orientación determinista de exploración | ✅ VALIDADO | Automatizado | `determinarOrientacionExploracion.test.js` (los 7 estados + precedencia); `ProyectaTuPensionRPM.helpers.test.js` (`textoOrientacion`, vocabulario prohibido) | — | MVP Oscar | — |
-| RPM-024 | Explicación IA | Camino(s) viable(s) presentes | Pedir "Entender este camino"/"Comparando tus caminos" | Explicación generada solo sobre escenarios viables, nunca inventa cifras | Explicación IA de caminos RPM | 🟡 PARCIAL/LIMITADO | Automatizado | Ver sección IA (`IA-001`…`IA-005`) | Recorrido real en producción: manual pendiente, depende de configuración de servidor | MVP Oscar | Lógica y contrato validados al 100%; la disponibilidad real en el entorno de revisión depende de configuración de servidor (ver `IA-005`). Ver corrección de alcance en la introducción de la sección IA — es capacidad **nueva** del MVP actual, integrada a la UI en `db1bac7`. |
+| RPM-024 | Explicación IA | Camino(s) viable(s) presentes | Pedir "Entender este camino"/"Comparando tus caminos" | Explicación generada solo sobre escenarios viables, nunca inventa cifras | Explicación IA de caminos RPM | 🟡 PARCIAL/LIMITADO | Automatizado | Ver sección IA (`IA-001`…`IA-005`) | No aplica — fuera del alcance que Oscar debe probar en esta publicación | Post-MVP (funcional y probada; alcance de exposición al usuario sujeto a decisión futura de producto) | Lógica y contrato validados al 100% (S4-007, integrada en `db1bac7`). Ver nota de alcance en la introducción de la sección IA (2026-08-27): existe y está probada, pero queda fuera del alcance de esta publicación del MVP — no una capacidad que Oscar deba encontrar o probar. |
 | RPM-025 | Profundización opcional | `historiaCotizacion = []` en ProyectaTuPensionRPM | Clic "Completar mi historia de cotización" → agregar períodos → Continuar → "Proyectar hacia el futuro" | Vuelve a ProyectaTuPensionRPM con `historiaCotizacion` actualizada, recalculado automáticamente | Profundización opcional (Historia + lectura histórica) sin afectar el camino rápido | 🟡 PARCIAL/LIMITADO | Manual únicamente | Sub-piezas automatizadas: `HistoriaCotizacionRPM.helpers.test.js`, `evidenciaIndicioVidaLaboral.test.js`; precondición de reachability del CTA validada en `generarCaminosRPM.test.js` (ver `RPM-032`); navegación/render JSX completos no tienen test propio | **Manual pendiente** — recorrido completo Caso B nunca ejercitado con automatización de navegador en esta sesión (sin herramienta disponible) | MVP Oscar | Implementado en `aa0e2c6`. **Corrección 2026-08-27:** una prueba manual real encontró que el CTA dependía exclusivamente de `resultado.escenarios.length > 0`, quedando inalcanzable exactamente cuando la ausencia de historia impedía calcular cualquier escenario — corregido (ver `RPM-032`). Riesgo menor conocido, sin cambios: estado transitorio de UI (ej. borrador de esfuerzo personalizado) se pierde al ir y volver — no es un dato declarado. |
 | RPM-026 | Historia parcial | Algunos períodos reales cargados, historia incompleta | Ver ExploraTuProyeccionRPM | Lectura calcula si alcanza la ventana de 3.650 días; si no, código estructurado, no error | Historia parcial manejada honestamente | ✅ VALIDADO | Automatizado | `calcularPensionRPM.test.js` (`Caso 5: no evaluable`; `Caso 7: suficiencia temporal vs. cobertura IPC`) | — | MVP Oscar | — |
 | RPM-027 | Historia suficiente | Historia cubre ≥3.650 días efectivos | Ver ExploraTuProyeccionRPM | IBL/tasa/resultado económico actual calculados, con comparación de vida laboral si aplica | Lectura histórica calculada (`calcularPensionRPM.js`) | ✅ VALIDADO | Automatizado | `calcularPensionRPM.test.js` (`Caso 1`, `Caso 6`, `Caso 6b`) | — | MVP Oscar | — |
@@ -133,29 +133,30 @@ commits RPM de esta sesión).
 
 ## IA
 
-**Corrección de alcance (importante):** la IA visible desde la UI de
-`ProyectaTuPensionRPM.jsx` (S4-007, integrada en `db1bac7`) se clasifica aquí
-como capacidad **nueva del MVP actual**, no como algo ya disponible en un MVP
-público anterior. `d39f329` (usado como referencia de comparación en una
-auditoría previa de esta sesión) es solo la punta de la rama de desarrollo
-`sprint-3-mvp-headless` — no hay tag ni marca de release que confirme que la
-IA visible ya formaba parte de una versión efectivamente publicada y revisada
-antes. El único tag del repositorio (`sprint-1-completo`) es muy anterior a
-esta capacidad.
+**Nota de alcance (decisión de producto, 2026-08-27):** la explicación con IA
+visible desde la UI de `ProyectaTuPensionRPM.jsx` (S4-007, integrada en
+`db1bac7`) está funcionalmente completa y probada, pero **no forma parte de la
+publicación de este MVP para Oscar** — no debe encontrarla ni probarla en esta
+ronda. La capacidad existe técnicamente y está probada, pero queda fuera del
+alcance de esta publicación del MVP; su incorporación a una experiencia futura
+de usuario queda sujeta a una decisión posterior de producto, todavía no
+tomada. Las filas `IA-001`…`IA-005` y `RPM-024` se conservan íntegras — mismos
+tests, misma evidencia — por su valor de trazabilidad técnica, reclasificadas
+como `Post-MVP` en la columna Entrega.
 
 | ID | Área | Escenario | Precondiciones/datos clave | Acción | Resultado esperado | Capacidad demostrada | Estado | Automatización | Tests automáticos relacionados | Validación manual | Entrega | Observaciones/limitaciones |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| IA-001 | Explicación IA | Escenarios viables calculados | Pedir "Entender este camino"/"Comparando tus caminos" | La IA solo explica cifras ya calculadas por dominio, nunca las produce | IA explica resultados ya calculados | ✅ VALIDADO | Automatizado | `explicarCaminos.test.js` (`construcción de la entrada al adaptador`); `validarConsistenciaExplicacion.test.js` | — | MVP Oscar (capacidad nueva) | — |
-| IA-002 | Explicación IA | Idem | Idem | Ninguna cifra pensional (IBC, pensión, tasa) se calcula ni se modifica dentro de la capa de IA | IA no calcula cifras pensionales (invariante protegida) | 🚫 NO DEBE OCURRIR | Automatizado | `validarConsistenciaExplicacion.test.js` (`ninguna cifra inventada o alterada llega al usuario como hecho`) | — | MVP Oscar (capacidad nueva) | Misma evidencia que `RPM-NEG-006` — fila duplicada a propósito, una como invariante RPM y otra como capacidad de la sección IA. |
-| IA-003 | Explicación IA | Hechos construidos desde el escenario (`construirHechosEscenario`) | Generar explicación | El texto de la IA es consistente con los hechos estructurados que se le pasaron, verificado antes de mostrarse | Respuesta consistente con hechos | ✅ VALIDADO | Automatizado | `src/ia/construirHechosEscenario.test.js`; `validarConsistenciaExplicacion.test.js` | — | MVP Oscar (capacidad nueva) | — |
-| IA-004 | Explicación IA | Proveedor de IA falla o no responde | Pedir explicación | `resultadoExplicacion.estado === 'error_proveedor'`; las cifras ya calculadas siguen exactamente igual de utilizables | Fallback/error cuando IA no está disponible | ✅ VALIDADO | Automatizado | `src/ia/adaptadores/AdaptadorExplicacionViaServidor.test.js` | Manual pendiente: forzar el fallo real en un entorno desplegado | MVP Oscar (capacidad nueva) | — |
-| IA-005 | Explicación IA | Build de producción | Desplegar y usar "Entender este camino" | La explicación depende de que la función de servidor esté configurada; si falta, se degrada visiblemente sin romper la pantalla | Recorrido visible real desde la UI | 🟡 PARCIAL/LIMITADO | Manual únicamente | `src/pages/ProyectaTuPensionRPM.jsx` (`adaptadorExplicacionProduccion = crearAdaptadorExplicacionViaServidor()`, default de producción, ver también `adaptadorExplicacionDesarrollo` solo bajo `import.meta.env.DEV`) | **Manual pendiente** — depende de la configuración real del entorno donde se revise con Oscar (README, sección "Explicación con IA — configuración y comportamiento") | MVP Oscar (capacidad nueva) | Antes de la revisión con Oscar, confirmar explícitamente si el entorno de despliegue tiene la función de servidor configurada — si no, la IA se degradará silenciosamente ahí, y eso debe explicarse, no descubrirse en vivo. |
+| IA-001 | Explicación IA | Escenarios viables calculados | Pedir "Entender este camino"/"Comparando tus caminos" | La IA solo explica cifras ya calculadas por dominio, nunca las produce | IA explica resultados ya calculados | ✅ VALIDADO | Automatizado | `explicarCaminos.test.js` (`construcción de la entrada al adaptador`); `validarConsistenciaExplicacion.test.js` | — | Post-MVP (funcional y probada; alcance de exposición al usuario sujeto a decisión futura de producto) | — |
+| IA-002 | Explicación IA | Idem | Idem | Ninguna cifra pensional (IBC, pensión, tasa) se calcula ni se modifica dentro de la capa de IA | IA no calcula cifras pensionales (invariante protegida) | 🚫 NO DEBE OCURRIR | Automatizado | `validarConsistenciaExplicacion.test.js` (`ninguna cifra inventada o alterada llega al usuario como hecho`) | — | Post-MVP (funcional y probada; alcance de exposición al usuario sujeto a decisión futura de producto) | Misma evidencia que `RPM-NEG-006` — fila duplicada a propósito, una como invariante RPM y otra como capacidad de la sección IA. |
+| IA-003 | Explicación IA | Hechos construidos desde el escenario (`construirHechosEscenario`) | Generar explicación | El texto de la IA es consistente con los hechos estructurados que se le pasaron, verificado antes de mostrarse | Respuesta consistente con hechos | ✅ VALIDADO | Automatizado | `src/ia/construirHechosEscenario.test.js`; `validarConsistenciaExplicacion.test.js` | — | Post-MVP (funcional y probada; alcance de exposición al usuario sujeto a decisión futura de producto) | — |
+| IA-004 | Explicación IA | Proveedor de IA falla o no responde | Pedir explicación | `resultadoExplicacion.estado === 'error_proveedor'`; las cifras ya calculadas siguen exactamente igual de utilizables | Fallback/error cuando IA no está disponible | ✅ VALIDADO | Automatizado | `src/ia/adaptadores/AdaptadorExplicacionViaServidor.test.js` | Manual pendiente: forzar el fallo real en un entorno desplegado | Post-MVP (funcional y probada; alcance de exposición al usuario sujeto a decisión futura de producto) | — |
+| IA-005 | Explicación IA | Build de producción | Desplegar y usar "Entender este camino" | La explicación depende de que la función de servidor esté configurada; si falta, se degrada visiblemente sin romper la pantalla | Recorrido visible real desde la UI | 🟡 PARCIAL/LIMITADO | Manual únicamente | `src/pages/ProyectaTuPensionRPM.jsx` (`adaptadorExplicacionProduccion = crearAdaptadorExplicacionViaServidor()`, default de producción, ver también `adaptadorExplicacionDesarrollo` solo bajo `import.meta.env.DEV`) | No aplica — fuera del alcance que Oscar debe probar en esta publicación | Post-MVP (funcional y probada; alcance de exposición al usuario sujeto a decisión futura de producto) | `OPENAI_API_KEY`/`OPENAI_MODEL` no son requisito de esta publicación — Oscar no debe necesitar ni verificar esa configuración. Queda como referencia técnica para una eventual publicación futura de esta capacidad. |
 
 ---
 
 ## Set de aceptación para Oscar
 
-Guía de prueba de producto — no técnica. Recorre estos 10 escenarios para
+Guía de prueba de producto — no técnica. Recorre estos 9 escenarios para
 formarte una opinión representativa del MVP sin necesitar conocer el sistema
 por dentro. Cada uno remite a la fila completa de arriba si quieres el
 detalle técnico.
@@ -180,18 +181,15 @@ detalle técnico.
    períodos reales, y confirma que vuelves a la proyección con la cifra
    posiblemente distinta — y que nunca fue obligatorio para llegar hasta
    ahí.
-7. **Explicación con IA** (`IA-001`/`IA-005`) — pide "Entender este camino"
-   y confirma que la explicación describe la cifra ya mostrada, sin
-   contradecirla ni inventar una nueva.
-8. **Un caso RAIS completo** (`RAIS-002`/`RAIS-003`) — repite un recorrido
+7. **Un caso RAIS completo** (`RAIS-002`/`RAIS-003`) — repite un recorrido
    equivalente en fondo privado, para confirmar que RAIS no cambió con
    nada de lo anterior.
-9. **Navegación — Volver en el camino rápido** (`RPM-029`) — desde la
+8. **Navegación — Volver en el camino rápido** (`RPM-029`) — desde la
    proyección, pulsa "Volver": debe regresar a Base de cotización, nunca a
    una pantalla vacía o desconectada.
-10. **Navegación — Volver durante la profundización** (`RPM-029`) — entra a
-    completar historia y pulsa "Volver" sin agregar nada: debe regresar
-    exactamente a la proyección, nunca a una pantalla que no visitaste.
+9. **Navegación — Volver durante la profundización** (`RPM-029`) — entra a
+   completar historia y pulsa "Volver" sin agregar nada: debe regresar
+   exactamente a la proyección, nunca a una pantalla que no visitaste.
 
 ---
 
@@ -200,6 +198,16 @@ detalle técnico.
 Solo capacidades ya decididas o documentadas — ninguna es una idea nueva de
 este documento.
 
+- **Explicación con IA en la experiencia de usuario** — funcionalmente
+  completa y probada (`IA-001`…`IA-005`, `RPM-024`), deliberadamente excluida
+  de esta publicación del MVP para Oscar (decisión de producto, 2026-08-27).
+  La capacidad existe técnicamente y está probada, pero queda fuera del
+  alcance de esta publicación; su incorporación a una experiencia futura de
+  usuario queda sujeta a una decisión posterior de producto, todavía no
+  tomada — no hay compromiso de que se publique en la siguiente versión.
+  Si se retoma, requiere confirmar la configuración de servidor
+  (`OPENAI_API_KEY`/`OPENAI_MODEL`) en el entorno de despliegue
+  correspondiente. Entrega: `Post-MVP`.
 - **Explorar un IBC menor** (caso `HOY_YA_ALCANZA_OBJETIVO`) — diseño
   conceptual y contrato funcional mínimo ya discutidos y aprobados como
   `Post-MVP` en esta misma sesión de trabajo (ver también el anexo de la

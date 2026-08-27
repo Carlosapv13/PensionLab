@@ -12,8 +12,10 @@ escenarios comparables a partir de lo que la persona declara y deja que ella dec
   `src/domain/formulas/trazabilidad-formula-RPM.md` y
   `src/domain/formulas/trazabilidad-formula-RAIS.md`.
 - **La IA, donde se usa, explica resultados ya calculados — nunca los calcula ni los
-  sustituye.** Si la explicación con IA falla o no está disponible, las cifras
-  (caminos, proyección, gráfica) siguen siendo correctas y utilizables sin ella.
+  sustituye.** Este principio se mantiene vigente para cuando esa capacidad esté
+  expuesta al usuario; **en el MVP actual para revisión de Oscar, la explicación con
+  IA no forma parte de la experiencia publicada** (ver "Estado actual" y
+  "Limitaciones conocidas del MVP").
 - **PensionLab no es asesoría financiera, legal ni pensional oficial**, y no emite
   recomendaciones personalizadas ("deberías", "te conviene"): compara estrategias de
   forma neutral y dejar la decisión a la persona es un principio de producto, no un
@@ -29,7 +31,6 @@ escenarios comparables a partir de lo que la persona declara y deja que ella dec
   de caminos, sin fixtures ni datos de desarrollo.
 - Experiencia RPM completa dentro del alcance del MVP (ver "Alcance del MVP" abajo).
 - Experiencia RAIS funcional, con un alcance deliberadamente más acotado que RPM.
-- Explicación con IA disponible bajo demanda donde corresponde (RPM).
 - Suite de **889 tests** en verde, lint sin errores, build de producción exitoso.
 
 ## Alcance del MVP
@@ -47,8 +48,6 @@ Recorrido completo disponible desde la UI pública, sin Panel de Desarrollo:
 - **Horizonte temporal explícito**: desde cuándo y hasta cuándo se supone mantener el
   IBC y el esfuerzo adicional de cada camino, con duración aproximada.
 - Gráfica esfuerzo↔resultado con el punto elegido por la persona marcado.
-- **Explicación con IA bajo demanda** ("Entender este camino" / "Comparando tus
-  caminos"), siempre opcional y siempre después de que las cifras ya existen.
 
 ### RAIS
 
@@ -57,7 +56,7 @@ independiente, cotización en Colombia, sin traslados de régimen previos) — f
 ese perfil, la app lo explica honestamente y nunca bloquea el recorrido general.
 
 Su alcance es **deliberadamente menor** que el de RPM en esta versión: no incluye
-esfuerzo personalizado, horizonte temporal explícito, gráfica ni explicación con IA.
+esfuerzo personalizado, horizonte temporal explícito ni gráfica.
 Esto es una decisión de alcance del MVP, no una funcionalidad rota o a medio
 terminar — la propia pantalla se lo indica brevemente a quien llega hasta ahí.
 
@@ -68,6 +67,13 @@ terminar — la propia pantalla se lo indica brevemente a quien llega hasta ahí
   recorrido desde el principio.
 - **RAIS tiene un alcance deliberadamente acotado** frente a RPM (ver arriba), no
   una implementación incompleta de lo que sí está en alcance.
+- **La explicación con IA existe en el código (`src/ia/`, RPM) y está probada, pero
+  no forma parte de esta publicación del MVP** — no es una capacidad que Oscar deba
+  encontrar o probar en esta ronda. La capacidad existe técnicamente y está
+  probada, pero queda fuera del alcance de esta publicación del MVP; su
+  incorporación a una experiencia futura de usuario queda sujeta a una decisión
+  posterior de producto. Ver `docs/qa/matriz-pruebas-funcionales-mvp.md` (sección
+  IA) para su estado técnico completo.
 - Algunas capacidades siguen fuera de este MVP a propósito (por ejemplo, un punto de
   entrada público a la interpretación de una declaración libre en lenguaje natural).
   No se documentan aquí una por una — para explorar posibles direcciones futuras, ver
@@ -84,6 +90,14 @@ npm run lint     # ESLint
 ```
 
 ## Explicación con IA — configuración y comportamiento
+
+> **Nota de alcance:** esta sección describe una capacidad que existe en el código
+> y está probada, pero **no está expuesta en la publicación actual del MVP para
+> Oscar** — se conserva aquí como referencia técnica para quien continúe el
+> desarrollo, no como instrucción de despliegue de esta versión. Su incorporación a
+> una experiencia futura de usuario queda sujeta a una decisión posterior de
+> producto; `OPENAI_API_KEY`/`OPENAI_MODEL` **no son requisito** para publicar o
+> probar este MVP.
 
 La explicación con IA es una capacidad **opcional**: el motor de cálculo, los
 caminos, la gráfica y toda la comparación funcionan sin ella.

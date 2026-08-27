@@ -48,6 +48,8 @@ import {
   construirPuntoSvg,
   construirRutaLinea,
   calcularYObjetivo,
+  textoEtiquetaEleccion,
+  etiquetaEleccionVaDebajo,
 } from './GraficoEsfuerzoResultado.helpers.js'
 import { formatearPesos } from '../format/formatearDinero.js'
 
@@ -78,6 +80,19 @@ function esPosicionSecundaria(posicion) {
 
 const RADIO_PUNTO_OBJETIVO = 7
 const RADIO_PUNTO_ELECCION = 7
+
+// Ajuste 2026-08-27 (separación visual de "Tu objetivo"/la curva) — antes 8, exclusivamente
+// para "Tu elección"; el gap de "Tu objetivo" (8, más abajo) queda sin cambios a propósito,
+// ver etiquetaEleccionVaDebajo (helpers.js).
+const GAP_PUNTO_ELECCION = 12
+
+// Ajuste 2026-08-27 (b), tras validación visual: cuando la etiqueta va debajo del punto
+// (etiquetaEleccionVaDebajo), queda más cerca de la curva que cuando va arriba — un gap
+// aparte, solo para esa rama, la separa un poco más sin tocar la rama "arriba" (que sigue
+// usando GAP_PUNTO_ELECCION) ni el caso de "Tu objetivo". Verificado con el fixture QA para
+// $100.000/$200.000/$600.000 antes de fijar este valor: 14 es el mayor que mantiene margen
+// seguro contra el eje X inferior en el caso más ajustado ($100.000).
+const GAP_PUNTO_ELECCION_ABAJO = 14
 
 // Alto de línea (unidades del viewBox, no em) entre las dos líneas de la etiqueta de "Tu
 // objetivo"/"Tu elección" (2026-08-27, ajuste tras validación visual) — coherente con el
@@ -278,32 +293,52 @@ function GraficoEsfuerzoResultado({ barrido, objetivoValorMensual, escenarioPers
             sin introducir un color nuevo (misma regla que el marcador de objetivo). Si
             coincide exactamente con "Tu objetivo" caen en el mismo píxel — solapamiento
             documentado (ver GraficoEsfuerzoResultado.helpers.test.js), no resuelto aquí.
-            Mismo patrón de dos líneas que el rombo, mismo motivo — sin repetir aquí la
-            pensión proyectada (no hay una línea horizontal equivalente para "Tu elección",
-            pero repetirla ya volvía la etiqueta larga y difícil de leer; el valor completo
-            sigue disponible en la tarjeta correspondiente). */}
-        {puntoPersonalizadoSvg && (
-          <g>
-            <rect
-              className="grafico-esfuerzo-resultado__punto-eleccion"
-              x={puntoPersonalizadoSvg.x - RADIO_PUNTO_ELECCION}
-              y={puntoPersonalizadoSvg.y - RADIO_PUNTO_ELECCION}
-              width={RADIO_PUNTO_ELECCION * 2}
-              height={RADIO_PUNTO_ELECCION * 2}
-            />
-            <text
-              className="grafico-esfuerzo-resultado__punto-etiqueta grafico-esfuerzo-resultado__punto-etiqueta--eleccion"
-              x={puntoPersonalizadoSvg.x}
-              y={puntoPersonalizadoSvg.y - RADIO_PUNTO_ELECCION - 8 - ALTO_LINEA_ETIQUETA}
-              textAnchor="middle"
-            >
-              <tspan x={puntoPersonalizadoSvg.x} dy={0}>Tu elección</tspan>
-              <tspan x={puntoPersonalizadoSvg.x} dy={ALTO_LINEA_ETIQUETA}>
-                {`${formatearPesos(puntoPersonalizado.esfuerzo.costoPensionalAdicionalMensual)} adicionales`}
-              </tspan>
-            </text>
-          </g>
-        )}
+            Ajuste 2026-08-27 (hallazgo pendiente cerrado): las dos líneas ahora reparten
+            esfuerzo y pensión proyectada, una variable por línea (textoEtiquetaEleccion,
+            helpers.js) — antes la 2ª línea solo repetía el esfuerzo, sin decir a qué pensión
+            equivale. Nunca IBC (este gráfico sigue siendo esfuerzo → pensión) ni % (ya vive
+            en la tarjeta, "Frente a tu objetivo").
+            Ajuste 2026-08-27 (b), tras validación visual: siempre centrada en X sobre su
+            propio punto (sin cambios ahí — nunca se desplaza horizontalmente, eso arriesgaba
+            salirse del viewBox en esfuerzos altos, ya verificado). En Y, en cambio, se voltea
+            arriba/abajo del punto según etiquetaEleccionVaDebajo (helpers.js): por defecto
+            arriba, igual que "Tu objetivo" — pero abajo cuando "Tu objetivo" queda posicionado
+            arriba de "Tu elección", que si no competirían por el mismo espacio vertical
+            (medido con el fixture QA: hasta 65 unidades de solape horizontal con solo 14 de
+            margen). Gap respecto al propio punto, solo para "Tu elección" — el de "Tu
+            objetivo" (8, arriba) queda intacto a propósito: 12 cuando va arriba
+            (GAP_PUNTO_ELECCION), 14 cuando va abajo (GAP_PUNTO_ELECCION_ABAJO, ajuste
+            2026-08-27 (b) — la rama "abajo" quedaba más cerca de la curva que la rama
+            "arriba"). */}
+        {puntoPersonalizadoSvg && (() => {
+          const { lineaEleccion, lineaPension } = textoEtiquetaEleccion(puntoPersonalizado)
+          const vaDebajo = etiquetaEleccionVaDebajo(puntoPersonalizadoSvg, puntoObjetivoSvg)
+          const yEtiquetaEleccion = vaDebajo
+            ? puntoPersonalizadoSvg.y + RADIO_PUNTO_ELECCION + GAP_PUNTO_ELECCION_ABAJO
+            : puntoPersonalizadoSvg.y - RADIO_PUNTO_ELECCION - GAP_PUNTO_ELECCION - ALTO_LINEA_ETIQUETA
+          return (
+            <g>
+              <rect
+                className="grafico-esfuerzo-resultado__punto-eleccion"
+                x={puntoPersonalizadoSvg.x - RADIO_PUNTO_ELECCION}
+                y={puntoPersonalizadoSvg.y - RADIO_PUNTO_ELECCION}
+                width={RADIO_PUNTO_ELECCION * 2}
+                height={RADIO_PUNTO_ELECCION * 2}
+              />
+              <text
+                className="grafico-esfuerzo-resultado__punto-etiqueta grafico-esfuerzo-resultado__punto-etiqueta--eleccion"
+                x={puntoPersonalizadoSvg.x}
+                y={yEtiquetaEleccion}
+                textAnchor="middle"
+              >
+                <tspan x={puntoPersonalizadoSvg.x} dy={0}>{lineaEleccion}</tspan>
+                <tspan x={puntoPersonalizadoSvg.x} dy={ALTO_LINEA_ETIQUETA}>
+                  {lineaPension}
+                </tspan>
+              </text>
+            </g>
+          )
+        })()}
 
         {/* Títulos de eje */}
         <text className="grafico-esfuerzo-resultado__titulo-eje" x={ejeXInicio} y={14}>

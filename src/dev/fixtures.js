@@ -19,6 +19,16 @@
  * @property {Object} datos - subconjunto de CLAVES_ESTADO_EDITABLE
  */
 
+// diasCotizados de historiaCotizacion, más abajo (caso QA RPM objetivo 7M), se deriva
+// siempre con diasCalendarioEnRango — mismo helper canónico que ya usa
+// HistoriaCotizacionRPM.helpers.js (construirPeriodoCotizacion) para no aceptar un
+// diasCotizados distinto de los días calendario completos del rango. Importarlo aquí es
+// seguro: src/dev/fixtures.js solo se alcanza desde PanelDesarrollo.jsx (montado
+// exclusivamente bajo import.meta.env.DEV, ver App.jsx) o desde tests — nunca desde una
+// pantalla productiva, así que esto no abre un segundo camino hacia domain/ en el bundle
+// de producción; es una función pura, sin estado, sin efectos.
+import { diasCalendarioEnRango } from '../domain/seleccionarPeriodosIBL.js'
+
 /** @type {Fixture[]} */
 export const FIXTURES = [
   {
@@ -379,6 +389,68 @@ export const FIXTURES = [
       certezaBaseCotizacion: 'conocido',
       valorBaseCotizacionDeclarado: '3200000',
       infoEsencialCompletada: true,
+    },
+  },
+  {
+    id: 'qa-rpm-objetivo-7m',
+    nombre: 'Caso QA — RPM objetivo 7M',
+    // Caso real de QA manual reutilizado repetidamente en la revisión de ProyectaTuPensionRPM
+    // (jerarquía IBC/aporte, "% de tu objetivo") — sin este fixture, recrearlo exigía
+    // recorrer ~15 pantallas cada vez para una microcorrección visual. Deliberadamente sin
+    // esfuerzo personalizado precargado (decisión de producto, 2026-08-27): el fixture
+    // representa el expediente y la pregunta base, no una decisión posterior de exploración
+    // — cargar $200.000/$100.000/etc. ya es una acción de 3 clics sobre la pantalla real
+    // (ver guion más abajo), nunca una responsabilidad del fixture.
+    //
+    // tipoCotizante: 'independiente' (no 'empleado') — decisión explícita: lugarCotizacion
+    // ya cubre "desde el exterior", pero tipoCotizante responde una pregunta distinta ("¿quién
+    // hizo los aportes?", ver HistorialLaboral.jsx) que el caso original no especificaba.
+    // 'independiente' es el patrón real más común para alguien que sostiene su cotización a
+    // Colpensiones desde el exterior sin un empleador que reporte por él (aportante
+    // voluntario/independiente) — no afecta el cálculo con certezaBaseCotizacion:'aproximado'
+    // (determinarBaseCotizacion.js solo lee tipoCotizante en la rama 'desconocido'), pero el
+    // fixture debe representar el caso fielmente, no solo lo que el motor necesita.
+    //
+    // historiaCotizacion: un solo período reciente y parcial (6 meses, ~181 días de los 3.650
+    // de la ventana IBL) — a propósito: representa "historia real parcial", no una historia
+    // completa. diasCotizados nunca hardcodeado: se deriva con diasCalendarioEnRango
+    // (import de arriba), el mismo helper que HistoriaCotizacionRPM.helpers.js usa para
+    // construir cualquier PeriodoCotizacion real.
+    //
+    // Guion rápido para probar el camino personalizado (no forma parte del fixture — acción
+    // manual sobre la pantalla real, mismo criterio que el guion de frases del fixture
+    // 'rpm-empleado-declaracion-libre-s4-006'): tras cargar y llegar a proyectaTuPensionRPM,
+    // clic en "Explorar otro esfuerzo mensual" → escribir 200000 (o 100000/250000/...) → clic
+    // en "Explorar este esfuerzo".
+    vistaSugerida: 'proyectaTuPensionRPM',
+    datos: {
+      objetivoSeleccionado: 'Descubrir mis opciones pensionales.',
+      lugarResidencia: 'Exterior',
+      cotizaActualmente: 'si',
+      sexo: 'Hombre',
+      fechaNacimiento: '1974-07-13',
+      regimenActual: 'RPM',
+      trasladoRegimen: 'si',
+      detalleTraslado: 'rais_a_rpm',
+      certezaFechaTraslado: 'aproximado',
+      fechaTrasladoRegimen: '2026-07-01',
+      tipoCotizante: 'independiente',
+      lugarCotizacion: 'exterior',
+      nivelConocimientoSemanas: 'aproximado',
+      semanasCotizadas: '1350',
+      certezaBaseCotizacion: 'aproximado',
+      valorBaseCotizacionDeclarado: '7000000',
+      infoEsencialCompletada: true,
+      historiaCotizacion: [
+        {
+          fechaDesde: '2026-01-01',
+          fechaHasta: '2026-06-30',
+          ibc: 1850000,
+          diasCotizados: diasCalendarioEnRango('2026-01-01', '2026-06-30'),
+        },
+      ],
+      edadJubilacionDeseada: '62',
+      objetivoPensionMensual: '7000000',
     },
   },
 ]

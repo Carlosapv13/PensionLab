@@ -353,3 +353,43 @@ extender.
 la ausencia de formateo en vivo genera errores de magnitud, fricción de uso
 o una degradación relevante en la comprensión/confianza durante la
 captura — no únicamente una preferencia estética.
+
+---
+
+## Posible redundancia de ExploraTuProyeccionRPM.jsx frente a ProyectaTuPensionRPM.jsx
+
+**Origen de la idea:** identificado durante el cierre del slice de ajustes UX de
+`ProyectaTuPensionRPM.jsx` (jerarquía IBC/aporte, % del objetivo, marcador "Tu
+elección" del gráfico) — al revisar el recorrido completo se hizo evidente que
+`ExploraTuProyeccionRPM.jsx` ("Lectura económica RPM con tu historia hasta hoy",
+una fotografía sin proyección a la edad objetivo) ya no es parte del recorrido
+principal: UX-RPM-01 lleva del `BaseCotizacion` directo a `ProyectaTuPensionRPM`
+(ver comentario de cabecera de esa pantalla) y la única puerta de entrada real
+que le queda a `ExploraTuProyeccionRPM` es la profundización opcional de
+historia ("Completar mi historia de cotización", vía `HistoriaCotizacionRPM.jsx`
+→ `ExploraTuProyeccionRPM.jsx` → vuelta a `ProyectaTuPensionRPM.jsx`). Con
+`ProyectaTuPensionRPM.jsx` ya proyectando a la edad objetivo con la historia
+disponible (parcial o vía declaración agregada, contrato GO-B), cabe preguntarse
+si esta pantalla intermedia sigue aportando una lectura que la persona
+realmente necesita ver por separado, o si es un paso redundante en un recorrido
+que ya llegó a resolver la pregunta más adelante.
+
+**Por qué no se resuelve ahora:** no bloquea el recorrido actual (la
+profundización opcional funciona), no compromete ningún cálculo, no elimina
+ninguna capacidad — el propio dominio (`calcularPensionRPM.js`) y la captura de
+historia (`HistoriaCotizacionRPM.jsx`) siguen intactos y en uso. Resolver esta
+pregunta (¿eliminar la pantalla?, ¿fusionarla con `ProyectaTuPensionRPM.jsx`?,
+¿dejarla como está porque la lectura "solo con tu historia hasta hoy" sigue
+siendo información distinta y legítima?) es una optimización de flujo, no un
+requisito para publicar este MVP.
+
+**Decisión actual: no implementar.** Queda fuera de alcance de este slice y del
+MVP actual — ningún trabajo se abre sobre `ExploraTuProyeccionRPM.jsx` a partir
+de este cierre.
+
+**Condición para revisarla más adelante:** evaluar con datos reales de uso (o
+con Oscar/producto) si las personas que llegan a `ExploraTuProyeccionRPM.jsx`
+vía la profundización opcional encuentran valor distintivo en esa lectura
+separada, o si conviene fusionarla/eliminarla — mismo Principio 9 ya aplicado
+al resto de este documento: no decidir por preferencia estética o simetría
+arquitectónica, sino por evidencia real de uso.

@@ -20,6 +20,10 @@ import { formatearFechaCorta } from '../format/formatearFechaCorta.js'
 import { formatearDuracionCalendario } from '../format/formatearDuracionCalendario.js'
 import { validarSemanas } from '../domain/evidenciaSemanasMinimas.js'
 
+// Ajuste UX/semántico (2026-08-26): "Tu IBC" pasó a ser la fila protagonista de la tarjeta
+// (la acción que la persona debe ejecutar); esta función queda como su consecuencia
+// económica derivada, siempre después y sin énfasis principal — decisión de producto, ver
+// textoAjusteIBC más abajo y ProyectaTuPensionRPM.jsx (orden de las celdas).
 /**
  * @param {Object} escenario
  * @returns {string}
@@ -27,17 +31,24 @@ import { validarSemanas } from '../domain/evidenciaSemanasMinimas.js'
 export function textoEsfuerzoAdicional(escenario) {
   if (escenario.tipo === 'base') return 'Sin cambios respecto a hoy.'
   if (escenario.esfuerzo.costoPensionalAdicionalMensual <= 0) return 'Sin cambios respecto a hoy.'
-  return `${formatearPesos(escenario.esfuerzo.costoPensionalAdicionalMensual)} adicionales al mes.`
+  return `Esto representa ${formatearPesos(escenario.esfuerzo.costoPensionalAdicionalMensual)} adicionales de aporte pensional al mes en este escenario.`
 }
 
+// Ajuste UX/semántico (2026-08-26, decisión Carlos): antes "textoIBCFuturo" solo informaba
+// el dato (un antes/después neutro, última fila de la tarjeta, sin énfasis). El diagnóstico
+// de esa fecha confirmó que la interfaz debía enfatizar primero el cambio de IBC como la
+// acción real que la persona ejecuta — el aporte pensional adicional (textoEsfuerzoAdicional,
+// arriba) es la consecuencia económica de esa acción, no al revés. Renombrada para reflejar
+// ese cambio de rol, no solo de posición. Misma fuente de datos (escenario.esfuerzo), ningún
+// cálculo nuevo — sigue siendo exclusivamente formato/presentación.
 /**
  * @param {Object} escenario
  * @returns {string}
  */
-export function textoIBCFuturo(escenario) {
+export function textoAjusteIBC(escenario) {
   const { ibcActual, ibcPropuesto } = escenario.esfuerzo
-  if (ibcPropuesto === ibcActual) return `${formatearPesos(ibcActual)} (sin cambios).`
-  return `${formatearPesos(ibcActual)} → ${formatearPesos(ibcPropuesto)}.`
+  if (ibcPropuesto === ibcActual) return `Mantén tu IBC actual en ${formatearPesos(ibcActual)}.`
+  return `Lleva tu IBC de ${formatearPesos(ibcActual)} a ${formatearPesos(ibcPropuesto)}.`
 }
 
 /**
@@ -48,6 +59,34 @@ export function textoDistancia(escenario) {
   const { cumple, delta } = escenario.distanciaObjetivo
   if (cumple) return 'Alcanza tu objetivo.'
   return `No alcanza tu objetivo — le faltarían ${formatearPesos(delta)} al mes.`
+}
+
+// Ajuste UX/producto (2026-08-27, tras revisión crítica de diseño — descartada la idea
+// original de una progress bar independiente): segunda línea, secundaria, dentro de la
+// misma celda que textoDistancia — nunca un componente ni bloque nuevo. Deliberadamente
+// null cuando cumple === true: "Alcanza tu objetivo." ya es la respuesta completa ahí, y
+// mostrar "100%"/"127%" se acercaría al lenguaje de puntaje/rentabilidad que esta pantalla
+// evita en todo el resto de su copy (ver textoDiferenciaFrenteABase, más abajo). Cuando
+// cumple es false, valorObjetivo es necesariamente positivo por construcción (delta =
+// valorObjetivo - resultado.valor > 0 y resultado.valor >= 0 ⇒ valorObjetivo > 0) — sin
+// guard adicional para valorObjetivo <= 0, ese caso no puede alcanzar esta rama (Principio:
+// no validar un escenario que no puede ocurrir). Solo formato/presentación: el porcentaje
+// se deriva de resultado.valor y distanciaObjetivo.valorObjetivo, ambos ya calculados por
+// generarCaminosRPM.js — ninguna pensión se recalcula aquí. Coma decimal (es-CO), un solo
+// decimal — mismo criterio de localización correcta que formatearPesos, arriba.
+/**
+ * @param {Object} escenario
+ * @returns {string|null} null cuando el escenario ya alcanza o supera el objetivo
+ */
+export function textoPorcentajeObjetivo(escenario) {
+  const { cumple, valorObjetivo } = escenario.distanciaObjetivo
+  if (cumple) return null
+  const porcentaje = (escenario.resultado.valor / valorObjetivo) * 100
+  const porcentajeFormateado = porcentaje.toLocaleString('es-CO', {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  })
+  return `Equivale al ${porcentajeFormateado}% de tu objetivo.`
 }
 
 /**

@@ -11,8 +11,9 @@
 import { describe, it, expect } from 'vitest'
 import {
   textoEsfuerzoAdicional,
-  textoIBCFuturo,
+  textoAjusteIBC,
   textoDistancia,
+  textoPorcentajeObjetivo,
   textoDiferenciaFrenteABase,
   textoOrientacion,
   textoHorizonte,
@@ -68,35 +69,37 @@ describe('textoEsfuerzoAdicional', () => {
     expect(textoEsfuerzoAdicional(escenario)).toBe('Sin cambios respecto a hoy.')
   })
 
-  it('camino alternativo con costo positivo: muestra exactamente ese valor formateado, ningún otro', () => {
+  it('camino alternativo con costo positivo: enmarca el valor como consecuencia del cambio de IBC, no como cifra aislada', () => {
     const escenario = { tipo: 'alternativo', esfuerzo: { costoPensionalAdicionalMensual: 391865 } }
-    expect(textoEsfuerzoAdicional(escenario)).toBe('$391.865 adicionales al mes.')
+    expect(textoEsfuerzoAdicional(escenario)).toBe(
+      'Esto representa $391.865 adicionales de aporte pensional al mes en este escenario.'
+    )
   })
 
   it('dos escenarios con costos distintos producen textos que reflejan cada uno su propio valor, sin mezclarlos', () => {
     const a = { tipo: 'alternativo', esfuerzo: { costoPensionalAdicionalMensual: 100000 } }
     const b = { tipo: 'alternativo', esfuerzo: { costoPensionalAdicionalMensual: 200000 } }
-    expect(textoEsfuerzoAdicional(a)).toBe('$100.000 adicionales al mes.')
-    expect(textoEsfuerzoAdicional(b)).toBe('$200.000 adicionales al mes.')
+    expect(textoEsfuerzoAdicional(a)).toBe('Esto representa $100.000 adicionales de aporte pensional al mes en este escenario.')
+    expect(textoEsfuerzoAdicional(b)).toBe('Esto representa $200.000 adicionales de aporte pensional al mes en este escenario.')
   })
 })
 
-describe('textoIBCFuturo', () => {
-  it('sin cambio de IBC: un solo valor, marcado "(sin cambios)"', () => {
+describe('textoAjusteIBC — ajuste UX/semántico 2026-08-26: el IBC como acción, no como dato de soporte (antes textoIBCFuturo)', () => {
+  it('sin cambio de IBC: enmarca como acción de mantener, no como "(sin cambios)" pasivo', () => {
     const escenario = { esfuerzo: { ibcActual: 2900000, ibcPropuesto: 2900000 } }
-    expect(textoIBCFuturo(escenario)).toBe('$2.900.000 (sin cambios).')
+    expect(textoAjusteIBC(escenario)).toBe('Mantén tu IBC actual en $2.900.000.')
   })
 
-  it('con cambio de IBC: muestra actual → propuesto, en ese orden exacto, sin invertirlos', () => {
+  it('con cambio de IBC: enmarca como acción "lleva de → a", en ese orden exacto, sin invertirlos', () => {
     const escenario = { esfuerzo: { ibcActual: 2900000, ibcPropuesto: 5345679 } }
-    expect(textoIBCFuturo(escenario)).toBe('$2.900.000 → $5.345.679.')
+    expect(textoAjusteIBC(escenario)).toBe('Lleva tu IBC de $2.900.000 a $5.345.679.')
   })
 
   it('no confunde ibcActual con ibcPropuesto entre dos escenarios distintos', () => {
     const a = { esfuerzo: { ibcActual: 1000000, ibcPropuesto: 1500000 } }
     const b = { esfuerzo: { ibcActual: 2000000, ibcPropuesto: 4000000 } }
-    expect(textoIBCFuturo(a)).toBe('$1.000.000 → $1.500.000.')
-    expect(textoIBCFuturo(b)).toBe('$2.000.000 → $4.000.000.')
+    expect(textoAjusteIBC(a)).toBe('Lleva tu IBC de $1.000.000 a $1.500.000.')
+    expect(textoAjusteIBC(b)).toBe('Lleva tu IBC de $2.000.000 a $4.000.000.')
   })
 })
 
@@ -116,6 +119,38 @@ describe('textoDistancia', () => {
     const b = { distanciaObjetivo: { cumple: false, delta: 999000 } }
     expect(textoDistancia(a)).toBe('No alcanza tu objetivo — le faltarían $50.000 al mes.')
     expect(textoDistancia(b)).toBe('No alcanza tu objetivo — le faltarían $999.000 al mes.')
+  })
+})
+
+describe('textoPorcentajeObjetivo — ajuste 2026-08-27, segunda línea secundaria junto a textoDistancia', () => {
+  it('cumple el objetivo: null — nunca "100%", "Alcanza tu objetivo." ya es la respuesta completa', () => {
+    const escenario = { resultado: { valor: 7000000 }, distanciaObjetivo: { cumple: true, valorObjetivo: 7000000 } }
+    expect(textoPorcentajeObjetivo(escenario)).toBeNull()
+  })
+
+  it('supera el objetivo (cumple true): sigue siendo null, nunca "110%" ni "127%"', () => {
+    const escenario = { resultado: { valor: 8000000 }, distanciaObjetivo: { cumple: true, valorObjetivo: 7000000 } }
+    expect(textoPorcentajeObjetivo(escenario)).toBeNull()
+  })
+
+  it('no cumple: caso real (ejemplo de producto) — $6.513.703 de $7.000.000 → "93,1%", coma decimal es-CO', () => {
+    const escenario = {
+      resultado: { valor: 6513703 },
+      distanciaObjetivo: { cumple: false, valorObjetivo: 7000000 },
+    }
+    expect(textoPorcentajeObjetivo(escenario)).toBe('Equivale al 93,1% de tu objetivo.')
+  })
+
+  it('dos escenarios con proporciones distintas producen porcentajes que reflejan cada uno el suyo, sin mezclarlos', () => {
+    const a = { resultado: { valor: 100 }, distanciaObjetivo: { cumple: false, valorObjetivo: 200 } }
+    const b = { resultado: { valor: 1 }, distanciaObjetivo: { cumple: false, valorObjetivo: 3 } }
+    expect(textoPorcentajeObjetivo(a)).toBe('Equivale al 50,0% de tu objetivo.')
+    expect(textoPorcentajeObjetivo(b)).toBe('Equivale al 33,3% de tu objetivo.')
+  })
+
+  it('siempre un decimal, incluso en un porcentaje exacto', () => {
+    const escenario = { resultado: { valor: 3500000 }, distanciaObjetivo: { cumple: false, valorObjetivo: 7000000 } }
+    expect(textoPorcentajeObjetivo(escenario)).toBe('Equivale al 50,0% de tu objetivo.')
   })
 })
 

@@ -638,29 +638,32 @@
   border-top-width: 3px;
 }
 
-.camino-celda--esfuerzo {
+/* Ajuste UX/semántico (2026-08-26, decisión Carlos): "Tu IBC" pasa a ser la primera fila de
+   datos de la tarjeta — el cambio de IBC es la acción real que la persona ejecuta, no un
+   dato de soporte. Renombrada de .camino-celda--base: esa fila existe en las tres tarjetas
+   (base, alternativo, personalizado), nunca fue exclusiva del camino "base" — el nombre
+   anterior era engañoso. */
+.camino-celda--ibc {
   grid-row: 2;
 }
 
-/* Lectura principal "esfuerzo → resultado → objetivo" (decisión de producto, 2026-08-24):
-   la pensión proyectada es la fila inmediatamente después del esfuerzo — "Cambio frente a
-   mantenerte como hoy" ya no es una fila propia, vive como segunda línea DENTRO de esta
-   misma celda (ver .camino-celda__valor--secundario), separada solo por el gap interno de
-   4px de .camino-celda, no por los 16px del grid. En el camino base esa segunda línea no
-   se renderiza (delta 0, ver textoDiferenciaFrenteABase) — la celda sigue existiendo, solo
-   con una línea en vez de dos. */
-.camino-celda--proyeccion {
+/* Lectura principal "IBC → aporte → resultado → objetivo" (ajuste 2026-08-26, reemplaza el
+   orden "esfuerzo → resultado → objetivo" de 2026-08-24): el aporte pensional adicional es
+   ahora la consecuencia económica derivada del cambio de IBC de arriba, así que queda
+   inmediatamente después, sin énfasis principal (ver .camino-celda__valor--enfasis, más
+   abajo, ya no se aplica a esta celda). */
+.camino-celda--esfuerzo {
   grid-row: 3;
 }
 
-.camino-celda--objetivo {
+/* La pensión proyectada conserva su énfasis y su posición relativa (segunda línea opcional
+   con "Cambio frente a mantenerte como hoy" vía .camino-celda__valor--secundario) — solo se
+   corrió una fila por la nueva celda --ibc arriba. */
+.camino-celda--proyeccion {
   grid-row: 4;
 }
 
-/* IBC futuro del escenario — información de soporte (2026-08-24), movida deliberadamente
-   después de "Frente a tu objetivo": ya no es parte de la lectura principal esfuerzo →
-   resultado → objetivo, pero sigue visible, solo con menor prioridad de lectura. */
-.camino-celda--base {
+.camino-celda--objetivo {
   grid-row: 5;
 }
 
@@ -718,9 +721,11 @@
   font-weight: 600;
 }
 
-/* S4-004: jerarquía visual moderada para las dos cifras que la comparación existe para
-   resaltar (esfuerzo adicional, pensión proyectada) — un paso por encima del valor base
-   (16px, normal), por debajo del título del camino en peso semántico. */
+/* S4-004, reasignada 2026-08-26: jerarquía visual moderada para las dos cifras que la
+   comparación existe para resaltar — hoy el IBC (la acción a ejecutar) y la pensión
+   proyectada (el resultado), ya no el aporte adicional (ver .camino-celda--esfuerzo, ahora
+   consecuencia sin énfasis) — un paso por encima del valor base (16px, normal), por debajo
+   del título del camino en peso semántico. */
 .camino-celda__valor--enfasis {
   font-size: 20px;
   font-weight: 600;

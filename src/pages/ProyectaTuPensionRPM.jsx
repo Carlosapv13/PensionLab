@@ -80,6 +80,24 @@
 // repetición de orientacion.razon cuando "Qué podrías explorar ahora" ya dijo lo mismo
 // (VARIOS_CUMPLEN_FALTA_PRIORIDAD → VARIOS_CAMINOS_CUMPLEN_FALTA_PRIORIDAD, mapeo
 // verificado en determinarOrientacionExploracion.js).
+//
+// Ajuste UX/producto (2026-08-27) — "% de tu objetivo" junto a "Frente a tu objetivo": tras
+// revisión crítica de diseño se descartó una progress bar/minigráfico independiente (más
+// costo, más redundancia con esta misma celda, sin resolver el problema real de decisión
+// fragmentada) a favor de una segunda línea secundaria dentro de la celda --objetivo ya
+// existente (ver textoPorcentajeObjetivo, helpers.js) — cero componente nuevo, cero CSS
+// nuevo. Se descartó también, para este slice, un "% de brecha cerrada" (mejora frente a la
+// situación actual, no frente al objetivo total): responde una pregunta distinta
+// (eficiencia marginal de la decisión, no posición frente al objetivo) y es más frágil
+// (indefinida cuando la persona ya alcanza el objetivo hoy) — queda como candidato para la
+// capa de IA (explicarCaminos.js), no para esta tarjeta.
+//
+// Hallazgo pendiente (2026-08-27, sin implementar): el marcador "Tu elección" del gráfico
+// (GraficoEsfuerzoResultado.jsx) muestra hoy el esfuerzo adicional mensual pero no la
+// pensión proyectada resultante — evaluar posteriormente si conviene enriquecerlo sin
+// comprometer legibilidad/mobile (el SVG ya posiciona texto por coordenadas absolutas, sin
+// manejo responsive de tamaño de fuente). Fuera de alcance de este ajuste — el gráfico no se
+// modifica aquí.
 
 import { useRef, useState } from 'react'
 import { determinarBaseCotizacion } from '../domain/determinarBaseCotizacion.js'
@@ -99,8 +117,9 @@ import CampoMonetario from '../components/CampoMonetario.jsx'
 import GraficoEsfuerzoResultado from '../components/GraficoEsfuerzoResultado.jsx'
 import {
   textoEsfuerzoAdicional,
-  textoIBCFuturo,
+  textoAjusteIBC,
   textoDistancia,
+  textoPorcentajeObjetivo,
   textoDiferenciaFrenteABase,
   textoOrientacion,
   textoHorizonte,
@@ -613,6 +632,7 @@ function ProyectaTuPensionRPM({
                 !resultado.orientacion.objetivoLegalmenteInalcanzable
               const notasEspecificas = limitacionesEspecificas(escenario, limitacionesComunes)
               const textoDiferencia = textoDiferenciaFrenteABase(escenario.diferenciaFrenteABase)
+              const textoPorcentaje = escenario.estado === 'descartado' ? null : textoPorcentajeObjetivo(escenario)
 
               return (
                 <div
@@ -629,11 +649,15 @@ function ProyectaTuPensionRPM({
                     <p className="camino-celda camino-celda--descartado">{escenario.razonDescartado.mensaje}</p>
                   ) : (
                     <>
+                      <div className="camino-celda camino-celda--ibc">
+                        <span className="camino-celda__etiqueta">Tu IBC</span>
+                        <span className="camino-celda__valor camino-celda__valor--enfasis">
+                          {textoAjusteIBC(escenario)}
+                        </span>
+                      </div>
                       <div className="camino-celda camino-celda--esfuerzo">
                         <span className="camino-celda__etiqueta">Aporte pensional adicional mensual</span>
-                        <span className="camino-celda__valor camino-celda__valor--enfasis">
-                          {textoEsfuerzoAdicional(escenario)}
-                        </span>
+                        <span className="camino-celda__valor">{textoEsfuerzoAdicional(escenario)}</span>
                       </div>
                       <div className="camino-celda camino-celda--proyeccion">
                         <span className="camino-celda__etiqueta">Pensión proyectada mensual (pesos de hoy)</span>
@@ -651,10 +675,9 @@ function ProyectaTuPensionRPM({
                         >
                           {textoDistancia(escenario)}
                         </span>
-                      </div>
-                      <div className="camino-celda camino-celda--base">
-                        <span className="camino-celda__etiqueta">IBC futuro del escenario</span>
-                        <span className="camino-celda__valor">{textoIBCFuturo(escenario)}</span>
+                        {textoPorcentaje && (
+                          <span className="camino-celda__valor camino-celda__valor--secundario">{textoPorcentaje}</span>
+                        )}
                       </div>
                       {notasEspecificas.length > 0 && (
                         <div className="camino-celda camino-celda--notas">

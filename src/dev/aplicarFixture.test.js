@@ -5,6 +5,7 @@ import { FIXTURES } from './fixtures.js'
 
 const FIXTURE_RAIS_EMPLEADO = FIXTURES.find((f) => f.id === 'rais-empleado-colombia')
 const FIXTURE_RAIS_INDEPENDIENTE = FIXTURES.find((f) => f.id === 'rais-independiente-colombia')
+const FIXTURE_QA_RPM_OBJETIVO_7M = FIXTURES.find((f) => f.id === 'qa-rpm-objetivo-7m')
 
 describe('validarFixture — claves reconocidas', () => {
   it('el fixture aprobado (RAIS empleado) es válido para su vista sugerida', () => {
@@ -15,6 +16,18 @@ describe('validarFixture — claves reconocidas', () => {
 
   it('el fixture aprobado (RAIS independiente, perfil soportado) es válido para su vista sugerida', () => {
     const r = validarFixture(FIXTURE_RAIS_INDEPENDIENTE, FIXTURE_RAIS_INDEPENDIENTE.vistaSugerida)
+    expect(r.valido).toBe(true)
+    expect(r.errores).toEqual([])
+  })
+
+  // Cobertura nueva (2026-08-27, caso QA RPM objetivo 7M): ningún fixture con
+  // vistaSugerida: 'proyectaTuPensionRPM' tenía hasta ahora un test explícito confirmando que
+  // realmente satisface CAMPOS_MINIMOS_POR_VISTA para esa vista — los dos fixtures RPM
+  // previos que ya apuntaban ahí ('rpm-empleado-proyecta-tu-pension' y su variante
+  // sin-margen) nunca se probaron contra validarFixture, solo se confiaba en probarlos a
+  // mano. Este test cierra ese hueco real de cobertura, no solo para este fixture.
+  it('el fixture aprobado (QA RPM objetivo 7M) es válido para su vista sugerida', () => {
+    const r = validarFixture(FIXTURE_QA_RPM_OBJETIVO_7M, FIXTURE_QA_RPM_OBJETIVO_7M.vistaSugerida)
     expect(r.valido).toBe(true)
     expect(r.errores).toEqual([])
   })

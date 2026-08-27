@@ -5,6 +5,8 @@
 // coordenadas de píxel dentro de un viewBox fijo. Testeable con Vitest sin montar el
 // componente — mismo patrón ya establecido por ProyectaTuPensionRPM.helpers.js.
 
+import { formatearPesos } from '../format/formatearDinero.js'
+
 export const ANCHO_SVG = 600
 export const ALTO_SVG = 320
 export const MARGEN = { arriba: 20, derecha: 24, abajo: 44, izquierda: 84 }
@@ -142,4 +144,49 @@ export function calcularDominioYConObjetivo(puntos, puntoObjetivo, objetivoValor
 export function calcularYObjetivo(objetivoValorMensual, dominioY) {
   const rangoY = [AREA_GRAFICA.y + AREA_GRAFICA.alto, AREA_GRAFICA.y]
   return escalarValor(objetivoValorMensual, dominioY, rangoY)
+}
+
+// Ajuste UX/producto (2026-08-27) — hallazgo pendiente cerrado: el marcador "Tu elección"
+// mostraba solo el esfuerzo, nunca la pensión proyectada resultante. Exactamente dos líneas,
+// mismo alto total que antes (ninguna cambia MARGEN/AREA_GRAFICA ni el cálculo de posición
+// del <text> en GraficoEsfuerzoResultado.jsx, solo su contenido) — verificado geométricamente
+// contra el fixture QA (dev/fixtures.js) antes de este cambio, incluido un caso límite de
+// esfuerzo alto cerca del borde superior derecho del viewBox. Nunca IBC (este gráfico sigue
+// siendo esfuerzo → pensión, no un segundo lugar para el IBC ya protagonista en la tarjeta) ni
+// %  (ya vive en la tarjeta, "Frente a tu objetivo" — evita la redundancia ya descartada en la
+// revisión crítica de diseño). Puro formato: ambos valores ya vienen calculados por
+// generarCaminosRPM.js dentro de `puntoPersonalizado` — ninguna resta ni derivación nueva.
+/**
+ * @param {{esfuerzo: {costoPensionalAdicionalMensual: number}, resultado: {valor: number}}} puntoPersonalizado
+ * @returns {{lineaEleccion: string, lineaPension: string}}
+ */
+export function textoEtiquetaEleccion(puntoPersonalizado) {
+  return {
+    lineaEleccion: `Tu elección: ${formatearPesos(puntoPersonalizado.esfuerzo.costoPensionalAdicionalMensual)}`,
+    lineaPension: `Pensión: ${formatearPesos(puntoPersonalizado.resultado.valor)}`,
+  }
+}
+
+// Ajuste UX/producto (2026-08-27, hallazgo de validación visual) — decide si la etiqueta
+// "Tu elección" se dibuja arriba o abajo de su propio punto: arriba es el comportamiento
+// histórico (mismo que "Tu objetivo", sin cambios), salvo que "Tu objetivo" esté
+// posicionado arriba de "Tu elección" en el eje Y — ahí ambas etiquetas, que por defecto
+// crecen hacia arriba de su punto, terminan compitiendo por el mismo espacio vertical
+// (medido con el fixture QA: hasta 65 unidades de solape horizontal con solo 14 de margen
+// vertical). Nunca toca el eje X ni la posición de "Tu objetivo" — GraficoEsfuerzoResultado.jsx
+// sigue siendo el único dueño de los radios/gaps/alto de línea (constantes de layout, no de
+// escala). Igualdad exacta de Y cae en la rama "arriba" (comportamiento por defecto): no hay
+// evidencia de que competir sea peor que no voltear en ese empate exacto de punto flotante,
+// prácticamente inalcanzable en la práctica, y no amerita una tercera rama solo para eso.
+// Sin puntoObjetivoSvg (objetivo no incluido en el dominio Y actual), no hay nada que
+// evitar: mismo comportamiento de siempre. Puro: nunca dibuja, nunca recalcula esfuerzo ni
+// pensión — solo decide un booleano a partir de coordenadas ya calculadas por
+// construirPuntoSvg.
+/**
+ * @param {{x: number, y: number}} puntoPersonalizadoSvg
+ * @param {{x: number, y: number}|null} puntoObjetivoSvg
+ * @returns {boolean}
+ */
+export function etiquetaEleccionVaDebajo(puntoPersonalizadoSvg, puntoObjetivoSvg) {
+  return puntoObjetivoSvg !== null && puntoObjetivoSvg.y < puntoPersonalizadoSvg.y
 }

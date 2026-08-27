@@ -8,6 +8,8 @@ import {
   construirPuntosSvg,
   construirRutaLinea,
   calcularYObjetivo,
+  textoEtiquetaEleccion,
+  etiquetaEleccionVaDebajo,
 } from './GraficoEsfuerzoResultado.helpers.js'
 import { formatearPesos } from '../format/formatearDinero.js'
 
@@ -233,18 +235,17 @@ describe('construirPuntoSvg — solapamiento cuando el esfuerzo personalizado co
 
 // Corrección de representación/UX (2026-08-27, hallazgo de auditoría manual; ajustado el
 // mismo día tras validación visual — la primera versión, en una sola línea con esfuerzo Y
-// pensión, resultó larga y redundante). El rombo "Tu objetivo" y el cuadrado "Tu elección"
-// ahora muestran, en dos líneas vía <tspan>, únicamente su etiqueta y el esfuerzo mensual
-// exacto — nunca la pensión, que para "Tu objetivo" ya identifica sin repetirla la línea
-// horizontal "Tu objetivo: $X" (calcularYObjetivo/objetivoValorMensual, sin cambios).
-// GraficoEsfuerzoResultado.jsx no tiene infraestructura de componente para verificar el
-// <text>/<tspan> renderizado (sin jsdom/RTL) — este test ancla, al nivel disponible, las
-// mismas dos líneas de texto que la JSX construye a partir de `puntoObjetivo`/
-// `puntoPersonalizado`, usando el caso real reportado (auditoría 2026-08-27): $302.026,08
-// de aporte adicional. La validación de que las dos líneas realmente aparecen en pantalla,
-// en la posición correcta, legibles y sin taparse con la línea, queda como verificación
-// manual (ver matriz funcional).
-describe('Etiqueta de "Tu objetivo"/"Tu elección" — dos líneas, solo esfuerzo, mismo texto que construye GraficoEsfuerzoResultado.jsx', () => {
+// pensión, resultó larga y redundante). El rombo "Tu objetivo" muestra, en dos líneas vía
+// <tspan>, únicamente su etiqueta y el esfuerzo mensual exacto — nunca la pensión, que ya
+// identifica sin repetirla la línea horizontal "Tu objetivo: $X"
+// (calcularYObjetivo/objetivoValorMensual, sin cambios). GraficoEsfuerzoResultado.jsx no
+// tiene infraestructura de componente para verificar el <text>/<tspan> renderizado (sin
+// jsdom/RTL) — este test ancla, al nivel disponible, las mismas dos líneas de texto que la
+// JSX construye a partir de `puntoObjetivo`, usando el caso real reportado (auditoría
+// 2026-08-27): $302.026,08 de aporte adicional. La validación de que las dos líneas
+// realmente aparecen en pantalla, en la posición correcta, legibles y sin taparse con la
+// línea, queda como verificación manual (ver matriz funcional).
+describe('Etiqueta de "Tu objetivo" — dos líneas, solo esfuerzo, mismo texto que construye GraficoEsfuerzoResultado.jsx', () => {
   function lineasMarcador(etiqueta, punto) {
     return [etiqueta, `${formatearPesos(punto.esfuerzo.costoPensionalAdicionalMensual)} adicionales`]
   }
@@ -263,22 +264,48 @@ describe('Etiqueta de "Tu objetivo"/"Tu elección" — dos líneas, solo esfuerz
     expect(linea2).not.toContain('7.000.000') // la pensión no se repite aquí — la muestra la línea horizontal
   })
 
-  it('"Tu elección" usa el mismo patrón de dos líneas, con sus propios valores — nunca los del objetivo, nunca la pensión', () => {
-    const puntoPersonalizado = {
-      esfuerzo: { costoPensionalAdicionalMensual: 150000 },
-      resultado: { valor: 6100000 },
-    }
-    const [linea1, linea2] = lineasMarcador('Tu elección', puntoPersonalizado)
-
-    expect(linea1).toBe('Tu elección')
-    expect(linea2).toBe('$150.000 adicionales')
-    expect(linea2).not.toContain('6.100.000')
-  })
-
   it('funciona razonablemente con cifras más largas (esfuerzo de 7 dígitos)', () => {
     const puntoEsfuerzoGrande = { esfuerzo: { costoPensionalAdicionalMensual: 1234567 }, resultado: { valor: 9000000 } }
     const [, linea2] = lineasMarcador('Tu objetivo', puntoEsfuerzoGrande)
     expect(linea2).toBe('$1.234.567 adicionales')
+  })
+})
+
+// Ajuste UX/producto (2026-08-27) — hallazgo pendiente cerrado: a diferencia de "Tu
+// objetivo" (arriba, sin cambios), "Tu elección" no tiene una línea horizontal equivalente
+// que ya identifique su pensión — por eso, y solo para este marcador, la 2ª línea deja de
+// repetir el esfuerzo y pasa a mostrar la pensión proyectada resultante. Testea la función
+// real exportada (textoEtiquetaEleccion), no una reimplementación local — a diferencia del
+// bloque de "Tu objetivo" arriba, que sí necesita `lineasMarcador` porque ese patrón vive
+// inline en el JSX, nunca extraído a un helper (sin un segundo consumidor real, Principio 9).
+describe('textoEtiquetaEleccion — "Tu elección": una línea por variable (esfuerzo, pensión), nunca IBC ni %', () => {
+  it('caso real (fixture QA, esfuerzo $200.000): línea 1 con el esfuerzo, línea 2 con la pensión proyectada', () => {
+    const puntoPersonalizado = {
+      esfuerzo: { costoPensionalAdicionalMensual: 200000 },
+      resultado: { valor: 6513702.781798975 },
+    }
+    const { lineaEleccion, lineaPension } = textoEtiquetaEleccion(puntoPersonalizado)
+
+    expect(lineaEleccion).toBe('Tu elección: $200.000')
+    expect(lineaPension).toBe('Pensión: $6.513.703')
+  })
+
+  it('dos escenarios con valores distintos producen líneas que reflejan cada uno los suyos, sin mezclarlos', () => {
+    const a = { esfuerzo: { costoPensionalAdicionalMensual: 150000 }, resultado: { valor: 6100000 } }
+    const b = { esfuerzo: { costoPensionalAdicionalMensual: 391865 }, resultado: { valor: 6900000 } }
+
+    expect(textoEtiquetaEleccion(a)).toEqual({ lineaEleccion: 'Tu elección: $150.000', lineaPension: 'Pensión: $6.100.000' })
+    expect(textoEtiquetaEleccion(b)).toEqual({ lineaEleccion: 'Tu elección: $391.865', lineaPension: 'Pensión: $6.900.000' })
+  })
+
+  it('nunca menciona IBC ni el símbolo de porcentaje — ese gráfico sigue siendo esfuerzo → pensión, y el % ya vive en la tarjeta', () => {
+    const puntoPersonalizado = { esfuerzo: { costoPensionalAdicionalMensual: 200000 }, resultado: { valor: 6513703 } }
+    const { lineaEleccion, lineaPension } = textoEtiquetaEleccion(puntoPersonalizado)
+
+    for (const linea of [lineaEleccion, lineaPension]) {
+      expect(linea).not.toMatch(/ibc/i)
+      expect(linea).not.toContain('%')
+    }
   })
 })
 
@@ -293,5 +320,41 @@ describe('calcularYObjetivo', () => {
   it('el objetivo en el máximo del dominio cae en el borde superior del área gráfica', () => {
     const dominioY = { min: 1000000, max: 2000000 }
     expect(calcularYObjetivo(2000000, dominioY)).toBeCloseTo(AREA_GRAFICA.y, 5)
+  })
+})
+
+// Ajuste UX/producto (2026-08-27, hallazgo de validación visual): "Tu objetivo" y "Tu
+// elección" competían visualmente cuando quedaban cerca — este helper decide arriba/abajo
+// para "Tu elección" únicamente, sin tocar "Tu objetivo" ni el eje X. Coordenadas de los
+// dos primeros tests tomadas literalmente de la verificación numérica contra el fixture QA
+// (src/dev/fixtures.js) para $200.000 y $600.000 — no inventadas.
+describe('etiquetaEleccionVaDebajo — arriba/abajo de "Tu elección" según la posición de "Tu objetivo"', () => {
+  it('caso real (fixture QA, esfuerzo $200.000): "Tu objetivo" queda arriba de "Tu elección" → etiqueta va debajo', () => {
+    const puntoObjetivoSvg = { x: 304.7334891988612, y: 160.1134817980046 }
+    const puntoPersonalizadoSvg = { x: 230.16849591191675, y: 199.04880735899346 }
+    expect(etiquetaEleccionVaDebajo(puntoPersonalizadoSvg, puntoObjetivoSvg)).toBe(true)
+  })
+
+  it('caso real (fixture QA, esfuerzo $600.000): "Tu objetivo" queda abajo de "Tu elección" → etiqueta se mantiene arriba', () => {
+    const puntoObjetivoSvg = { x: 304.7334891988612, y: 160.1134817980046 }
+    const puntoPersonalizadoSvg = { x: 522.5054877357502, y: 47.44043355070619 }
+    expect(etiquetaEleccionVaDebajo(puntoPersonalizadoSvg, puntoObjetivoSvg)).toBe(false)
+  })
+
+  it('sin puntoObjetivoSvg (objetivo no incluido en el dominio actual): comportamiento por defecto, arriba', () => {
+    const puntoPersonalizadoSvg = { x: 100, y: 100 }
+    expect(etiquetaEleccionVaDebajo(puntoPersonalizadoSvg, null)).toBe(false)
+  })
+
+  it('igualdad exacta de Y: cae en la rama por defecto (arriba), no en la de "debajo"', () => {
+    const puntoObjetivoSvg = { x: 50, y: 150 }
+    const puntoPersonalizadoSvg = { x: 200, y: 150 }
+    expect(etiquetaEleccionVaDebajo(puntoPersonalizadoSvg, puntoObjetivoSvg)).toBe(false)
+  })
+
+  it('la posición en X de ambos puntos nunca influye en la decisión — solo Y', () => {
+    const puntoObjetivoSvg = { x: 999999, y: 50 } // muy arriba, X irrelevante
+    const puntoPersonalizadoSvg = { x: -999999, y: 200 } // muy abajo, X irrelevante
+    expect(etiquetaEleccionVaDebajo(puntoPersonalizadoSvg, puntoObjetivoSvg)).toBe(true)
   })
 })

@@ -46,6 +46,7 @@ import {
   determinarSalidaMotivoConsulta,
   manejarEnvioMotivoConsulta,
   volverALasOpciones,
+  volverDesdeDetencion,
   MENSAJES_DETENCION_MOTIVO_CONSULTA,
   TEXTO_NO_ES_ASESORIA_JURIDICA,
 } from './Objetivo.helpers.js'
@@ -96,12 +97,8 @@ function Objetivo({ motivoConsulta, onCambiarMotivoConsulta, onContinuar, onVolv
     })
   }
 
+  // Botón "Volver a las opciones" de la aclaración.
   function volverAlMotivo() {
-    // Delegado en Objetivo.helpers.js#volverALasOpciones: no limpia
-    // motivoConsulta (por construcción, esa función no recibe su setter) —
-    // la persona vuelve a ver exactamente lo que ya había marcado, para
-    // corregirlo o confirmarlo. Usado por "Volver a las opciones" tanto en
-    // la aclaración como en la detención — misma etiqueta, mismo destino.
     volverALasOpciones(setPasoObjetivo)
   }
 
@@ -112,6 +109,15 @@ function Objetivo({ motivoConsulta, onCambiarMotivoConsulta, onContinuar, onVolv
   const mensajeDetencion = resultadoDetenido.caso
     ? MENSAJES_DETENCION_MOTIVO_CONSULTA[resultadoDetenido.caso]
     : null
+
+  // Botón "Volver a las opciones" de la detención — destino según resultadoDetenido.caso (ver Objetivo.helpers.js).
+  function manejarVolverDesdeDetencion() {
+    volverDesdeDetencion({
+      caso: resultadoDetenido.caso,
+      setPasoObjetivo,
+      onCambiarMotivoConsulta,
+    })
+  }
 
   return (
     <form className="screen screen--objetivo" onSubmit={manejarEnvio} ref={formRef}>
@@ -213,16 +219,9 @@ function Objetivo({ motivoConsulta, onCambiarMotivoConsulta, onContinuar, onVolv
 
           <p className="option__hint">{TEXTO_NO_ES_ASESORIA_JURIDICA}</p>
 
-          {/* Ajuste de UX (2026-09-01): una sola acción de recuperación, no dos.
-              Antes coexistían aquí un "Volver" genérico (a Bienvenida, vía onVolver)
-              y "Corregir mi selección" (local, vía volverAlMotivo) — misma palabra
-              "Volver" que ya significa "ir a la pregunta anterior" en el resto de la
-              app, generando ambigüedad real sobre cuál de los dos botones hacía qué.
-              Se retiró el "Volver" genérico y se renombró la acción restante a
-              "Volver a las opciones" — misma etiqueta y mismo destino que ya usa la
-              aclaración (arriba), sin ambigüedad entre pantallas de esta vista. */}
+          {/* Única acción de recuperación; destino según el caso (manejarVolverDesdeDetencion). */}
           <div className="screen__actions">
-            <button type="button" className="btn btn-secondary" onClick={volverAlMotivo}>
+            <button type="button" className="btn btn-secondary" onClick={manejarVolverDesdeDetencion}>
               Volver a las opciones
             </button>
           </div>

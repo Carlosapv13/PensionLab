@@ -6,6 +6,7 @@ import {
   determinarSalidaMotivoConsulta,
   manejarEnvioMotivoConsulta,
   volverALasOpciones,
+  volverDesdeDetencion,
   MENSAJES_DETENCION_MOTIVO_CONSULTA,
 } from './Objetivo.helpers.js'
 
@@ -227,7 +228,7 @@ describe('manejarEnvioMotivoConsulta — integración mínima con espías (sin D
 // (arriba) ahora invoca `onContinuar` directamente para vejez, sin paso
 // intermedio, y las pruebas de esta suite ya cubren esa garantía completa.
 
-describe('volverALasOpciones — única acción de recuperación (aclaración y detención, ajuste de UX 2026-09-01)', () => {
+describe('volverALasOpciones — botón "Volver a las opciones" de la ACLARACIÓN (siempre vuelve a "motivo")', () => {
   it('invoca el setter de paso exactamente una vez, con "motivo"', () => {
     const setPasoObjetivo = vi.fn()
     volverALasOpciones(setPasoObjetivo)
@@ -248,5 +249,34 @@ describe('volverALasOpciones — única acción de recuperación (aclaración y 
     volverALasOpciones(setPasoObjetivo)
     expect(setPasoObjetivo).toHaveBeenNthCalledWith(1, 'motivo')
     expect(setPasoObjetivo).toHaveBeenNthCalledWith(2, 'motivo')
+  })
+})
+
+describe('volverDesdeDetencion — dos ramas según el caso (PL-250 §15.1)', () => {
+  it('NO_SEGURO_PERSISTE: vuelve a "aclaracion" y limpia esa selección a NO_SEGURO', () => {
+    const setPasoObjetivo = vi.fn()
+    const onCambiarMotivoConsulta = vi.fn()
+    volverDesdeDetencion({ caso: MOTIVO_CONSULTA.NO_SEGURO_PERSISTE, setPasoObjetivo, onCambiarMotivoConsulta })
+    expect(setPasoObjetivo).toHaveBeenCalledWith('aclaracion')
+    expect(onCambiarMotivoConsulta).toHaveBeenCalledWith(MOTIVO_CONSULTA.NO_SEGURO)
+  })
+
+  it.each([
+    MOTIVO_CONSULTA.INCAPACIDAD_LABORAL,
+    MOTIVO_CONSULTA.PROTECCION_FAMILIAR,
+    MOTIVO_CONSULTA.PENSION_YA_RECONOCIDA,
+    MOTIVO_CONSULTA.RECLAMO_O_PROCESO_ACTIVO,
+  ])('%s: vuelve a "motivo" sin tocar motivoConsulta', (caso) => {
+    const setPasoObjetivo = vi.fn()
+    const onCambiarMotivoConsulta = vi.fn()
+    volverDesdeDetencion({ caso, setPasoObjetivo, onCambiarMotivoConsulta })
+    expect(setPasoObjetivo).toHaveBeenCalledWith('motivo')
+    expect(onCambiarMotivoConsulta).not.toHaveBeenCalled()
+  })
+
+  it('caso no reconocido: se trata como un caso directo, vuelve a "motivo"', () => {
+    const setPasoObjetivo = vi.fn()
+    volverDesdeDetencion({ caso: 'valor_no_reconocido', setPasoObjetivo, onCambiarMotivoConsulta: vi.fn() })
+    expect(setPasoObjetivo).toHaveBeenCalledWith('motivo')
   })
 })

@@ -161,19 +161,23 @@ export function manejarEnvioMotivoConsulta({ motivoConsulta, onContinuar, onOrie
   // salida === null (nada seleccionado todavía): ninguna callback se invoca.
 }
 
-/**
- * Transición "Volver a las opciones" — la única acción de recuperación que
- * ofrecen tanto la aclaración como la detención (PL-250, ajuste de UX
- * 2026-09-01: antes la detención ofrecía además un "Volver" genérico a
- * Bienvenida, retirado por ambiguo frente a esta misma etiqueta). Extraída
- * para que su contrato sea verificable sin DOM: recibe únicamente el setter
- * de paso — nunca un setter de `motivoConsulta` — por lo que, por
- * construcción, no puede limpiar la selección ya hecha.
- *
- * @param {(paso: 'motivo') => void} setPasoObjetivo
- */
+// "Volver a las opciones" de la ACLARACIÓN: siempre vuelve a 'motivo', sin
+// tocar motivoConsulta.
 export function volverALasOpciones(setPasoObjetivo) {
   setPasoObjetivo('motivo')
+}
+
+// "Volver a las opciones" de la DETENCIÓN: el destino depende de qué la
+// causó. NO_SEGURO_PERSISTE vuelve a la aclaración (limpiando solo esa
+// respuesta, no el "no estoy seguro" original); cualquier otro caso vuelve
+// al motivo principal sin tocar nada — nunca avanza por sí sola.
+export function volverDesdeDetencion({ caso, setPasoObjetivo, onCambiarMotivoConsulta }) {
+  if (caso === MOTIVO_CONSULTA.NO_SEGURO_PERSISTE) {
+    onCambiarMotivoConsulta(MOTIVO_CONSULTA.NO_SEGURO)
+    setPasoObjetivo('aclaracion')
+  } else {
+    setPasoObjetivo('motivo')
+  }
 }
 
 // Mensajes de remisión — cada caso nombra la situación detectada en lenguaje

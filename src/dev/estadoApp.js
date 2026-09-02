@@ -14,7 +14,13 @@
 // para que un olvido sea visible como un campo faltante, no un error
 // silencioso).
 export const VALORES_POR_DEFECTO = {
-  objetivoSeleccionado: null,
+  // PL-250 Bloque 1 (2026-09-01): motivo de consulta, capturado en
+  // Objetivo.jsx — ver Objetivo.helpers.js#determinarSalidaMotivoConsulta.
+  // `objetivoSeleccionado` ("¿en qué quieres que te ayudemos hoy?") se
+  // retiró del estado activo tras la auditoría de producto: sus dos
+  // opciones habilitadas nunca producían un resultado distinto
+  // (`DECISIÓN_APARENTE`, PL-250 §20).
+  motivoConsulta: null,
   fechaNacimiento: '',
   sexo: null,
   lugarResidencia: null,

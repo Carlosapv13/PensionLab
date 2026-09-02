@@ -94,6 +94,23 @@ describe('validarFixture — campos mínimos según la vista destino', () => {
   })
 })
 
+// Coherencia con Objetivo.jsx/PL-250 (2026-09-01): ninguna fixture de este
+// archivo representa hoy un caso excluido (B-01..B-13) — todas son
+// recorridos de pensión de vejez, aunque su vistaSugerida salte directo a
+// una pantalla posterior a Objetivo.jsx. Sin motivoConsulta: 'vejez'
+// declarado, navegar "Volver" hasta Objetivo.jsx dejaría el motivo en null
+// (su valor por defecto) — "Continuar" aparecería deshabilitado para un
+// caso que en realidad sí es de vejez. Si en el futuro se agrega una
+// fixture que represente un caso excluido, esta prueba deberá excluirla
+// explícitamente, no eliminarse.
+describe('Coherencia de motivoConsulta en fixtures de recorrido de vejez', () => {
+  it('cada fixture declara motivoConsulta: "vejez", para que el estado no quede incoherente al volver a Objetivo.jsx', () => {
+    for (const fixture of FIXTURES) {
+      expect(fixture.datos.motivoConsulta).toBe('vejez')
+    }
+  })
+})
+
 // Parametrizado sobre FIXTURES (no solo el de empleado): ninguna aserción de
 // este bloque depende de valores específicos de un fixture — se generaliza
 // naturalmente a cualquier fixture presente y futuro.

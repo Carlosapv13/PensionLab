@@ -44,7 +44,12 @@ const adaptadorExplicacionDesarrollo = import.meta.env.DEV ? crearAdaptadorExpli
 
 function App() {
   const [vista, setVista] = useState('bienvenida')
-  const [objetivoSeleccionado, setObjetivoSeleccionado] = useState(null)
+  // PL-250 Bloque 1 (2026-09-01): motivo de consulta — decide, junto con
+  // Objetivo.helpers.js#determinarSalidaMotivoConsulta, si el recorrido de
+  // vejez continúa o se detiene con una remisión (B-01/B-02/B-03/B-13 en esta
+  // entrega). Se recalcula siempre desde este valor, nunca se guarda un
+  // booleano de "está detenido" aparte.
+  const [motivoConsulta, setMotivoConsulta] = useState(null)
   const [fechaNacimiento, setFechaNacimiento] = useState('')
   const [sexo, setSexo] = useState(null)
   const [lugarResidencia, setLugarResidencia] = useState(null)
@@ -240,7 +245,7 @@ function App() {
   // ser visible" que src/dev/estadoApp.js: si se agrega un campo nuevo de
   // estado aquí arriba, este objeto debe actualizarse a mano.
   const estadoEditableDev = {
-    objetivoSeleccionado,
+    motivoConsulta,
     fechaNacimiento,
     sexo,
     lugarResidencia,
@@ -271,7 +276,7 @@ function App() {
   }
 
   const settersEstadoEditableDev = {
-    objetivoSeleccionado: setObjetivoSeleccionado,
+    motivoConsulta: setMotivoConsulta,
     fechaNacimiento: setFechaNacimiento,
     sexo: setSexo,
     lugarResidencia: setLugarResidencia,
@@ -345,8 +350,8 @@ function App() {
 
       {vista === 'objetivo' && (
         <Objetivo
-          objetivoSeleccionado={objetivoSeleccionado}
-          onSeleccionarObjetivo={setObjetivoSeleccionado}
+          motivoConsulta={motivoConsulta}
+          onCambiarMotivoConsulta={setMotivoConsulta}
           onContinuar={() => setVista('datosIniciales')}
           onVolver={() => setVista('bienvenida')}
         />
@@ -389,7 +394,6 @@ function App() {
 
       {vista === 'expedientePensional' && (
         <ExpedientePensional
-          objetivoSeleccionado={objetivoSeleccionado}
           fechaNacimiento={fechaNacimiento}
           sexo={sexo}
           lugarResidencia={lugarResidencia}

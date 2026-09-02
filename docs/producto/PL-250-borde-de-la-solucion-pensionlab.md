@@ -1,14 +1,15 @@
 # PL-250 — Borde de la solución y contrato de alcance
 
-**Versión:** 0.4 (borrador para decisión de producto — no congelado, no autoriza implementación)
+**Versión:** 0.5 (borrador para decisión de producto — no congelado)
 **Fecha:** 2026-09-01
 **Categoría documental:** Alcance de producto — borde de la solución
 **Proyecto:** PensionLab
 **Estado:** Borrador para decisión de producto.
 
 Este documento sigue sin estatus de "documento fundacional de la Biblioteca
-de Conocimiento" ni entregable `.docx` asociado. Ninguna sección de diseño
-(§15-§17) autoriza implementación — es diseño documental para discusión.
+de Conocimiento" ni entregable `.docx` asociado. Las secciones de diseño
+(§15-§17) documentan la intención; §20 registra qué de eso ya tiene una
+primera entrega vertical real (código + pruebas) y qué sigue pendiente.
 
 ## Control de versiones
 
@@ -18,6 +19,7 @@ de Conocimiento" ni entregable `.docx` asociado. Ninguna sección de diseño
 | 0.2 | 2026-09-01 | Equipo de producto de PensionLab, con asistencia de Claude (Anthropic) | Renombrado a `PL-250`. Agrega horizonte único (V1/POST-V1/FUERA DE ALCANCE) y distingue cobertura de resolución vs. detección. |
 | 0.3 | 2026-09-01 | Equipo de producto de PensionLab, con asistencia de Claude (Anthropic) | Define tres salidas de control de entrada con falla cerrada real (elimina "continuar bajo advertencia"). Audita los 8 bloqueadores individualmente y propone una divulgación progresiva en dos pasos (Paso A + Paso B, este último como pantalla nueva). Separa horizonte de detección/resolución en las 30 filas. |
 | 0.4 | 2026-09-01 | Equipo de producto de PensionLab, con asistencia de Claude (Anthropic) | Revisión de cierre antes de congelar. (1) Corrige un error de navegación: `trasladoRegimen` se declara en `HistoriaPensional.jsx`, no en `IndiciosRegimenTransicion.jsx` — corregido en la matriz y en §14. (2) Elimina el `Paso B` como pantalla nueva: las cuatro comprobaciones que antes vivían ahí se redistribuyen en pantallas ya existentes (`Objetivo.jsx`, `SituacionPensional.jsx`, `HistorialLaboral.jsx`, `IndiciosRegimenTransicion.jsx`), verificado contra el código real de cada una — camino feliz sin pantallas ni clics de navegación adicionales. (3) Resuelve la contradicción de `B-10` (aparecía en dos lugares a la vez): queda únicamente como pregunta condicional en `IndiciosRegimenTransicion.jsx`. (4) Amplía la redacción de la opción 4 de `Objetivo.jsx` para que cubra `B-13` completo (antes solo cubría "me negaron", dejando "proceso activo" sin mecanismo) — reduce a 4, no 3, los bloqueadores resueltos en la primera pantalla. (5) Agrega secuencia de cierre de V1 en 4 bloques. Verificada la integridad estructural del archivo: título único, versión única, 30 filas de matriz sin duplicados, encabezados únicos. No implementa nada.|
+| 0.5 | 2026-09-01 | Equipo de producto de PensionLab, con asistencia de Claude (Anthropic) | Primera entrega vertical real del Bloque 1 (§17): motivo de consulta en `Objetivo.jsx`, cerrando `B-01`, `B-02`, `B-03` y `B-13`. Agrega §20 con el detalle de implementación, archivos y pruebas. Registra explícitamente por qué `B-03` y `B-13` son opciones separadas (remisiones distintas) y qué queda pendiente del Bloque 1 (régimen especial `B-04`, alto riesgo `B-05`, traslado discutido `B-10`, mensaje `B-12`). **Corrección posterior, misma versión:** la revisión visual de esa entrega encontró que mostrar simultáneamente las 6 opciones de motivo y las 4 de objetivo hacía la pantalla demasiado larga en móvil — se rediseñó como divulgación progresiva en dos pasos dentro de la misma vista (sin pantalla global nueva), aceptando +1 clic de progresión en el camino de vejez; corregida la afirmación de "0 clics adicionales" en §18 (era válida para pantallas, no para clics de progresión dentro de una misma pantalla dividida en pasos). **Segunda corrección posterior, misma versión:** auditoría de extremo a extremo de `objetivoSeleccionado` (el Paso 2) clasificó la pregunta como `DECISIÓN_APARENTE` — sus dos opciones habilitadas nunca producían un resultado distinto. Se eliminó el Paso 2 completo (Alternativa A, sin construir una consecuencia artificial): `Objetivo.jsx` vuelve a una sola pregunta; se retiró `objetivoSeleccionado` de `App.jsx`, `estadoApp.js`, `fixtures.js` y el bloque de resumen en `ExpedientePensional.jsx`; se eliminaron `OPCIONES_OBJETIVO_VEJEZ`/`objetivoEstaDisponible`/`manejarEnvioObjetivo` y sus 15 pruebas; se retiró `.btn-link` de `App.css` sin consumidores. Costo final del camino de vejez: 0 pantallas y 0 clics adicionales frente al `Objetivo.jsx` previo a PL-250 — la única selección nueva y obligatoria es el motivo de consulta, con consecuencia real. Corregida además la afirmación de `docs/producto/oportunidades-futuras.md` sobre qué gobierna el flujo. Sigue como borrador, sin congelar.|
 
 ## Trazabilidad con el resto del proyecto
 
@@ -505,19 +507,36 @@ pregunta condicional en pantalla existente (1), D. solo mensaje (1), E.
 verificaciones de cierre (2).
 
 **Costo neto del control de alcance sobre el camino feliz (persona sin
-ninguna condición especial): 0 pantallas adicionales, 0 clics de navegación
-adicionales.** Se agregan selecciones dentro de pantallas ya existentes:
-+1 en `Objetivo.jsx` (motivo de consulta), +0 en `SituacionPensional.jsx`
-(una opción más dentro del mismo grupo de radios ya obligatorio), +1 en
-`HistorialLaboral.jsx` (nuevo fieldset de alto riesgo), +0 en
-`IndiciosRegimenTransicion.jsx` para quien nunca se trasladó (condicional).
-**Distinción que debe conservarse sin ambigüedad:** son dos cosas distintas
-—0 clics de navegación adicionales (ninguna pantalla ni botón "Continuar"
-nuevo) frente a 2 selecciones adicionales en el camino normal (motivo de
-consulta en `Objetivo.jsx`, actividad de alto riesgo en `HistorialLaboral.jsx`)—
-y no deben fundirse en una sola cifra de "fricción cero".
-Ningún botón "Continuar" nuevo, ninguna pantalla nueva, en ningún punto del
-recorrido de vejez.
+ninguna condición especial), estado final tras la auditoría de
+`objetivoSeleccionado` (§20):** **0 pantallas adicionales y 0 clics
+adicionales** frente al recorrido de `Objetivo.jsx` anterior a PL-250 (el
+que solo preguntaba "¿en qué quieres que te ayudemos hoy?"). Sí existe una
+**nueva selección obligatoria con consecuencia real**: el motivo de
+consulta — reemplaza, no se suma a, la pregunta original, porque esa
+pregunta original resultó ser una `DECISIÓN_APARENTE` (§20) y se retiró.
+
+**Historial de esta cifra, para que quede trazable (no se repite el error de
+declarar una métrica sin haberla verificado dos veces):**
+1. Diseño original (§15.1): se asumió que la pregunta de motivo de consulta
+   podía convivir en la misma pantalla que la pregunta original de objetivo,
+   sin costo adicional — nunca verificado visualmente.
+2. Primera entrega real (§20): la revisión visual mostró que mostrar ambas a
+   la vez (6 + 4 opciones) hacía la pantalla demasiado larga en móvil. Se
+   corrigió con un Paso 2 interno (divulgación progresiva), aceptando +1
+   clic de progresión — una fricción real, pero todavía sobre una pregunta
+   (`objetivoSeleccionado`) cuya utilidad nunca se había auditado.
+3. **Auditoría de extremo a extremo (§20, esta versión):** se encontró que
+   `objetivoSeleccionado` era una `DECISIÓN_APARENTE` — sus dos opciones
+   habilitadas nunca produjeron un recorrido, cálculo, texto u orientación
+   distintos. Se eliminó por completo, sin sustituirla por ninguna
+   consecuencia artificial. El Paso 2 desaparece con ella, y el clic de
+   progresión que costaba también desaparece: `Objetivo.jsx` vuelve a tener
+   una sola pregunta con un solo "Continuar".
+
+Para las demás integraciones de §15 (`B-04` en `SituacionPensional.jsx`,
+`B-05` en `HistorialLaboral.jsx`, `B-10` condicional en
+`IndiciosRegimenTransicion.jsx`), el análisis de §14 sigue vigente sin
+cambios — ninguna de ellas se implementó todavía (§20).
 
 ---
 
@@ -536,3 +555,135 @@ sobre el propio archivo de este documento, que existe un solo título, una
 sola versión vigente, una sola fila de control de cambios por versión, cada
 encabezado principal una sola vez, y las 30 filas de la matriz (`A-01`-`A-16`,
 `B-01`-`B-14`) exactamente una vez cada una.
+
+---
+
+## 20. Implementación real — Bloque 1, primera entrega vertical (v0.5)
+
+Primera entrega de código real de PL-250, dentro del diseño de §15.1: motivo
+de consulta en `Objetivo.jsx`, cerrando `B-01`, `B-02`, `B-03` y `B-13`.
+Régimen especial (`B-04`), alto riesgo (`B-05`), traslado discutido (`B-10`)
+y el mensaje propio de `B-12` **no** se tocaron en esta entrega — siguen
+pendientes del Bloque 1 (§17).
+
+**Por qué `B-03` y `B-13` son opciones separadas, no una sola:** aunque
+ambas terminan en `DETENER_Y_REMITIR`, exigen una remisión distinta. `B-03`
+(pensión ya reconocida, quiere reliquidación) se remite a la entidad que ya
+le reconoció la pensión, sobre la revisión de un derecho ya otorgado. `B-13`
+(negado o trámite/proceso en curso) se remite a hacer seguimiento de un
+trámite que todavía no tiene una decisión firme a su favor. Fusionarlas
+habría producido un mensaje de remisión incorrecto para una de las dos
+situaciones — la separación no es una preferencia de redacción, es un
+requisito de que la remisión sea específica, no genérica (PL-250 §16,
+criterio 7).
+
+### Auditoría de `objetivoSeleccionado` y su eliminación (misma versión 0.5)
+
+La pregunta original de `Objetivo.jsx` ("¿en qué quieres que te ayudemos
+hoy?", campo `objetivoSeleccionado`) se conservó primero como Paso 2, tras
+el motivo de consulta, cuando la revisión visual encontró que mostrar las 6
+opciones de motivo y las 4 de objetivo a la vez hacía la pantalla demasiado
+larga en móvil. Antes de aceptar ese Paso 2 como definitivo, se auditó de
+extremo a extremo: se buscaron todas las lecturas de `objetivoSeleccionado`
+en `src/` (navegación, cálculo, generación de escenarios, textos,
+orientación, resultado final, panel de desarrollo, pruebas).
+
+**Hallazgo:** cero ramificación. Las dos opciones habilitadas
+("Descubrir mis opciones pensionales." / "No estoy seguro, quiero que
+PensionLab me guíe.") llevaban exactamente a la misma vista
+(`DatosIniciales`), el mismo motor, los mismos caminos y los mismos textos
+en todo el recorrido posterior — el único lugar donde el valor influía en
+algo visible era `ExpedientePensional.jsx`, que solo reimprimía el mismo
+texto ya elegido, sin interpretarlo. Clasificación:
+**`DECISIÓN_APARENTE`** — la persona elegía, pero la aplicación hacía
+exactamente lo mismo en ambos casos.
+
+**Decisión de producto: Alternativa A — eliminar el Paso 2**, en vez de
+inventarle una consecuencia artificial (Alternativa B) solo para justificar
+la pregunta — coherente con el Principio 9 del proyecto (generalizar/
+construir solo con evidencia real) y con PL-250 §16 criterio 3 (ninguna
+pregunta se agrega "por si acaso"). `Objetivo.jsx` vuelve a tener una sola
+pregunta — el motivo de consulta — con una sola salida "Continuar" por paso.
+
+### Archivos (estado final de esta entrega)
+
+- **`src/pages/Objetivo.helpers.js`** — catálogo de opciones
+  (`OPCIONES_MOTIVO_CONSULTA`, `OPCIONES_ACLARACION_MOTIVO_CONSULTA`),
+  decisión pura `determinarSalidaMotivoConsulta` (mismo vocabulario de
+  salidas que §4-bis), `manejarEnvioMotivoConsulta` (invoca exactamente una
+  de tres callbacks — extraída para que fuera testeable con espías sin
+  DOM), los mensajes de remisión por caso
+  (`MENSAJES_DETENCION_MOTIVO_CONSULTA`) y el aviso de "no es asesoría
+  jurídica personalizada". `OPCIONES_OBJETIVO_VEJEZ`,
+  `objetivoEstaDisponible` y `manejarEnvioObjetivo` (Paso 2) **se
+  eliminaron** junto con la pregunta que servían.
+- **`src/pages/Objetivo.helpers.test.js`** — 27 pruebas (ver más abajo); se
+  retiraron las 15 que solo probaban el Paso 2 eliminado.
+- **`src/pages/Objetivo.jsx`** — una sola pregunta de motivo de consulta,
+  dentro del mismo `<form>`, sin objetivo ni Paso 2. Estado local
+  `pasoObjetivo` reducido a `'motivo'` | `'aclaracion'` | `'detenido'`.
+  Vejez confirmada invoca `onContinuar` (la prop real que avanza a
+  `DatosIniciales`) directamente, sin paso intermedio.
+- **`src/App.jsx`** — `objetivoSeleccionado`/`setObjetivoSeleccionado`
+  eliminados del estado, de `estadoEditableDev`/`settersEstadoEditableDev`
+  y de las props pasadas a `Objetivo`/`ExpedientePensional`.
+  `motivoConsulta`/`setMotivoConsulta` se mantienen sin cambios.
+- **`src/dev/estadoApp.js`** — `objetivoSeleccionado` eliminado de
+  `VALORES_POR_DEFECTO` (y por lo tanto de `CLAVES_ESTADO_EDITABLE`).
+- **`src/dev/fixtures.js`** — eliminada la línea `objetivoSeleccionado:
+  'Descubrir mis opciones pensionales.'` de las 10 fixtures (las 10 usaban
+  el mismo valor exacto; quitarla no cambia el significado de ninguna).
+- **`src/pages/ExpedientePensional.jsx`** — eliminado el bloque de resumen
+  "Objetivo" (`<h2>` + `<p>{objetivoSeleccionado}</p>`) completo, sin dejar
+  encabezado huérfano. No se sustituyó por `motivoConsulta`: para toda
+  persona que llega a `ExpedientePensional`, el motivo ya es "vejez"
+  (cualquier otro motivo se detiene antes, en `Objetivo.jsx`) — mostrarlo
+  ahí repetiría la misma frase para todas las personas, sin aportar
+  información nueva al resumen.
+- **`src/App.css`** — eliminada la clase `.btn-link` (agregada para el
+  botón "Cambiar" del Paso 2, ya sin ningún consumidor en `src/`,
+  confirmado por búsqueda antes de retirarla).
+
+**Por qué la decisión de alcance nunca queda obsoleta:** `manejarEnvio`
+recalcula `determinarSalidaMotivoConsulta(motivoConsulta)` en cada envío,
+nunca guarda el resultado como una bandera aparte — corregir la selección a
+`vejez` y reenviar recalcula limpio, sin rastro del caso anterior (mismo
+criterio que `tienePrimeraLecturaValor` ya aplica en `App.jsx`). "Volver"
+nunca limpia `motivoConsulta`.
+
+### Pruebas (`Objetivo.helpers.test.js`, 27 casos)
+
+Sobre la capa de decisión pura (sin DOM — el proyecto no tiene
+infraestructura de test de componentes):
+
+- **Decisión (`determinarSalidaMotivoConsulta`, 11 casos):** motivo
+  obligatorio, vejez → `CONTINUAR_FLUJO_VEJEZ`, cada uno de
+  `B-01`/`B-02`/`B-03`/`B-13` → `DETENER_Y_REMITIR` con su caso exacto, que
+  `B-03` y `B-13` nunca comparten valor ni caso, "no estoy seguro" →
+  `ORIENTAR_ANTES_DE_CONTINUAR`, "sigo sin saber" → `DETENER_Y_REMITIR`
+  general, determinismo de la decisión.
+- **Catálogo (6 casos):** integridad de las opciones de motivo y de
+  aclaración, que ningún mensaje sea genérico ni use vocabulario de
+  asesoría jurídica personalizada.
+- **Integración con espías (`manejarEnvioMotivoConsulta`, 10 casos):**
+  vejez es la única entrada, de 8 posibles, que invoca `onContinuar`
+  (exactamente una vez); cada uno de los 4 casos directos y la remisión
+  general **nunca** invocan `onContinuar` (solo `onDetener`); "no estoy
+  seguro" tampoco (solo `onOrientar`); valores inválidos no invocan
+  ninguna callback.
+
+**Nota de alcance de las pruebas:** igual que el resto del proyecto (sin
+`jsdom`/`@testing-library/react`), verifican la **decisión y el cableado de
+callbacks**, no el **renderizado** (radio marcado, foco visible, longitud
+real en móvil). Esos comportamientos requieren la revisión visual pedida
+para esta misma entrega.
+
+### Qué sigue pendiente del Bloque 1
+
+`B-04` (régimen especial, `SituacionPensional.jsx`), `B-05` (alto riesgo,
+`HistorialLaboral.jsx`), `B-10` (traslado discutido, condicional en
+`IndiciosRegimenTransicion.jsx`) y el mensaje propio de `B-12`
+(`SituacionPensional.jsx`) — diseñados en §15.2-15.5, sin ningún código
+todavía. El Bloque 1 (§17) no se considera terminado hasta que los 8
+bloqueadores estructurales de detección (§11) tengan la misma cobertura que
+`B-01`/`B-02`/`B-03`/`B-13` alcanzan en esta entrega.

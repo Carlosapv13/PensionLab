@@ -93,8 +93,13 @@ primera versión de C-v1), sin recurrir a heurísticas de palabras clave o
 conteo que simulen comprensión sin tenerla.
 
 **Decisión actual: no implementar.** No hay todavía un caso de uso concreto
-que dependa de interpretar texto libre — el MVP gobierna el flujo por
-`objetivoSeleccionado`, no por declaración libre.
+que dependa de interpretar texto libre — el control de alcance del MVP lo
+gobierna `motivoConsulta` (ver PL-250), no por declaración libre. **Corrección
+(2026-09-01):** esta sección afirmaba antes que "el MVP gobierna el flujo por
+`objetivoSeleccionado`" — ese campo se eliminó del MVP tras una auditoría de
+extremo a extremo (PL-250 v0.5, `docs/producto/PL-250-borde-de-la-solucion-pensionlab.md`
+§20) que lo clasificó como `DECISIÓN_APARENTE`: sus opciones nunca producían
+un recorrido, cálculo o texto distinto entre sí.
 
 ### 2.2 Comparación de caminos ya conocidos
 
@@ -124,8 +129,11 @@ resultado produce?) en vez de generar o contrastar candidatas.
 contrato para capturar "una estrategia ya decidida" de forma estructurada.
 
 **Condición para revisar 2.1, 2.2 o 2.3:** que aparezca evidencia real de
-que alguien las necesita, no solo la simetría de completar las cuatro
-opciones de `Objetivo.jsx` — mismo Principio 9 ya aplicado en la entrada 1.
+que alguien las necesita, y que su reintroducción produzca una consecuencia
+real (un recorrido, cálculo o texto distinto) — no solo la simetría de
+completar opciones visibles sin comportamiento propio. Mismo Principio 9 ya
+aplicado en la entrada 1, y mismo criterio que llevó a retirar
+`objetivoSeleccionado` en PL-250 v0.5 por ser una `DECISIÓN_APARENTE`.
 
 ---
 

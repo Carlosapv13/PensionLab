@@ -10,6 +10,16 @@
 // Cada `datos` es un subconjunto de CLAVES_ESTADO_EDITABLE (estadoApp.js) —
 // las claves omitidas se resetean a su valor por defecto al cargar (ver
 // aplicarFixture.js), nunca se conserva un residuo de un fixture anterior.
+//
+// `motivoConsulta: 'vejez'` (2026-09-01): todas las fixtures de este archivo
+// representan recorridos de pensión de vejez (RPM/RAIS) — ninguna representa
+// un caso excluido (B-01..B-13, ver Objetivo.helpers.js). Se declara
+// explícitamente en cada una, aunque su `vistaSugerida` salte directo a una
+// pantalla posterior a Objetivo.jsx, para que el estado siga siendo
+// coherente si alguien navega "Volver" hacia atrás hasta esa pantalla: sin
+// este valor, el motivo quedaría en `null` (su valor por defecto) y
+// "Continuar" aparecería deshabilitado para un caso que en realidad sí es de
+// vejez.
 
 /**
  * @typedef {Object} Fixture
@@ -41,7 +51,7 @@ export const FIXTURES = [
     // regimenActual, que este fixture ya declara.
     vistaSugerida: 'queDeterminaResultado',
     datos: {
-      objetivoSeleccionado: 'Descubrir mis opciones pensionales.',
+      motivoConsulta: 'vejez',
       lugarResidencia: 'Colombia',
       cotizaActualmente: 'si',
       sexo: 'Hombre',
@@ -69,7 +79,7 @@ export const FIXTURES = [
     // de cotización"), no solo el base.
     vistaSugerida: 'exploraTuProyeccion',
     datos: {
-      objetivoSeleccionado: 'Descubrir mis opciones pensionales.',
+      motivoConsulta: 'vejez',
       lugarResidencia: 'Colombia',
       cotizaActualmente: 'si',
       sexo: 'Mujer',
@@ -115,7 +125,7 @@ export const FIXTURES = [
     // persona — mismo hallazgo reportado y corregido en la ronda de revisión de este Slice.
     vistaSugerida: 'exploraTuProyeccionRPM',
     datos: {
-      objetivoSeleccionado: 'Descubrir mis opciones pensionales.',
+      motivoConsulta: 'vejez',
       lugarResidencia: 'Colombia',
       cotizaActualmente: 'si',
       sexo: 'Mujer',
@@ -152,7 +162,7 @@ export const FIXTURES = [
     // evaluación por completo (VACIOS_EN_VENTANA_IBL_NO_SOPORTADOS).
     vistaSugerida: 'exploraTuProyeccionRPM',
     datos: {
-      objetivoSeleccionado: 'Descubrir mis opciones pensionales.',
+      motivoConsulta: 'vejez',
       lugarResidencia: 'Colombia',
       cotizaActualmente: 'si',
       sexo: 'Hombre',
@@ -184,7 +194,7 @@ export const FIXTURES = [
     // revisar esta pantalla manualmente.
     vistaSugerida: 'proyectaTuPensionRPM',
     datos: {
-      objetivoSeleccionado: 'Descubrir mis opciones pensionales.',
+      motivoConsulta: 'vejez',
       lugarResidencia: 'Colombia',
       cotizaActualmente: 'si',
       sexo: 'Hombre',
@@ -228,7 +238,7 @@ export const FIXTURES = [
     // alcance para ejercitar realmente 'sin_margen'/SIN_MARGEN_TOPE_LEGAL.
     vistaSugerida: 'proyectaTuPensionRPM',
     datos: {
-      objetivoSeleccionado: 'Descubrir mis opciones pensionales.',
+      motivoConsulta: 'vejez',
       lugarResidencia: 'Colombia',
       cotizaActualmente: 'si',
       sexo: 'Hombre',
@@ -285,7 +295,7 @@ export const FIXTURES = [
     //      error_proveedor / TIMEOUT, simula una falla del proveedor.
     vistaSugerida: 'declaracionLibre',
     datos: {
-      objetivoSeleccionado: 'Descubrir mis opciones pensionales.',
+      motivoConsulta: 'vejez',
       lugarResidencia: 'Colombia',
       cotizaActualmente: 'si',
       sexo: 'Hombre',
@@ -332,7 +342,7 @@ export const FIXTURES = [
     //       pedir nada estructurado.
     vistaSugerida: 'declaracionLibre',
     datos: {
-      objetivoSeleccionado: 'Descubrir mis opciones pensionales.',
+      motivoConsulta: 'vejez',
       lugarResidencia: 'Colombia',
       cotizaActualmente: 'si',
       sexo: 'Hombre',
@@ -374,7 +384,7 @@ export const FIXTURES = [
     // indicios de régimen de transición".
     vistaSugerida: 'indiciosTransicion',
     datos: {
-      objetivoSeleccionado: 'Descubrir mis opciones pensionales.',
+      motivoConsulta: 'vejez',
       lugarResidencia: 'Colombia',
       cotizaActualmente: 'si',
       sexo: 'Hombre',
@@ -424,7 +434,7 @@ export const FIXTURES = [
     // en "Explorar este esfuerzo".
     vistaSugerida: 'proyectaTuPensionRPM',
     datos: {
-      objetivoSeleccionado: 'Descubrir mis opciones pensionales.',
+      motivoConsulta: 'vejez',
       lugarResidencia: 'Exterior',
       cotizaActualmente: 'si',
       sexo: 'Hombre',

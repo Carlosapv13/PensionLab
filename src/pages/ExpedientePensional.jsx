@@ -53,7 +53,6 @@ function formatearFecha(fecha) {
 
 /**
  * @param {Object} props
- * @param {string | null} props.objetivoSeleccionado
  * @param {string} props.fechaNacimiento
  * @param {string | null} props.sexo
  * @param {string | null} props.lugarResidencia
@@ -65,7 +64,6 @@ function formatearFecha(fecha) {
  * @param {() => void} props.onVolver
  */
 function ExpedientePensional({
-  objetivoSeleccionado,
   fechaNacimiento,
   sexo,
   lugarResidencia,
@@ -103,11 +101,6 @@ function ExpedientePensional({
       </p>
 
       <div className="summary">
-        <section className="summary__block">
-          <h2 className="summary__block-title">Objetivo</h2>
-          <p>{objetivoSeleccionado}</p>
-        </section>
-
         <section className="summary__block">
           <h2 className="summary__block-title">Datos personales</h2>
           <p>Fecha de nacimiento: {formatearFecha(fechaNacimiento)}</p>

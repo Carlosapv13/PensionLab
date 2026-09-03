@@ -6,7 +6,6 @@ import Objetivo from './pages/Objetivo.jsx'
 import DatosIniciales from './pages/DatosIniciales.jsx'
 import SituacionPensional from './pages/SituacionPensional.jsx'
 import HistorialLaboral from './pages/HistorialLaboral.jsx'
-import ExpedientePensional from './pages/ExpedientePensional.jsx'
 import CompletarExpediente from './pages/CompletarExpediente.jsx'
 import InformacionPensionalEsencial from './pages/InformacionPensionalEsencial.jsx'
 import HistoriaPensional from './pages/HistoriaPensional.jsx'
@@ -387,30 +386,21 @@ function App() {
           onCambiarLugarCotizacion={actualizarLugarCotizacion}
           cotizaActualmente={cotizaActualmente}
           onCambiarCotizaActualmente={setCotizaActualmente}
-          onContinuar={() => setVista('expedientePensional')}
+          onContinuar={() => setVista('completarExpediente')}
           onVolver={() => setVista('situacionPensional')}
         />
       )}
 
-      {vista === 'expedientePensional' && (
-        <ExpedientePensional
-          fechaNacimiento={fechaNacimiento}
-          sexo={sexo}
-          lugarResidencia={lugarResidencia}
-          regimenActual={regimenActual}
-          tipoCotizante={tipoCotizante}
-          lugarCotizacion={lugarCotizacion}
-          cotizaActualmente={cotizaActualmente}
-          onComenzarExpediente={() => setVista('completarExpediente')}
-          onVolver={() => setVista('historialLaboral')}
-        />
-      )}
-
+      {/* ExpedientePensional.jsx se eliminó (2026-09-02, feedback de usuaria real): era una
+          introducción sin datos, decisiones ni función técnica indispensable, seguida
+          inmediatamente por otra introducción (CompletarExpediente.jsx) — dos pantallas
+          consecutivas sin ninguna decisión real entre ellas. Su contenido útil (qué sigue, para
+          qué, que se avanza paso a paso) ya vive en CompletarExpediente.jsx. */}
       {vista === 'completarExpediente' && (
         <CompletarExpediente
           infoEsencialCompletada={infoEsencialCompletada}
           onContinuar={() => setVista('informacionPensional')}
-          onVolver={() => setVista('expedientePensional')}
+          onVolver={() => setVista('historialLaboral')}
         />
       )}
 

@@ -1058,12 +1058,6 @@
   color: var(--text-h);
 }
 
-.badge--siguiente {
-  background: var(--accent);
-  color: #fff;
-  font-weight: 600;
-}
-
 .visually-hidden {
   position: absolute;
   width: 1px;

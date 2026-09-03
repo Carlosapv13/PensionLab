@@ -606,7 +606,7 @@ function ProyectaTuPensionRPM({
             </div>
             <div className="screen__actions">
               <button type="button" className="btn btn-secondary" onClick={onProfundizarHistoria}>
-                Completar mi historia de cotización
+                Agregar períodos de mi historia de cotización
               </button>
             </div>
           </>
@@ -792,7 +792,7 @@ function ProyectaTuPensionRPM({
           {historiaCotizacion.length === 0 && (
             <div className="screen__actions">
               <button type="button" className="btn btn-secondary" onClick={onProfundizarHistoria}>
-                Completar mi historia de cotización
+                Agregar períodos de mi historia de cotización
               </button>
             </div>
           )}

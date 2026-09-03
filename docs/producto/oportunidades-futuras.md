@@ -374,7 +374,7 @@ una fotografía sin proyección a la edad objetivo) ya no es parte del recorrido
 principal: UX-RPM-01 lleva del `BaseCotizacion` directo a `ProyectaTuPensionRPM`
 (ver comentario de cabecera de esa pantalla) y la única puerta de entrada real
 que le queda a `ExploraTuProyeccionRPM` es la profundización opcional de
-historia ("Completar mi historia de cotización", vía `HistoriaCotizacionRPM.jsx`
+historia ("Agregar períodos de mi historia de cotización", vía `HistoriaCotizacionRPM.jsx`
 → `ExploraTuProyeccionRPM.jsx` → vuelta a `ProyectaTuPensionRPM.jsx`). Con
 `ProyectaTuPensionRPM.jsx` ya proyectando a la edad objetivo con la historia
 disponible (parcial o vía declaración agregada, contrato GO-B), cabe preguntarse

@@ -69,7 +69,6 @@ export const VISTAS_CONOCIDAS = [
   'datosIniciales',
   'situacionPensional',
   'historialLaboral',
-  'expedientePensional',
   'completarExpediente',
   'informacionPensional',
   'historiaPensional',

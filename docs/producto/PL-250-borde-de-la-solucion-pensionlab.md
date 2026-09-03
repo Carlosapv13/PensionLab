@@ -1,7 +1,7 @@
 # PL-250 — Borde de la solución y contrato de alcance
 
-**Versión:** 0.5 (borrador para decisión de producto — no congelado)
-**Fecha:** 2026-09-01
+**Versión:** 0.6 (borrador para decisión de producto — no congelado)
+**Fecha:** 2026-09-02
 **Categoría documental:** Alcance de producto — borde de la solución
 **Proyecto:** PensionLab
 **Estado:** Borrador para decisión de producto.
@@ -20,6 +20,7 @@ primera entrega vertical real (código + pruebas) y qué sigue pendiente.
 | 0.3 | 2026-09-01 | Equipo de producto de PensionLab, con asistencia de Claude (Anthropic) | Define tres salidas de control de entrada con falla cerrada real (elimina "continuar bajo advertencia"). Audita los 8 bloqueadores individualmente y propone una divulgación progresiva en dos pasos (Paso A + Paso B, este último como pantalla nueva). Separa horizonte de detección/resolución en las 30 filas. |
 | 0.4 | 2026-09-01 | Equipo de producto de PensionLab, con asistencia de Claude (Anthropic) | Revisión de cierre antes de congelar. (1) Corrige un error de navegación: `trasladoRegimen` se declara en `HistoriaPensional.jsx`, no en `IndiciosRegimenTransicion.jsx` — corregido en la matriz y en §14. (2) Elimina el `Paso B` como pantalla nueva: las cuatro comprobaciones que antes vivían ahí se redistribuyen en pantallas ya existentes (`Objetivo.jsx`, `SituacionPensional.jsx`, `HistorialLaboral.jsx`, `IndiciosRegimenTransicion.jsx`), verificado contra el código real de cada una — camino feliz sin pantallas ni clics de navegación adicionales. (3) Resuelve la contradicción de `B-10` (aparecía en dos lugares a la vez): queda únicamente como pregunta condicional en `IndiciosRegimenTransicion.jsx`. (4) Amplía la redacción de la opción 4 de `Objetivo.jsx` para que cubra `B-13` completo (antes solo cubría "me negaron", dejando "proceso activo" sin mecanismo) — reduce a 4, no 3, los bloqueadores resueltos en la primera pantalla. (5) Agrega secuencia de cierre de V1 en 4 bloques. Verificada la integridad estructural del archivo: título único, versión única, 30 filas de matriz sin duplicados, encabezados únicos. No implementa nada.|
 | 0.5 | 2026-09-01 | Equipo de producto de PensionLab, con asistencia de Claude (Anthropic) | Primera entrega vertical real del Bloque 1 (§17): motivo de consulta en `Objetivo.jsx`, cerrando `B-01`, `B-02`, `B-03` y `B-13`. Agrega §20 con el detalle de implementación, archivos y pruebas. Registra explícitamente por qué `B-03` y `B-13` son opciones separadas (remisiones distintas) y qué queda pendiente del Bloque 1 (régimen especial `B-04`, alto riesgo `B-05`, traslado discutido `B-10`, mensaje `B-12`). **Corrección posterior, misma versión:** la revisión visual de esa entrega encontró que mostrar simultáneamente las 6 opciones de motivo y las 4 de objetivo hacía la pantalla demasiado larga en móvil — se rediseñó como divulgación progresiva en dos pasos dentro de la misma vista (sin pantalla global nueva), aceptando +1 clic de progresión en el camino de vejez; corregida la afirmación de "0 clics adicionales" en §18 (era válida para pantallas, no para clics de progresión dentro de una misma pantalla dividida en pasos). **Segunda corrección posterior, misma versión:** auditoría de extremo a extremo de `objetivoSeleccionado` (el Paso 2) clasificó la pregunta como `DECISIÓN_APARENTE` — sus dos opciones habilitadas nunca producían un resultado distinto. Se eliminó el Paso 2 completo (Alternativa A, sin construir una consecuencia artificial): `Objetivo.jsx` vuelve a una sola pregunta; se retiró `objetivoSeleccionado` de `App.jsx`, `estadoApp.js`, `fixtures.js` y el bloque de resumen en `ExpedientePensional.jsx`; se eliminaron `OPCIONES_OBJETIVO_VEJEZ`/`objetivoEstaDisponible`/`manejarEnvioObjetivo` y sus 15 pruebas; se retiró `.btn-link` de `App.css` sin consumidores. Costo final del camino de vejez: 0 pantallas y 0 clics adicionales frente al `Objetivo.jsx` previo a PL-250 — la única selección nueva y obligatoria es el motivo de consulta, con consecuencia real. Corregida además la afirmación de `docs/producto/oportunidades-futuras.md` sobre qué gobierna el flujo. **Tercera corrección, misma versión:** se precisó §15.1 (el límite de "tercer intento" es sobre avance automático/silencioso, no sobre corrección voluntaria) y se implementó `volverDesdeDetencion` con sus dos ramas. Sigue como borrador, sin congelar.|
+| 0.6 | 2026-09-02 | Equipo de producto de PensionLab, con asistencia de Claude (Anthropic) | Sincronización de §13 con feedback de usuaria real (Yenny), ajeno al alcance de este documento: `expedientePensional` (pantalla 6) se retiró del recorrido — era una introducción sin datos, decisiones ni función técnica indispensable, seguida inmediatamente de otra introducción (`completarExpediente`, pantalla 7) sin ninguna decisión real entre ambas. `ExpedientePensional.jsx` se eliminó; su contenido útil se fusionó en `CompletarExpediente.jsx`; `historialLaboral.onContinuar` navega ahora directo a `completarExpediente`. La numeración de §13 se conserva sin renumerar (pantallas 7-12 mantienen su número) para no invalidar las referencias a "pantalla 9"/"pantalla 11" ya citadas en §0 y en la matriz de §14. No cambia ninguna decisión de alcance, matriz de bloqueadores ni diseño de §15-§17.|
 
 ## Trazabilidad con el resto del proyecto
 
@@ -257,7 +258,12 @@ principales, antes de llegar a `baseCotizacion`:
 4. `situacionPensional` — `SituacionPensional.jsx` (`regimenActual`)
 5. `historialLaboral` — `HistorialLaboral.jsx` (`tipoCotizante`,
    `lugarCotizacion`, `cotizaActualmente`)
-6. `expedientePensional` — `ExpedientePensional.jsx`
+6. *(retirada 2026-09-02 — ver v0.6 en Control de versiones)* `expedientePensional` —
+   `ExpedientePensional.jsx` se eliminó: introducción sin datos, decisiones ni función técnica
+   indispensable, seguida inmediatamente de otra introducción (pantalla 7) sin decisión real
+   entre ambas (feedback de usuaria real). Su contenido útil se fusionó en `completarExpediente`.
+   `historialLaboral.onContinuar` navega ahora directo a la pantalla 7. Numeración conservada
+   sin renumerar — ver nota bajo esta lista.
 7. `completarExpediente` — `CompletarExpediente.jsx`
 8. `informacionPensional` — `InformacionPensionalEsencial.jsx`
 9. `historiaPensional` — `HistoriaPensional.jsx` (**aquí se declara
@@ -274,6 +280,13 @@ seguía siendo correcta en cuanto a *dónde* debía vivir el seguimiento de
 disputa (pantalla 11, condicional), pero la descripción de dónde vive la
 pregunta base estaba equivocada. Ya corregida en la matriz (§8) y en esta
 sección.
+
+**Por qué la pantalla 6 se marca retirada en vez de renumerar la lista (v0.6):**
+renumerar habría obligado a actualizar cada referencia a "pantalla 9" y
+"pantalla 11" ya citada en §0 (v0.4) y en la matriz de §14/§8 (`B-10`) — un
+cambio de mayor superficie y riesgo que la sincronización puntual que motivó
+esta revisión. Los números de pantalla de esta lista identifican una posición
+histórica verificada, no un índice que deba recalcularse ante cada retiro.
 
 ---
 

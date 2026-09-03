@@ -41,29 +41,67 @@ function textoRangoPeriodo(periodo) {
   return `${periodo.fechaDesde} – ${hasta} · ${formatearPesos(periodo.ibc)}`
 }
 
-const TEXTO_INVITACION_GENERICA =
-  'Si tienes más historia disponible, agregarla puede ayudarte a acceder a una alternativa de ' +
-  'cálculo más favorable.'
+// Jerarquía visual (revisión de usuaria real, 2026-09-02): solo instrucción principal + nota
+// breve quedan visibles antes de la lista; el resto vive dentro del <details>, organizado en
+// dos subtítulos no interactivos ("Cómo completarla" / "Cómo usa PensionLab esta información").
+const TEXTO_INSTRUCCION_PRINCIPAL =
+  'Agrega un período por cada tramo continuo en el que cotizaste con la misma base de ' +
+  'cotización (IBC), es decir, el ingreso reportado para calcular tus aportes. Si cambió tu ' +
+  'IBC, crea otro período. No incluyas los meses o años en los que no cotizaste.'
 
-// Capa 2 de la UX progresiva (revisión de S4-001): el texto cambia según el indicio ya
-// evaluado, nunca según un cálculo — 'indicio_probable' se basa en lo declarado, no en la
-// historia estructurada (ver evidenciaIndicioVidaLaboral.js).
+const TEXTO_NOTA_SECUNDARIA =
+  'Estos son aportes que ya realizaste; no estás creando aportes nuevos, adicionales ni voluntarios.'
+
+const TEXTO_AYUDA_HISTORIA_OFICIAL =
+  'Si tienes a la mano tu historia laboral de Colpensiones o de tu fondo privado, puedes ' +
+  'consultarla para identificar fechas e IBC con precisión.'
+
+const TEXTO_AYUDA_HISTORIA_PARCIAL =
+  'Puedes comenzar con los períodos que ya conozcas — no hace falta que tengas toda tu historia lista.'
+
+const TEXTO_AYUDA_HUECOS =
+  'Los intervalos en los que no cotizaste no se agregan como período: su ausencia ya representa ese hueco.'
+
+const TEXTO_AYUDA_INFORMACION_INSUFICIENTE =
+  'Si la información que agregues no alcanza para estimar tu pensión con precisión, PensionLab te lo indicará.'
+
+// Condensa Art. 21 Ley 100 de 1993 + convención de 3.650 días (ver trazabilidad-normativa.md)
+// en un solo párrafo, sin repetir la instrucción principal.
+const TEXTO_LEGAL_VENTANA_FECHAS =
+  'La ley (Art. 21, Ley 100 de 1993) usa como referencia los 10 años anteriores al momento en ' +
+  'que te reconozcan la pensión — una fecha futura que hoy no podemos calcular sin inventar ' +
+  'datos. Por eso esta lectura usa tus últimos años efectivamente cotizados, contados hacia ' +
+  'atrás desde hoy: es un punto de partida honesto, no tu resultado final. Para saber cuándo ' +
+  'esos años se completan usamos 3.650 días de cotización efectiva (el equivalente a 10 años) ' +
+  '— una convención técnica propia de PensionLab, respaldada por un caso real de la Corte ' +
+  'Suprema de Justicia. Si tu historia tiene interrupciones, retrocedemos más atrás en el ' +
+  'tiempo para completarlos.'
+
+const TEXTO_REGLA_1250_SEMANAS =
+  'Si tienes 1.250 semanas o más cotizadas en total, puede existir la opción de comparar el ' +
+  'promedio de los últimos 10 años con el de toda tu vida laboral y usar el que resulte más ' +
+  'favorable. Por eso agregar más historia puede cambiar el resultado.'
+
+// Solo se llama con indicio.estado === 'indicio_probable' (ver guarda de render, más abajo) —
+// la rama genérica que existía aquí (TEXTO_INVITACION_GENERICA) se eliminó por
+// inalcanzable: repetía TEXTO_REGLA_1250_SEMANAS sin aportar nada nuevo (2026-09-02).
 function textoInvitacionVidaLaboral(indicio) {
-  if (indicio.estado === 'indicio_probable') {
-    return (
-      `Nos dijiste antes que tienes aproximadamente ${indicio.semanasDeclaradas} semanas cotizadas — ` +
-      'si agregas tu historia más allá de estos 10 años, podríamos confirmar si calificas para una ' +
-      'alternativa de cálculo que la ley permite cuando resulta más favorable.'
-    )
-  }
-  return TEXTO_INVITACION_GENERICA
+  return (
+    `Nos dijiste antes que tienes aproximadamente ${indicio.semanasDeclaradas} semanas cotizadas — ` +
+    'si agregas tu historia más allá de estos 10 años, podríamos confirmar si calificas para una ' +
+    'alternativa de cálculo que la ley permite cuando resulta más favorable.'
+  )
 }
 
-// Capa 3, solo si trasladoRegimen === 'si' — ver bloqueo §8.9 del Entregable 2 y
-// src/data/legal/trazabilidad-normativa.md ("Traslado de régimen (RAIS→RPM) e IBL").
-const TEXTO_ADVERTENCIA_TRASLADO =
-  'Como te trasladaste de régimen: todavía no podemos confirmar cómo debe tratarse tu historia ' +
-  'previa al traslado en este cálculo. Puedes agregarla igual — lo explicamos abajo.'
+// Advertencia + fundamento legal de traslado fusionados en una sola redacción (antes
+// duplicados entre un aviso corto y el detalle normativo) — ver §8.9 del Entregable 2 y
+// trazabilidad-normativa.md. Se renderiza solo si trasladoRegimen === 'si'.
+const TEXTO_TRASLADO_REGIMEN =
+  'Como te trasladaste de régimen: el tiempo cotizado en tu régimen anterior sí tiene respaldo ' +
+  'legal para reconocerse (Decreto 3800 de 2003, Art. 3), pero ninguna fuente que consultamos ' +
+  'resuelve cómo debe tratarse el valor económico de esa historia previa al traslado en este ' +
+  'cálculo. Puedes agregarla igual: la tratamos igual que el resto de tu historia, sin que eso ' +
+  'sea una afirmación de que así debe calcularse legalmente en tu caso.'
 
 /**
  * @param {Object} props
@@ -89,6 +127,10 @@ function HistoriaCotizacionRPM({
   const indicioVidaLaboral = evaluarIndicioVidaLaboral({ regimenActual, nivelConocimientoSemanas, semanasCotizadas })
   const [borrador, setBorrador] = useState(borradorVacio())
   const [intentoAgregar, setIntentoAgregar] = useState(false)
+  // Confirmación accesible tras agregar/quitar un período (feedback de usuaria real,
+  // 2026-09-02) — estado local simple, sin arquitectura nueva; se limpia al quitar un
+  // período para no dejar un mensaje de "agregaste X" sobre una lista que ya cambió.
+  const [mensajeConfirmacion, setMensajeConfirmacion] = useState(null)
 
   const evaluacion = evaluarNuevoPeriodo(borrador)
 
@@ -109,7 +151,9 @@ function HistoriaCotizacionRPM({
       setIntentoAgregar(true)
       return
     }
-    onCambiarHistoriaCotizacion([...historiaCotizacion, construirPeriodoCotizacion(evaluacion)])
+    const nuevoPeriodo = construirPeriodoCotizacion(evaluacion)
+    onCambiarHistoriaCotizacion([...historiaCotizacion, nuevoPeriodo])
+    setMensajeConfirmacion(`Agregaste el período ${textoRangoPeriodo(nuevoPeriodo)}.`)
     setBorrador(borradorVacio())
     setIntentoAgregar(false)
   }
@@ -126,6 +170,7 @@ function HistoriaCotizacionRPM({
 
   function manejarQuitarPeriodo(indice) {
     onCambiarHistoriaCotizacion(historiaCotizacion.filter((_, i) => i !== indice))
+    setMensajeConfirmacion(null)
   }
 
   const campoIbc = useCampoMonetario(borrador.ibc, (valor) => actualizarBorrador({ ibc: valor }))
@@ -142,76 +187,30 @@ function HistoriaCotizacionRPM({
     <form className="screen" onSubmit={manejarEnvio} ref={formRef}>
       <h1 className="screen__title screen__title--historia-cotizacion-rpm">Tu historia de cotización</h1>
 
-      {/* Nota de preparación (hallazgo de revisión manual de S4-001): ayuda a que la persona
-          sepa, antes de empezar a capturar, que puede apoyarse en un documento oficial —
-          nunca lo convierte en requisito: "puedes continuar igual" cierra la frase a propósito. */}
-      <p className="screen__subtitle screen__subtitle--secundario">
-        Si tienes a la mano tu historia laboral de Colpensiones o de tu fondo privado, este es un
-        buen momento para consultarla — te ayuda a identificar fechas e IBC con precisión. Si no la
-        tienes, puedes continuar igual con lo que ya conoces.
-      </p>
+      <p className="screen__subtitle">{TEXTO_INSTRUCCION_PRINCIPAL}</p>
+      <p className="screen__subtitle screen__subtitle--secundario">{TEXTO_NOTA_SECUNDARIA}</p>
 
-      {/* Capa 1 — mensaje principal corto. Desde el Slice correctivo de la ventana del IBL
-          (2026-08-19) ya no anunciamos un rango de fechas fijo: PensionLab retrocede
-          automáticamente en la historia declarada para completarlo, así que no hay un
-          "hasta aquí" que la persona deba adivinar ni cubrir sin huecos. No afirma que esta
-          sea la ventana jurídicamente definitiva para su pensión futura — eso se explica en
-          la Capa 4, no aquí. */}
-      <p className="screen__subtitle">
-        Para tu primera lectura, agrega los períodos de cotización que conozcas. No hace falta que
-        cubran exactamente los últimos 10 años ni que estén sin huecos — si tuviste una
-        interrupción, simplemente no agregues un período para ese tramo: PensionLab retrocederá en
-        tu historia lo que haga falta para completar el cálculo. Tampoco es necesario que tengas el
-        resto de tu historia lista — puedes continuar con lo que ya tengas.
-      </p>
-
-      {/* Capa 2 — invitación a más historia, condicionada al indicio declarado, no genérica. */}
-      <p className="screen__subtitle screen__subtitle--secundario">{textoInvitacionVidaLaboral(indicioVidaLaboral)}</p>
-
-      {/* Capa 3 — advertencia de traslado, breve, solo si aplica. */}
-      {trasladoRegimen === 'si' && (
-        <div className="field__warning">
-          <p>{TEXTO_ADVERTENCIA_TRASLADO}</p>
-        </div>
-      )}
-
-      {/* Capa 4 — detalle normativo, colapsado por defecto (mismo patrón que "Ver fundamento
-          legal" en BaseCotizacion.jsx). Aquí vive toda la precisión jurídica, no en el mensaje
-          principal. */}
       <details className="legal-detail">
-        <summary>¿Por qué estas fechas, y por qué esta limitación?</summary>
-        <p>
-          La ley (Art. 21, Ley 100 de 1993) usa como referencia los 10 años anteriores al momento
-          en que te reconozcan la pensión — una fecha futura que hoy no podemos calcular sin
-          inventar datos (inflación y salario mínimo futuros). Por eso esta lectura usa tus últimos
-          años efectivamente cotizados, contados hacia atrás desde hoy: es un punto de partida
-          honesto, no tu resultado final.
-        </p>
-        <p>
-          Para saber cuándo esos años se completan usamos 3.650 días de cotización efectiva (el
-          equivalente a 10 años) — una convención técnica propia de PensionLab, respaldada por un
-          caso real de la Corte Suprema de Justicia, no una cifra que la ley fije expresamente. Si
-          tu historia tiene interrupciones, retrocedemos más atrás en el tiempo para completarlos,
-          en vez de exigir que esos años estén cubiertos sin huecos.
-        </p>
-        <p>
-          Si acumulas 1250 semanas o más en total (no solo en los últimos 10 años), la ley te
-          permite optar por el promedio de toda tu vida laboral si resulta más favorable —
-          por eso puede convenirte agregar más historia de la estrictamente necesaria.
-        </p>
-        {trasladoRegimen === 'si' && (
-          <p>
-            Sobre tu traslado de régimen: el tiempo cotizado en tu régimen anterior sí tiene
-            respaldo legal para reconocerse (Decreto 3800 de 2003, Art. 3), pero ninguna fuente
-            que consultamos resuelve cómo debe tratarse el valor económico de esa historia previa
-            dentro de este cálculo. No la estamos incluyendo ni excluyendo con una regla propia:
-            si la agregas, se tratará igual que el resto, sin que eso sea una afirmación de que
-            así debe calcularse legalmente en tu caso.
-          </p>
-        )}
+        <summary>¿Necesitas ayuda para completar tu historia?</summary>
+
+        <p className="insight__label">Cómo completarla</p>
+        <p>{TEXTO_AYUDA_HISTORIA_OFICIAL}</p>
+        <p>{TEXTO_AYUDA_HISTORIA_PARCIAL}</p>
+        <p>{TEXTO_AYUDA_HUECOS}</p>
+        <p>{TEXTO_AYUDA_INFORMACION_INSUFICIENTE}</p>
+
+        <p className="insight__label">Cómo usa PensionLab esta información</p>
+        <p>{TEXTO_LEGAL_VENTANA_FECHAS}</p>
+        <p>{TEXTO_REGLA_1250_SEMANAS}</p>
+        {indicioVidaLaboral.estado === 'indicio_probable' && <p>{textoInvitacionVidaLaboral(indicioVidaLaboral)}</p>}
+        {trasladoRegimen === 'si' && <p>{TEXTO_TRASLADO_REGIMEN}</p>}
       </details>
 
-      {historiaCotizacion.length > 0 && (
+      {historiaCotizacion.length === 0 ? (
+        <p className="screen__subtitle screen__subtitle--secundario">
+          Todavía no has agregado ningún período. Agrega abajo los tramos de tiempo en los que sí cotizaste.
+        </p>
+      ) : (
         <ul className="checklist">
           {historiaCotizacion.map((periodo, indice) => (
             <li className="checklist__item" key={`${periodo.fechaDesde}-${indice}`}>
@@ -222,6 +221,12 @@ function HistoriaCotizacionRPM({
             </li>
           ))}
         </ul>
+      )}
+
+      {mensajeConfirmacion && (
+        <p className="screen__subtitle screen__subtitle--secundario" role="status">
+          {mensajeConfirmacion}
+        </p>
       )}
 
       <fieldset className="field-group" onKeyDown={manejarEnterEnBorrador}>

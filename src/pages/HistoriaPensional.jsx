@@ -8,9 +8,6 @@
 import { useRef } from 'react'
 import { useRestaurarFocoAlMontar } from '../hooks/useRestaurarFocoAlMontar.js'
 
-const HOY = new Date().toISOString().slice(0, 10)
-const ANIO_ACTUAL = Number(HOY.slice(0, 4))
-
 function textoRegimen(regimenActual) {
   if (regimenActual === 'RPM') return 'Colpensiones'
   if (regimenActual === 'RAIS') return 'un fondo privado'
@@ -44,20 +41,24 @@ function textoComprension(regimenActual, tipoCotizante, nivelConocimientoSemanas
   return `Hasta ahora hemos comprendido que cotizas en ${regimen}, que lo has hecho ${tipo}, y que ${semanas}.`
 }
 
+// Corrección de precisión y confianza (feedback de usuaria real, 2026-09-02): esta pantalla
+// mostraba antes "llevas X años construyendo tu historia pensional", calculado como
+// año_actual − anioInicioCotizacion. Ese número es solo años calendario transcurridos desde
+// un dato autorreportado — nunca semanas o períodos efectivamente cotizados, e insinuaba
+// continuidad que PensionLab no puede confirmar (mismo motivo, ya documentado, por el que
+// src/data/legal/trazabilidad-normativa.md excluye anioInicioCotizacion de cualquier
+// cálculo: "dato autorreportado y sensible a interrupciones laborales"). No se calcula ni
+// se muestra ningún número de años aquí — el dato solo se usa como contexto.
 function textoValorPersonalizado(anioInicioCotizacion) {
   if (anioInicioCotizacion === 'desconocido') {
     return 'No recordar el año exacto no detiene la construcción de tu expediente. Más adelante podremos verificarlo con tu historia laboral oficial.'
   }
 
-  const anios = ANIO_ACTUAL - Number(anioInicioCotizacion)
-
-  if (anios === 0) {
-    return 'Según el año que nos compartiste, comenzaste a construir tu historia pensional este mismo año.'
-  }
-  if (anios === 1) {
-    return 'Según el año que nos compartiste, llevas aproximadamente un año construyendo tu historia pensional.'
-  }
-  return `Según el año que nos compartiste, llevas aproximadamente ${anios} años construyendo tu historia pensional.`
+  return (
+    `Nos indicaste que empezaste a cotizar aproximadamente en ${anioInicioCotizacion}. Esto no significa que ` +
+    'hayas cotizado de forma continua desde entonces — pudiste tener interrupciones. Para evaluar tu situación, ' +
+    'PensionLab usa las semanas y los períodos de cotización que declares, no el tiempo transcurrido desde ese año.'
+  )
 }
 
 function textoOpcionNo(regimenActual) {

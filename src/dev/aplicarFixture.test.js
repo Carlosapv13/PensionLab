@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { validarFixture, aplicarFixture } from './aplicarFixture.js'
-import { CLAVES_ESTADO_EDITABLE, VALORES_POR_DEFECTO } from './estadoApp.js'
+import { CLAVES_ESTADO_EDITABLE, VALORES_POR_DEFECTO, VISTAS_CONOCIDAS } from './estadoApp.js'
 import { FIXTURES } from './fixtures.js'
 
 const FIXTURE_RAIS_EMPLEADO = FIXTURES.find((f) => f.id === 'rais-empleado-colombia')
@@ -103,6 +103,23 @@ describe('validarFixture — campos mínimos según la vista destino', () => {
 // caso que en realidad sí es de vejez. Si en el futuro se agrega una
 // fixture que represente un caso excluido, esta prueba deberá excluirla
 // explícitamente, no eliminarse.
+// Cobertura nueva (2026-09-02, fusión de ExpedientePensional.jsx en CompletarExpediente.jsx):
+// ninguna fixture apuntaba a 'expedientePensional', pero nada lo garantizaba como contrato —
+// esta prueba lo deja explícito y evita que una vista retirada vuelva a colarse en el futuro.
+describe('Coherencia de vistaSugerida en fixtures', () => {
+  it('cada fixture apunta a una vista que sigue existiendo en VISTAS_CONOCIDAS', () => {
+    for (const fixture of FIXTURES) {
+      expect(VISTAS_CONOCIDAS).toContain(fixture.vistaSugerida)
+    }
+  })
+
+  it('ninguna fixture apunta a la vista retirada "expedientePensional"', () => {
+    for (const fixture of FIXTURES) {
+      expect(fixture.vistaSugerida).not.toBe('expedientePensional')
+    }
+  })
+})
+
 describe('Coherencia de motivoConsulta en fixtures de recorrido de vejez', () => {
   it('cada fixture declara motivoConsulta: "vejez", para que el estado no quede incoherente al volver a Objetivo.jsx', () => {
     for (const fixture of FIXTURES) {

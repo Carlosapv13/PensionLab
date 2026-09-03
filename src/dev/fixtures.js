@@ -11,15 +11,15 @@
 // las claves omitidas se resetean a su valor por defecto al cargar (ver
 // aplicarFixture.js), nunca se conserva un residuo de un fixture anterior.
 //
-// `motivoConsulta: 'vejez'` (2026-09-01): todas las fixtures de este archivo
-// representan recorridos de pensión de vejez (RPM/RAIS) — ninguna representa
-// un caso excluido (B-01..B-13, ver Objetivo.helpers.js). Se declara
-// explícitamente en cada una, aunque su `vistaSugerida` salte directo a una
-// pantalla posterior a Objetivo.jsx, para que el estado siga siendo
-// coherente si alguien navega "Volver" hacia atrás hasta esa pantalla: sin
-// este valor, el motivo quedaría en `null` (su valor por defecto) y
-// "Continuar" aparecería deshabilitado para un caso que en realidad sí es de
-// vejez.
+// `motivoConsulta: 'vejez'` (2026-09-01; Objetivo.jsx retirada del recorrido en Bloque 4,
+// 2026-09-03 — motivoConsulta ahora se establece en Bienvenida.jsx, no en una pantalla
+// seleccionable): todas las fixtures de este archivo representan recorridos de pensión de
+// vejez (RPM/RAIS) — ninguna representa un caso fuera de alcance (incapacidad laboral,
+// protección familiar, pensión ya reconocida, reclamo/proceso activo — ver
+// docs/producto/PL-250-borde-de-la-solucion-pensionlab.md). Se declara explícitamente en
+// cada una, aunque su `vistaSugerida` salte directo a una pantalla posterior a Bienvenida,
+// para que el estado siga siendo coherente y trazable como "recorrido de vejez" — mismo
+// criterio que el resto de este archivo: ninguna clave queda en un valor ambiguo o residual.
 
 /**
  * @typedef {Object} Fixture

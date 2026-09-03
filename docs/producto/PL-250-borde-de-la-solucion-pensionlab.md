@@ -1,15 +1,16 @@
 # PL-250 — Borde de la solución y contrato de alcance
 
-**Versión:** 0.6 (borrador para decisión de producto — no congelado)
-**Fecha:** 2026-09-02
+**Versión:** 0.7 (borrador para decisión de producto — no congelado)
+**Fecha:** 2026-09-03
 **Categoría documental:** Alcance de producto — borde de la solución
 **Proyecto:** PensionLab
 **Estado:** Borrador para decisión de producto.
 
 Este documento sigue sin estatus de "documento fundacional de la Biblioteca
 de Conocimiento" ni entregable `.docx` asociado. Las secciones de diseño
-(§15-§17) documentan la intención; §20 registra qué de eso ya tiene una
-primera entrega vertical real (código + pruebas) y qué sigue pendiente.
+(§15-§17) documentan la intención original; §20 registra la primera entrega
+vertical real (`Objetivo.jsx`, luego retirada) y §21 registra su retiro y el
+reemplazo por un control de alcance informativo en `Bienvenida.jsx`.
 
 ## Control de versiones
 
@@ -21,6 +22,7 @@ primera entrega vertical real (código + pruebas) y qué sigue pendiente.
 | 0.4 | 2026-09-01 | Equipo de producto de PensionLab, con asistencia de Claude (Anthropic) | Revisión de cierre antes de congelar. (1) Corrige un error de navegación: `trasladoRegimen` se declara en `HistoriaPensional.jsx`, no en `IndiciosRegimenTransicion.jsx` — corregido en la matriz y en §14. (2) Elimina el `Paso B` como pantalla nueva: las cuatro comprobaciones que antes vivían ahí se redistribuyen en pantallas ya existentes (`Objetivo.jsx`, `SituacionPensional.jsx`, `HistorialLaboral.jsx`, `IndiciosRegimenTransicion.jsx`), verificado contra el código real de cada una — camino feliz sin pantallas ni clics de navegación adicionales. (3) Resuelve la contradicción de `B-10` (aparecía en dos lugares a la vez): queda únicamente como pregunta condicional en `IndiciosRegimenTransicion.jsx`. (4) Amplía la redacción de la opción 4 de `Objetivo.jsx` para que cubra `B-13` completo (antes solo cubría "me negaron", dejando "proceso activo" sin mecanismo) — reduce a 4, no 3, los bloqueadores resueltos en la primera pantalla. (5) Agrega secuencia de cierre de V1 en 4 bloques. Verificada la integridad estructural del archivo: título único, versión única, 30 filas de matriz sin duplicados, encabezados únicos. No implementa nada.|
 | 0.5 | 2026-09-01 | Equipo de producto de PensionLab, con asistencia de Claude (Anthropic) | Primera entrega vertical real del Bloque 1 (§17): motivo de consulta en `Objetivo.jsx`, cerrando `B-01`, `B-02`, `B-03` y `B-13`. Agrega §20 con el detalle de implementación, archivos y pruebas. Registra explícitamente por qué `B-03` y `B-13` son opciones separadas (remisiones distintas) y qué queda pendiente del Bloque 1 (régimen especial `B-04`, alto riesgo `B-05`, traslado discutido `B-10`, mensaje `B-12`). **Corrección posterior, misma versión:** la revisión visual de esa entrega encontró que mostrar simultáneamente las 6 opciones de motivo y las 4 de objetivo hacía la pantalla demasiado larga en móvil — se rediseñó como divulgación progresiva en dos pasos dentro de la misma vista (sin pantalla global nueva), aceptando +1 clic de progresión en el camino de vejez; corregida la afirmación de "0 clics adicionales" en §18 (era válida para pantallas, no para clics de progresión dentro de una misma pantalla dividida en pasos). **Segunda corrección posterior, misma versión:** auditoría de extremo a extremo de `objetivoSeleccionado` (el Paso 2) clasificó la pregunta como `DECISIÓN_APARENTE` — sus dos opciones habilitadas nunca producían un resultado distinto. Se eliminó el Paso 2 completo (Alternativa A, sin construir una consecuencia artificial): `Objetivo.jsx` vuelve a una sola pregunta; se retiró `objetivoSeleccionado` de `App.jsx`, `estadoApp.js`, `fixtures.js` y el bloque de resumen en `ExpedientePensional.jsx`; se eliminaron `OPCIONES_OBJETIVO_VEJEZ`/`objetivoEstaDisponible`/`manejarEnvioObjetivo` y sus 15 pruebas; se retiró `.btn-link` de `App.css` sin consumidores. Costo final del camino de vejez: 0 pantallas y 0 clics adicionales frente al `Objetivo.jsx` previo a PL-250 — la única selección nueva y obligatoria es el motivo de consulta, con consecuencia real. Corregida además la afirmación de `docs/producto/oportunidades-futuras.md` sobre qué gobierna el flujo. **Tercera corrección, misma versión:** se precisó §15.1 (el límite de "tercer intento" es sobre avance automático/silencioso, no sobre corrección voluntaria) y se implementó `volverDesdeDetencion` con sus dos ramas. Sigue como borrador, sin congelar.|
 | 0.6 | 2026-09-02 | Equipo de producto de PensionLab, con asistencia de Claude (Anthropic) | Sincronización de §13 con feedback de usuaria real (Yenny), ajeno al alcance de este documento: `expedientePensional` (pantalla 6) se retiró del recorrido — era una introducción sin datos, decisiones ni función técnica indispensable, seguida inmediatamente de otra introducción (`completarExpediente`, pantalla 7) sin ninguna decisión real entre ambas. `ExpedientePensional.jsx` se eliminó; su contenido útil se fusionó en `CompletarExpediente.jsx`; `historialLaboral.onContinuar` navega ahora directo a `completarExpediente`. La numeración de §13 se conserva sin renumerar (pantallas 7-12 mantienen su número) para no invalidar las referencias a "pantalla 9"/"pantalla 11" ya citadas en §0 y en la matriz de §14. No cambia ninguna decisión de alcance, matriz de bloqueadores ni diseño de §15-§17.|
+| 0.7 | 2026-09-03 | Equipo de producto de PensionLab, con asistencia de Claude (Anthropic) | **Bloque 4 — se retira el control de entrada interactivo** (feedback de usuaria real, Yenny, tras revisión visual del Bloque 3): la divulgación progresiva de dos pasos (v0.7 anterior, revertida) no resolvía el problema de producto — solo escondía las 4 categorías no atendidas detrás de un clic extra, que seguían terminando sin ninguna respuesta de PensionLab. Decisión final: `Objetivo.jsx` (pantalla 2 del recorrido) se elimina por completo, junto con `Objetivo.helpers.js` y sus pruebas — sin consumidores fuera de esa pantalla, confirmado antes de borrar. El control de alcance deja de ser una decisión que la persona toma (radios, "Continuar") y pasa a ser **informativo, no interactivo**: `Bienvenida.jsx` comunica que la única capacidad calculada es la pensión de vejez, nombra los 4 casos no atendidos como una advertencia de exclusión (nunca como opciones seleccionables) y orienta a acudir al fondo de pensiones o a un profesional. El único botón establece `motivoConsulta = 'vejez'` y navega directo a `DatosIniciales` — **0 pantallas y 0 clics** frente al recorrido pre-PL-250 (mejora la cifra de v0.5, que ya estaba en 0 adicionales pero todavía exigía 1 pantalla + 1 clic de `Objetivo.jsx`). `motivoConsulta` se conserva en el estado y en las fixtures (`dev/fixtures.js`) por decisión explícita de producto, aunque hoy ningún cálculo de dominio lo consuma. **Consecuencia que se registra sin suavizar** (§21): la detección de `B-01`/`B-02`/`B-03`/`B-13` deja de ser activa (una pregunta que la persona debe responder) y pasa a ser pasiva (una advertencia que la persona debe leer) — la matriz de §8/§11/§14 describe el mecanismo anterior y queda desactualizada en ese punto específico; no se reescribió la matriz de 30 filas ni la clasificación COMPLETA/PARCIAL de cobertura de detección, que sigue pendiente de una decisión de producto explícita sobre si ese cambio de mecanismo debe reflejarse ahí. No se amplió el alcance funcional: PensionLab sigue calculando únicamente pensión de vejez.|
 
 ## Trazabilidad con el resto del proyecto
 
@@ -166,9 +168,9 @@ tabla).*
 
 | ID | Persona/caso | Horizonte detección | Horizonte resolución | Cobertura detección | Cobertura resolución | Evidencia | Justificación | Prioridad |
 |---|---|---|---|---|---|---|---|---|
-| B-01 | Invalidez | **V1_OBLIGATORIA** | FUERA_DE_ALCANCE_ACTUAL | AUSENTE | FUERA_DE_ALCANCE_ACTUAL | `Objetivo.jsx` no pregunta motivo de consulta | Riesgo directo de dar lectura de vejez a un caso de invalidez | **Alta — bloqueador** |
-| B-02 | Sobrevivientes / sustitución | **V1_OBLIGATORIA** | FUERA_DE_ALCANCE_ACTUAL | AUSENTE | FUERA_DE_ALCANCE_ACTUAL | Ídem | Mismo riesgo | **Alta — bloqueador** |
-| B-03 | Ya pensionado, reliquidación | **V1_OBLIGATORIA** | FUERA_DE_ALCANCE_ACTUAL | AUSENTE | FUERA_DE_ALCANCE_ACTUAL | Sin estado "ya pensionado" en `App.jsx` | Podría recorrer todo el flujo de vejez sin advertencia | **Alta — bloqueador** |
+| B-01 | Invalidez | **V1_OBLIGATORIA** | FUERA_DE_ALCANCE_ACTUAL | AUSENTE (advertencia visible en `Bienvenida.jsx`, no detección — ver nota v0.7 bajo la tabla) | FUERA_DE_ALCANCE_ACTUAL | `Bienvenida.jsx` nombra este caso como exclusión, pero no verifica la respuesta ni bloquea continuar — sin mecanismo de reconocimiento/enrutamiento activo (§4) | Riesgo directo de dar lectura de vejez a un caso de invalidez si la persona ignora la advertencia | **Alta — bloqueador** |
+| B-02 | Sobrevivientes / sustitución | **V1_OBLIGATORIA** | FUERA_DE_ALCANCE_ACTUAL | AUSENTE (advertencia visible, no detección — ídem B-01) | FUERA_DE_ALCANCE_ACTUAL | Ídem | Mismo riesgo | **Alta — bloqueador** |
+| B-03 | Ya pensionado, reliquidación | **V1_OBLIGATORIA** | FUERA_DE_ALCANCE_ACTUAL | AUSENTE (advertencia visible, no detección — ídem B-01) | FUERA_DE_ALCANCE_ACTUAL | Sin estado "ya pensionado" en `App.jsx`; `Bienvenida.jsx` nombra el caso pero no lo verifica | Podría recorrer todo el flujo de vejez sin que el sistema lo confirme | **Alta — bloqueador** |
 | B-04 | Régimen especial/exceptuado | **V1_OBLIGATORIA** | FUERA_DE_ALCANCE_ACTUAL | AUSENTE | FUERA_DE_ALCANCE_ACTUAL | `SituacionPensional.jsx` (`OPCIONES_REGIMEN`) solo admite RPM/RAIS/"no estoy seguro" | Forzado a elegir un régimen que no es el suyo | **Alta — bloqueador** |
 | B-05 | Actividad de alto riesgo | **V1_OBLIGATORIA** | FUERA_DE_ALCANCE_ACTUAL | AUSENTE | FUERA_DE_ALCANCE_ACTUAL | `HistorialLaboral.jsx` no pregunta tipo de actividad | **Puede corromper un cálculo RPM legítimo** (edad mínima real distinta), no solo dejarlo sin detectar | **Alta — bloqueador, el más severo** |
 | B-06 | Convenciones o beneficios especiales | POST_V1_PRIORITARIA | FUERA_DE_ALCANCE_ACTUAL | AUSENTE | FUERA_DE_ALCANCE_ACTUAL | Sin campo relacionado | No invalida el cálculo ordinario — bajo daño si no se detecta | Baja |
@@ -178,7 +180,7 @@ tabla).*
 | B-10 | Traslado de régimen discutido | **V1_OBLIGATORIA** | FUERA_DE_ALCANCE_ACTUAL | AUSENTE (el hecho simple sí se captura; la disputa no) | FUERA_DE_ALCANCE_ACTUAL | `trasladoRegimen` se declara en `HistoriaPensional.jsx` (pantalla 9); `IndiciosRegimenTransicion.jsx` (pantalla 11) recibe ese valor y solo detalla dirección/fecha cuando es `'si'` — la disputa nunca se pregunta; RAIS excluye cualquier traslado; RPM lo captura sin efecto en la fórmula (`RPM-005`) | Ya atraviesa hoy el flujo ordinario y recibe una cifra que ignora la disputa | **Alta — bloqueador** |
 | B-11 | Bono pensional controvertido | POST_V1_PRIORITARIA | FUERA_DE_ALCANCE_ACTUAL | AUSENTE | FUERA_DE_ALCANCE_ACTUAL | Bono pensional ya declarado como limitación general en 5+ archivos | La limitación general ya cubre el caso con honestidad suficiente | Baja |
 | B-12 | Datos que no permiten identificar régimen/norma | **V1_OBLIGATORIA** | FUERA_DE_ALCANCE_ACTUAL (no es un dominio a resolver — ver nota) | PARCIAL | N/A | `SituacionPensional.jsx` ya tiene la opción "No estoy seguro" (`regimenActual = 'desconocido'`); `generarCaminosRAIS.js` la resuelve como `PERFIL_NO_EVALUABLE` genérico | El dato ya se detecta hoy — falta un mensaje propio, no una pregunta nueva | **Alta — bloqueador (de mensaje, no de pregunta nueva)** |
-| B-13 | Reconocimiento negado o proceso activo | **V1_OBLIGATORIA** | FUERA_DE_ALCANCE_ACTUAL | AUSENTE | FUERA_DE_ALCANCE_ACTUAL | Sin capacidad ni campo relacionado | Mismo riesgo de fondo que B-01/B-02/B-04 | **Alta — bloqueador** |
+| B-13 | Reconocimiento negado o proceso activo | **V1_OBLIGATORIA** | FUERA_DE_ALCANCE_ACTUAL | AUSENTE (advertencia visible, no detección — ídem B-01) | FUERA_DE_ALCANCE_ACTUAL | `Bienvenida.jsx` nombra el caso pero no lo verifica | Mismo riesgo de fondo que B-01/B-02/B-04 | **Alta — bloqueador** |
 | B-14 | Indemnización sustitutiva / devolución de saldos / BEPS | POST_V1_PRIORITARIA | FUERA_DE_ALCANCE_ACTUAL | AUSENTE | FUERA_DE_ALCANCE_ACTUAL | Sin mención en `src/` | Solo se activa después de que `A-03`/`A-05` ya concluyeron "no alcanzable" — mejora del siguiente paso, no de intake | Media |
 
 **Nota sobre `B-12`:** no describe una prestación distinta que alguien
@@ -187,6 +189,24 @@ qué régimen se está (más cercano al criterio de entrada §2 que a una
 exclusión de dominio). Por eso su horizonte y cobertura de resolución se
 marcan por convención (`FUERA_DE_ALCANCE_ACTUAL`/`N/A`), no porque exista un
 motor que construir.
+
+**Nota v0.7 (Bloque 4) sobre `B-01`/`B-02`/`B-03`/`B-13` — decisión de
+producto ya tomada, no pendiente:** hasta la v0.6, `Objetivo.jsx` detectaba
+estos 4 casos con una pregunta obligatoria — el sistema no podía avanzar sin
+que la persona se auto-clasificara. Esa pantalla se retiró (§21): el control
+de alcance ahora es una **advertencia visible en `Bienvenida.jsx`**, no una
+pregunta. La distinción que exige esta matriz, aplicada aquí explícitamente:
+una **advertencia visible** (existe: la persona puede leerla antes de
+continuar) no es lo mismo que **detección** según la definición de §4
+("capacidad de reconocer que el caso entró y dirigirlo") — nadie confirma ni
+verifica que la persona no está en uno de estos 4 casos, y la persona puede
+ignorar la advertencia y entrar igual al recorrido de vejez. Por eso
+`Cobertura de detección` para los 4 se clasifica `AUSENTE`, con la anotación
+"advertencia visible, no detección" para que no se lea como ausencia total de
+tratamiento. Esta fila ya reflejaba `AUSENTE` desde antes de esta revisión —
+la evidencia (antes "`Objetivo.jsx` no pregunta motivo de consulta") nunca se
+sincronizó cuando `Objetivo.jsx` se construyó (v0.5) ni cuando se retiró
+(v0.7); queda corregida ahora junto con el resumen agregado de §18.
 
 ---
 
@@ -209,10 +229,15 @@ Recategorizados según el mecanismo real de detección verificado en §13-15
 (ya no "Paso A/Paso B" — esa distinción desaparece junto con la pantalla
 nueva que quedó descartada):
 
-**A. Resueltos en `Objetivo.jsx`, sin comprobación adicional — 4:** `B-01`
-(invalidez), `B-02` (sobrevivientes), `B-03` (ya pensionado/reliquidación),
-`B-13` (reconocimiento negado/proceso activo — con la redacción ampliada de
-§15).
+**A. `B-01`/`B-02`/`B-03`/`B-13` — 4:** invalidez, sobrevivientes, ya
+pensionado/reliquidación, reconocimiento negado/proceso activo. **Decisión de
+producto tomada en v0.7 (§21), no pendiente:** ya no se detectan con una
+pregunta — `Objetivo.jsx` se retiró. Se nombran como advertencia de exclusión,
+informativa, en `Bienvenida.jsx`, que la persona puede leer o ignorar. Su
+`Cobertura de detección` es `AUSENTE` (§8, §18) — la advertencia visible no
+sustituye la detección activa que exige la definición de §4. Siguen siendo
+bloqueadores reales de V1 (categoría A, sin mecanismo de detección que los
+cierre), no capacidades resueltas.
 
 **B. Requieren una pregunta nueva en una pantalla ya existente — 2:** `B-04`
 (régimen especial, en `SituacionPensional.jsx`), `B-05` (alto riesgo, en
@@ -252,9 +277,16 @@ Verificado directamente contra `src/App.jsx` en esta revisión (no contra la
 v0.3, que tenía un error puntual — ver §0). Orden exacto de las vistas
 principales, antes de llegar a `baseCotizacion`:
 
-1. `bienvenida` — `Bienvenida.jsx`
-2. `objetivo` — `Objetivo.jsx`
-3. `datosIniciales` — `DatosIniciales.jsx`
+1. `bienvenida` — `Bienvenida.jsx` (desde v0.7/Bloque 4, establece `motivoConsulta = 'vejez'`
+   directamente al pulsar su único botón — ver pantalla 2, abajo, y §21)
+2. *(retirada 2026-09-03 — ver v0.7 en Control de versiones y §21)* `objetivo` —
+   `Objetivo.jsx` se eliminó: la divulgación progresiva de dos pasos (v0.7 anterior, revertida)
+   solo escondía las 4 categorías no atendidas detrás de un clic extra, sin resolver que
+   seguían terminando sin ninguna respuesta de PensionLab. El control de alcance ahora es
+   informativo, no interactivo — vive en la pantalla 1 (`Bienvenida.jsx`). `bienvenida`
+   navega ahora directo a la pantalla 3. Numeración conservada sin renumerar — mismo criterio
+   que la pantalla 6, ver nota bajo esta lista.
+3. `datosIniciales` — `DatosIniciales.jsx` ("Volver" regresa a la pantalla 1, `bienvenida`)
 4. `situacionPensional` — `SituacionPensional.jsx` (`regimenActual`)
 5. `historialLaboral` — `HistorialLaboral.jsx` (`tipoCotizante`,
    `lugarCotizacion`, `cotizaActualmente`)
@@ -281,21 +313,31 @@ disputa (pantalla 11, condicional), pero la descripción de dónde vive la
 pregunta base estaba equivocada. Ya corregida en la matriz (§8) y en esta
 sección.
 
-**Por qué la pantalla 6 se marca retirada en vez de renumerar la lista (v0.6):**
-renumerar habría obligado a actualizar cada referencia a "pantalla 9" y
-"pantalla 11" ya citada en §0 (v0.4) y en la matriz de §14/§8 (`B-10`) — un
-cambio de mayor superficie y riesgo que la sincronización puntual que motivó
-esta revisión. Los números de pantalla de esta lista identifican una posición
-histórica verificada, no un índice que deba recalcularse ante cada retiro.
+**Por qué las pantallas 2 y 6 se marcan retiradas en vez de renumerar la lista
+(v0.6-v0.7):** renumerar habría obligado a actualizar cada referencia a
+"pantalla 9" y "pantalla 11" ya citada en §0 (v0.4) y en la matriz de §14/§8
+(`B-10`) — un cambio de mayor superficie y riesgo que la sincronización
+puntual que motivó cada revisión. Los números de pantalla de esta lista
+identifican una posición histórica verificada, no un índice que deba
+recalcularse ante cada retiro.
 
 ---
 
 ## 14. Mecanismo de detección de cada uno de los 8 bloqueadores estructurales
 
+**Nota v0.7:** las filas `B-01`/`B-02`/`B-03`/`B-13` describen el mecanismo de
+`Objetivo.jsx`, retirado (§21) — quedan como registro histórico del diseño
+que se implementó y luego se retiró, no como mecanismo vigente. Su
+`Cobertura de detección` real hoy es `AUSENTE` (advertencia visible en
+`Bienvenida.jsx`, no detección — §8, §18), no `DETENER_Y_REMITIR` por
+selección directa como describen. `B-04`/`B-05`/`B-10`/`B-12` no se tocaron
+en esta entrega y siguen exactamente como describe esta sección.
+
 Auditoría fila por fila, contra el código real de cada pantalla (`Objetivo.jsx`,
 `SituacionPensional.jsx`, `HistorialLaboral.jsx`, `IndiciosRegimenTransicion.jsx`
 leídos íntegros en esta revisión). Ninguna fila asume una pantalla que no
-exista hoy.
+exista hoy. *(Vigente al momento de esta auditoría, v0.4 — ver nota v0.7
+arriba para lo que cambió desde entonces.)*
 
 | ID | Qué pregunta/dato lo detecta | ¿Con el motivo de consulta? | ¿Requiere 2ª comprobación? | Pantalla real de integración | Salida | Clics/pantallas que agrega al camino feliz | Riesgo de falso positivo | Riesgo de dejar pasar el caso |
 |---|---|---|---|---|---|---|---|---|
@@ -308,9 +350,10 @@ exista hoy.
 | **B-12** Identificación de régimen/norma | Ya detectado hoy por la opción "No estoy seguro" de `SituacionPensional.jsx` (`regimenActual = 'desconocido'`) | No aplica — es un problema de dato, no de motivo | **No** — el gap es de mensaje, no de detección | `SituacionPensional.jsx` (corregir el mensaje que se muestra cuando el régimen queda desconocido, en vez del `PERFIL_NO_EVALUABLE` genérico de RAIS) | `ORIENTAR_ANTES_DE_CONTINUAR` (ayuda para identificarlo) → `DETENER_Y_REMITIR` si persiste | 0 pantallas, 0 clics — cambio de contenido, no de flujo | No aplica | Bajo — el dato ya se captura, solo falta el mensaje correcto |
 | **B-13** Reconocimiento negado / proceso activo | Cubierto íntegramente por la opción ampliada de `Objetivo.jsx` (ver `B-03`) | **Sí, directo, con la redacción ampliada** | No (a diferencia de la v0.3, ya no requiere una comprobación separada) | `Objetivo.jsx` | `DETENER_Y_REMITIR` | 0 pantallas, 0 clics (comparte selección con B-03) | Bajo | Bajo — la redacción ampliada cubre explícitamente "trámite en curso", el subcaso que antes se perdía |
 
-**Conclusión de esta auditoría:** los 8 bloqueadores se cierran con **cero
-pantallas nuevas**. Cuatro se resuelven en `Objetivo.jsx` con una sola
-selección (ampliando la redacción de una opción ya propuesta), dos requieren
+**Conclusión de esta auditoría (histórica — ver nota v0.7 arriba):** los 8
+bloqueadores se cerraban con **cero pantallas nuevas**. Cuatro se resolvían
+en `Objetivo.jsx` con una sola selección (ampliando la redacción de una
+opción ya propuesta), dos requieren
 una opción/campo nuevo en una pantalla que la persona ya visita
 (`SituacionPensional.jsx`, `HistorialLaboral.jsx`), uno es una pregunta
 condicional en una pantalla existente que la mayoría nunca ve
@@ -324,7 +367,15 @@ corregir un mensaje (`SituacionPensional.jsx`, caso `B-12`).
 Sin código. Estructura inicial para evaluar, no texto final de UI. Ninguna
 pantalla nueva.
 
-### 15.1 — `Objetivo.jsx`: motivo de consulta
+### 15.1 — `Objetivo.jsx`: motivo de consulta — **RETIRADA (v0.7, ver §21)**
+
+`Objetivo.jsx` (y el diseño de esta sección, construido y luego revertido en
+dos entregas: v0.5 seis opciones directas, v0.7 divulgación progresiva de dos
+pasos) se eliminó del recorrido el 2026-09-03. El control de alcance para
+`B-01`/`B-02`/`B-03`/`B-13` ya no vive en una pantalla ni una pregunta
+seleccionable — es una advertencia informativa en `Bienvenida.jsx` (§21). El
+resto de esta subsección queda como registro histórico del diseño que
+efectivamente se construyó y luego se retiró, no como especificación vigente.
 
 Se agrega un `<fieldset>` nuevo a la misma pantalla y el mismo `<form>` que
 ya tiene la pregunta "¿en qué quieres que te ayudemos hoy?" (mismo patrón que
@@ -525,14 +576,34 @@ FUERA_DE_ALCANCE_ACTUAL 14 (Bloque B completo, incluido `B-12` por
 convención).
 
 **Cobertura de resolución:** COMPLETA 10, PARCIAL 6, AUSENTE 13, N/A 1
-(`B-12`). **Cobertura de detección:** COMPLETA 14, PARCIAL 2 (`A-13`, `B-12`),
-AUSENTE 13, N/A 1 (`A-13`, contado una sola vez en PARCIAL — ver matriz para
-el detalle por fila).
+(`B-12`).
 
-**Bloqueadores reales de V1: 10**, en 5 categorías activas (§11): A. resueltos
-en `Objetivo.jsx` (4), B. pregunta nueva en pantalla existente (2), C.
-pregunta condicional en pantalla existente (1), D. solo mensaje (1), E.
-verificaciones de cierre (2).
+**Cobertura de detección (recalculada, v0.7):** COMPLETA 15 (Bloque A
+completo salvo `A-13`), PARCIAL 2 (`A-13`, `B-12`), AUSENTE 13 (Bloque B
+completo salvo `B-12`), N/A 0. Suma 15+2+13 = 30, sin remanentes. **Corrige
+dos cifras de la versión anterior de este resumen (0.1-0.6), no solo una
+consecuencia de retirar `Objetivo.jsx`:**
+1. `B-01`/`B-02`/`B-03`/`B-13` **ya estaban** `AUSENTE` en la matriz de §8
+   desde antes de esta revisión — la narrativa de §11/§14/§18 los trataba
+   como "resueltos"/`COMPLETA` desde que `Objetivo.jsx` se construyó (v0.5),
+   pero nadie volvió a editar las celdas de §8 para que coincidieran. Con
+   `Objetivo.jsx` retirado (§21), `AUSENTE` es ahora, además, el valor
+   correcto — no hace falta cambiar la celda, solo dejar de describirlos
+   como `COMPLETA` en el resto del documento (§11, §14, aquí).
+2. El total `COMPLETA 14` de la versión anterior no coincidía con una suma
+   directa de la matriz (`15` en Bloque A, `0` en Bloque B) — error
+   aritmético preexistente, corregido aquí a `15`. El fragmento "`N/A 1
+   (A-13...)`" de la versión anterior tampoco correspondía a ninguna celda
+   real marcada `N/A` en detección — eliminado.
+
+**Bloqueadores reales de V1: 10**, en 5 categorías activas (§11): A.
+`B-01`/`B-02`/`B-03`/`B-13` (4) — **ya no "resueltos en `Objetivo.jsx`"**:
+detección `AUSENTE`, solo advertencia visible en `Bienvenida.jsx` (ver nota
+v0.7 bajo la matriz de §8 y §21); B. pregunta nueva en pantalla existente
+(2); C. pregunta condicional en pantalla existente (1); D. solo mensaje (1);
+E. verificaciones de cierre (2). El total de 10 bloqueadores no cambia — los
+4 de la categoría A siguen siendo bloqueadores reales, ahora sin mecanismo de
+detección activo que los cierre.
 
 **Costo neto del control de alcance sobre el camino feliz (persona sin
 ninguna condición especial), estado final tras la auditoría de
@@ -565,6 +636,15 @@ Para las demás integraciones de §15 (`B-04` en `SituacionPensional.jsx`,
 `B-05` en `HistorialLaboral.jsx`, `B-10` condicional en
 `IndiciosRegimenTransicion.jsx`), el análisis de §14 sigue vigente sin
 cambios — ninguna de ellas se implementó todavía (§20).
+
+**Actualización v0.7/Bloque 4 (§21):** con `Objetivo.jsx` retirado, el camino
+de vejez pasó de "0 pantallas/0 clics adicionales frente al `Objetivo.jsx`
+anterior a PL-250" a **una pantalla y un clic menos que ese mismo baseline**
+— `Bienvenida.jsx` navega directo a `DatosIniciales`, sin ninguna pregunta
+intermedia. La cifra de "Bloqueadores reales de V1: 10" (arriba) ya no
+describe correctamente cómo se resuelven `B-01`/`B-02`/`B-03`/`B-13` —
+dejaron de tener un mecanismo de detección activo; ver §21 para el registro
+completo de esa consecuencia, deliberadamente no suavizada.
 
 ---
 
@@ -715,3 +795,153 @@ para esta misma entrega.
 todavía. El Bloque 1 (§17) no se considera terminado hasta que los 8
 bloqueadores estructurales de detección (§11) tengan la misma cobertura que
 `B-01`/`B-02`/`B-03`/`B-13` alcanzan en esta entrega.
+
+---
+
+## 21. Implementación real — Bloque 4, retiro del control interactivo (v0.7)
+
+Feedback de usuaria real (Yenny), 2026-09-03, tras la revisión visual del
+Bloque 3: la divulgación progresiva de dos pasos (paso inicial reducido a 2
+opciones, las 4 categorías movidas al paso de aclaración) **no resolvía el
+problema de producto** — únicamente ocultaba las 4 opciones no atendidas
+detrás de un segundo clic. Seguían terminando sin ninguna respuesta real de
+PensionLab. Decisión final de producto: eliminar la pantalla interactiva por
+completo. Los casos no atendidos se nombran ahora como una advertencia de
+alcance en `Bienvenida.jsx`, no como opciones seleccionables.
+
+### Diagnóstico que motivó la decisión
+
+Ni el diseño de v0.5 (6 opciones directas) ni el de v0.7-revertido (2 pasos)
+cambiaban el hecho de fondo: PensionLab solo calcula pensión de vejez, y las
+4 categorías de detención directa siempre terminan igual — un mensaje de
+remisión, nunca un resultado. Presentarlas como "opciones a elegir" (con o
+sin un paso intermedio) seguía comunicando, aunque fuera implícitamente, que
+eran capacidades entre las que la persona podía escoger. La solución no era
+una mejor divulgación progresiva — era dejar de presentarlas como control de
+entrada interactivo.
+
+### Decisión de UX aplicada
+
+`Bienvenida.jsx` (pantalla 1, ver §13) es ahora la única pantalla del borde
+de la solución:
+
+- **Texto principal:** "PensionLab te ayuda a entender y proyectar tu futura
+  pensión de vejez." — nombra la única capacidad calculada, sin ambigüedad.
+- **Advertencia de alcance** (informativa, no interactiva — sin radios, sin
+  botón propio, sin desplegable que la esconda): nombra los 4 casos no
+  atendidos (`B-01` incapacidad laboral, `B-02` protección familiar, `B-03`
+  pensión ya reconocida/reliquidación, `B-13` reclamación/demanda/trámite
+  activo) como exclusiones explícitas, nunca como capacidades disponibles.
+- **Orientación:** recomienda acudir al fondo de pensiones o a un profesional
+  en seguridad social — mismo criterio que ya regía los mensajes de remisión
+  de `Objetivo.jsx` (§16, criterio 8: nunca asesoría jurídica personalizada).
+- **Único botón — "Proyectar mi pensión de vejez":** establece
+  `motivoConsulta = 'vejez'` y navega directo a `DatosIniciales`. Ninguna
+  selección, ningún clic adicional.
+
+### Navegación final
+
+`Bienvenida` → `DatosIniciales` (directo). "Volver" desde `DatosIniciales`
+regresa a `Bienvenida` — ya no existe ninguna ruta normal hacia una pantalla
+`Objetivo`.
+
+### Por qué se conserva `motivoConsulta`
+
+Sigue siendo necesario declarar explícitamente que el recorrido es de vejez
+— decisión de producto, no una dependencia técnica descubierta: hoy ningún
+cálculo de `domain/` lo consume (verificado por búsqueda antes de decidir
+conservarlo), pero la declaración en sí misma tiene valor — deja trazable,
+en el estado y en cada fixture, que el caso es de vejez. Se conserva en
+`App.jsx` (estado) y en `dev/fixtures.js` (`motivoConsulta: 'vejez'` en las
+10 fixtures, sin cambios). `Bienvenida.jsx` lo establece directamente en su
+único manejador de envío — ya no hay una pantalla ni una decisión separada
+que pueda dejarlo en otro valor.
+
+### Código eliminado (sin consumidores fuera de lo retirado, verificado antes de borrar)
+
+- **`src/pages/Objetivo.jsx`** — eliminado. Único importador: `App.jsx`
+  (import y rama de render también eliminados).
+- **`src/pages/Objetivo.helpers.js`** — eliminado. Exportaba
+  `MOTIVO_CONSULTA`, `OPCIONES_MOTIVO_CONSULTA`,
+  `OPCIONES_ACLARACION_MOTIVO_CONSULTA`, `determinarSalidaMotivoConsulta`,
+  `manejarEnvioMotivoConsulta`, `volverALasOpciones`, `volverDesdeDetencion`,
+  `MENSAJES_DETENCION_MOTIVO_CONSULTA` (los 5 mensajes de remisión
+  especializados) y `TEXTO_NO_ES_ASESORIA_JURIDICA` — verificado por
+  búsqueda en todo `src/` que ningún archivo fuera de `Objetivo.jsx` y su
+  propio test importaba nada de este módulo. `fixtures.js` y `estadoApp.js`
+  solo lo mencionaban en comentarios, nunca en un `import` — comentarios
+  corregidos, no código funcional afectado.
+- **`src/pages/Objetivo.helpers.test.js`** — eliminado junto con el módulo
+  que probaba exclusivamente (45 pruebas, la mayoría agregadas en el Bloque 3
+  ahora revertido).
+- **`src/dev/estadoApp.js`** — `'objetivo'` retirado de `VISTAS_CONOCIDAS`;
+  comentario de `motivoConsulta` en `VALORES_POR_DEFECTO` corregido (ya no
+  referencia `Objetivo.jsx`/`Objetivo.helpers.js`, ninguno de los dos existe).
+- **`src/pages/Bienvenida.jsx`** — reescrita: copy nuevo (texto principal,
+  advertencia de alcance, orientación, botón), mismo contrato de props
+  (`onComenzar`) sin cambios — `App.jsx` decide qué hace ese callback.
+- **`src/App.jsx`** — import de `Objetivo` y su rama de render eliminados;
+  `onComenzar` de `Bienvenida` ahora establece `motivoConsulta = 'vejez'` y
+  navega a `datosIniciales` en un mismo manejador; `onVolver` de
+  `DatosIniciales` apunta a `bienvenida`. Comentario de `motivoConsulta`
+  actualizado.
+- **`src/dev/fixtures.js`** — ninguna fixture usaba `vistaSugerida:
+  'objetivo'` (verificado antes de decidir que no había nada que
+  actualizar); comentario sobre `motivoConsulta: 'vejez'` corregido para no
+  referenciar `Objetivo.jsx`.
+
+### Mensajes de remisión especializados: verificación antes de eliminar
+
+`MENSAJES_DETENCION_MOTIVO_CONSULTA` (los 5 mensajes de `B-01`/`B-02`/`B-03`/
+`B-13`/remisión general) no tenían ningún consumidor fuera de `Objetivo.jsx`
+— confirmado por búsqueda en todo `src/` antes de decidir eliminarlos junto
+con el módulo. Su contenido sustantivo (qué no cubre PensionLab, a quién
+acudir) no se perdió: se registra ahora en la advertencia de
+`Bienvenida.jsx`, consolidado en un solo texto en vez de 4 mensajes
+independientes por categoría — ver "Qué queda fuera de alcance", abajo.
+
+### Qué queda fuera de alcance (registrado, no como componentes huérfanos)
+
+PensionLab hoy calcula únicamente pensión de vejez. Quedan explícitamente
+fuera, comunicados en `Bienvenida.jsx` como advertencia de alcance, no como
+capacidades disponibles:
+
+- Prestación por pérdida de capacidad para trabajar (invalidez) — `B-01`.
+- Protección de la familia por fallecimiento (sobrevivientes/sustitución) —
+  `B-02`.
+- Revisión o reliquidación de una pensión ya reconocida — `B-03`.
+- Reclamaciones, negaciones ya notificadas, demandas o trámites
+  administrativos/judiciales en curso — `B-13`.
+
+Régimen especial (`B-04`), alto riesgo (`B-05`) y traslado discutido (`B-10`)
+no se tocaron en esta entrega — siguen sin mecanismo de detección, mismo
+estado que antes del Bloque 1 (§11, categorías B y C).
+
+### Reclasificación de cobertura de detección — decisión tomada, no pendiente
+
+`B-01`/`B-02`/`B-03`/`B-13` no tienen hoy detección activa: `Bienvenida.jsx`
+nombra estos casos en una advertencia visible, pero nadie confirma que la
+persona no pertenece a ninguno, y la persona puede ignorar la advertencia y
+entrar igual al recorrido de vejez. Según la definición de §4
+(`COBERTURA_DE_DETECCION` — "capacidad de reconocer que el caso entró y
+dirigirlo"), esto no es detección: es una advertencia, un mecanismo distinto
+y más débil. La clasificación correcta, aplicada en §8 y §18, es `Cobertura
+de detección: AUSENTE`, anotada explícitamente como "advertencia visible, no
+detección" para no leerse como ausencia total de tratamiento del caso.
+
+Esta reclasificación queda decidida y aplicada en esta misma versión (v0.7)
+— no es una pregunta abierta para una revisión futura. La matriz de 30 filas
+(§8) y el resumen agregado (§18) ya reflejan `AUSENTE` para los 4 casos, con
+los totales recalculados. Antes de `Objetivo.jsx` (v0.5), y durante su vida
+(v0.5-v0.6), la matriz de §8 nunca llegó a decir `COMPLETA` para estos 4 —
+seguía en `AUSENTE`, desincronizada de la narrativa de §11/§14/§18, que sí
+los trataba como resueltos. Esa desincronización documental preexistente
+queda corregida aquí junto con el registro del cambio real de mecanismo.
+
+### Qué no cambió
+
+Ningún cálculo ni regla pensional; `SituacionPensional.jsx`,
+`HistorialLaboral.jsx`, `IndiciosRegimenTransicion.jsx` (`B-04`/`B-05`/`B-10`
+siguen exactamente igual que al cierre del Bloque 1); el orden de las
+pantallas posteriores a `DatosIniciales`; las fixtures (mismos 10 casos,
+mismos datos pensionales, `motivoConsulta: 'vejez'` sin cambios).

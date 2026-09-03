@@ -2,7 +2,6 @@ import { useState } from 'react'
 import './App.css'
 import AppShell from './components/layout/AppShell.jsx'
 import Bienvenida from './pages/Bienvenida.jsx'
-import Objetivo from './pages/Objetivo.jsx'
 import DatosIniciales from './pages/DatosIniciales.jsx'
 import SituacionPensional from './pages/SituacionPensional.jsx'
 import HistorialLaboral from './pages/HistorialLaboral.jsx'
@@ -43,11 +42,13 @@ const adaptadorExplicacionDesarrollo = import.meta.env.DEV ? crearAdaptadorExpli
 
 function App() {
   const [vista, setVista] = useState('bienvenida')
-  // PL-250 Bloque 1 (2026-09-01): motivo de consulta — decide, junto con
-  // Objetivo.helpers.js#determinarSalidaMotivoConsulta, si el recorrido de
-  // vejez continúa o se detiene con una remisión (B-01/B-02/B-03/B-13 en esta
-  // entrega). Se recalcula siempre desde este valor, nunca se guarda un
-  // booleano de "está detenido" aparte.
+  // PL-250 (2026-09-01, Bloque 1; retirado el control interactivo en Bloque 4,
+  // 2026-09-03): motivoConsulta declara explícitamente que el recorrido es de
+  // vejez. Bienvenida.jsx lo establece a 'vejez' al pulsar su único botón —
+  // ya no existe una pantalla ni una decisión que pueda dejarlo en otro valor.
+  // Se conserva como estado (y en las fixtures, `dev/fixtures.js`) por
+  // decisión explícita de producto — ningún cálculo de dominio lo consume
+  // hoy, pero la declaración en sí sigue siendo necesaria.
   const [motivoConsulta, setMotivoConsulta] = useState(null)
   const [fechaNacimiento, setFechaNacimiento] = useState('')
   const [sexo, setSexo] = useState(null)
@@ -343,16 +344,17 @@ function App() {
         />
       )}
       <AppShell>
+      {/* Objetivo.jsx se retiró del recorrido (2026-09-03, feedback de usuaria real): la
+          divulgación progresiva de dos pasos no resolvía el problema, solo escondía las 4
+          categorías no atendidas detrás de un clic extra. El control de alcance ahora es
+          informativo, no interactivo — vive en Bienvenida.jsx, que establece motivoConsulta
+          directamente al pulsar su único botón, sin ninguna selección intermedia. */}
       {vista === 'bienvenida' && (
-        <Bienvenida onComenzar={() => setVista('objetivo')} />
-      )}
-
-      {vista === 'objetivo' && (
-        <Objetivo
-          motivoConsulta={motivoConsulta}
-          onCambiarMotivoConsulta={setMotivoConsulta}
-          onContinuar={() => setVista('datosIniciales')}
-          onVolver={() => setVista('bienvenida')}
+        <Bienvenida
+          onComenzar={() => {
+            setMotivoConsulta('vejez')
+            setVista('datosIniciales')
+          }}
         />
       )}
 
@@ -365,7 +367,7 @@ function App() {
           lugarResidencia={lugarResidencia}
           onCambiarLugarResidencia={setLugarResidencia}
           onContinuar={() => setVista('situacionPensional')}
-          onVolver={() => setVista('objetivo')}
+          onVolver={() => setVista('bienvenida')}
         />
       )}
 

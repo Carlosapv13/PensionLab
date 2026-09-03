@@ -94,18 +94,19 @@ describe('validarFixture — campos mínimos según la vista destino', () => {
   })
 })
 
-// Coherencia con Objetivo.jsx/PL-250 (2026-09-01): ninguna fixture de este
-// archivo representa hoy un caso excluido (B-01..B-13) — todas son
-// recorridos de pensión de vejez, aunque su vistaSugerida salte directo a
-// una pantalla posterior a Objetivo.jsx. Sin motivoConsulta: 'vejez'
-// declarado, navegar "Volver" hasta Objetivo.jsx dejaría el motivo en null
-// (su valor por defecto) — "Continuar" aparecería deshabilitado para un
-// caso que en realidad sí es de vejez. Si en el futuro se agrega una
-// fixture que represente un caso excluido, esta prueba deberá excluirla
-// explícitamente, no eliminarse.
-// Cobertura nueva (2026-09-02, fusión de ExpedientePensional.jsx en CompletarExpediente.jsx):
-// ninguna fixture apuntaba a 'expedientePensional', pero nada lo garantizaba como contrato —
-// esta prueba lo deja explícito y evita que una vista retirada vuelva a colarse en el futuro.
+// Coherencia con PL-250 (2026-09-01; Objetivo.jsx retirada del recorrido en Bloque 4,
+// 2026-09-03): ninguna fixture de este archivo representa hoy un caso excluido
+// (incapacidad laboral, protección familiar, pensión ya reconocida, reclamo/proceso
+// activo) — todas son recorridos de pensión de vejez, aunque su vistaSugerida salte
+// directo a una pantalla posterior a Bienvenida. `motivoConsulta: 'vejez'` se declara en
+// cada una para que el estado siga siendo trazable como recorrido de vejez, aunque ya no
+// exista una pantalla seleccionable que dependa de ese valor para habilitar "Continuar".
+// Si en el futuro se agrega una fixture que represente un caso excluido, esta prueba
+// deberá excluirla explícitamente, no eliminarse.
+// Cobertura (2026-09-02, fusión de ExpedientePensional.jsx en CompletarExpediente.jsx;
+// 2026-09-03, retiro de Objetivo.jsx): ninguna fixture apuntaba a 'expedientePensional' ni
+// a 'objetivo', pero nada lo garantizaba como contrato — esta prueba lo deja explícito y
+// evita que una vista retirada vuelva a colarse en el futuro.
 describe('Coherencia de vistaSugerida en fixtures', () => {
   it('cada fixture apunta a una vista que sigue existiendo en VISTAS_CONOCIDAS', () => {
     for (const fixture of FIXTURES) {
@@ -118,10 +119,17 @@ describe('Coherencia de vistaSugerida en fixtures', () => {
       expect(fixture.vistaSugerida).not.toBe('expedientePensional')
     }
   })
+
+  it('"objetivo" ya no es una vista conocida ni sugerida por ninguna fixture', () => {
+    expect(VISTAS_CONOCIDAS).not.toContain('objetivo')
+    for (const fixture of FIXTURES) {
+      expect(fixture.vistaSugerida).not.toBe('objetivo')
+    }
+  })
 })
 
 describe('Coherencia de motivoConsulta en fixtures de recorrido de vejez', () => {
-  it('cada fixture declara motivoConsulta: "vejez", para que el estado no quede incoherente al volver a Objetivo.jsx', () => {
+  it('cada fixture declara motivoConsulta: "vejez", trazable como recorrido de vejez aunque no exista una pantalla que dependa de este valor', () => {
     for (const fixture of FIXTURES) {
       expect(fixture.datos.motivoConsulta).toBe('vejez')
     }

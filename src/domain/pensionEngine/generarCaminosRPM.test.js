@@ -1195,3 +1195,165 @@ describe('generarCaminosRPM — regresión: retomar la proyección original tras
     expect(r.orientacion.razon).toContain('3628')
   })
 })
+
+// E2 (PL-260, Slice "separación entre elegibilidad proyectada y cuantía económica") —
+// integra evaluarElegibilidadProyectadaRPM.js/evaluarDisponibilidadCuantiaRPM.js en
+// generarCaminosRPM.js. Estos tests verifican específicamente la integración (los
+// contratos en sí ya están probados exhaustivamente en sus propios archivos de test) y
+// reproducen los Casos de Oscar 3A/3B como regresión de aceptación end-to-end.
+describe('generarCaminosRPM — E2: elegibilidad/disponibilidadCuantia expuestas en el resultado', () => {
+  it('resultado exitoso (PERFIL_BASE): elegibilidad.estado CUMPLE_REQUISITOS_EN_FECHA_OBJETIVO y disponibilidadCuantia.estado CUANTIA_CALCULABLE, ambos adjuntos', () => {
+    const r = generarCaminosRPM(PERFIL_BASE)
+    expect(r.elegibilidad).not.toBeNull()
+    expect(r.elegibilidad.estado).toBe('CUMPLE_REQUISITOS_EN_FECHA_OBJETIVO')
+    expect(r.disponibilidadCuantia).not.toBeNull()
+    expect(r.disponibilidadCuantia.estado).toBe('CUANTIA_CALCULABLE')
+  })
+
+  it('PERFIL_NO_EVALUABLE (régimen distinto de RPM): elegibilidad nunca se evalúa, queda null', () => {
+    const r = generarCaminosRPM({ ...PERFIL_BASE, regimenActual: 'RAIS' })
+    expect(r.elegibilidad).toBeNull()
+    expect(r.disponibilidadCuantia).toBeNull()
+  })
+
+  it('Oscar 3A/3B (Hombre, 53 años, RPM, hasta 62, sin historia detallada, horizonte < 10 años): elegibilidad CUMPLE_REQUISITOS_EN_FECHA_OBJETIVO, cuantía no calculable, ninguna cifra de pensión ni aporte inventada — reproduce end-to-end el hallazgo del diagnóstico previo', () => {
+    const PERFIL_OSCAR = {
+      regimenActual: 'RPM',
+      sexo: 'Hombre',
+      fechaNacimiento: '1972-06-15', // 53 años al 2026-01-01
+      edadJubilacionDeseada: 62,
+      historiaCotizacion: [],
+      ibcAplicableSimulacion: 1751000,
+      objetivoValorMensual: 1751000,
+      fecha: FECHA_CALCULO,
+    }
+
+    for (const semanas of [1200, 1300]) {
+      const r = generarCaminosRPM({
+        ...PERFIL_OSCAR,
+        semanasReferenciaDeclaradas: { cantidad: semanas, certeza: 'conocido' },
+      })
+
+      // Elegibilidad: sí evaluada, y confirmada — el hallazgo central de este Slice.
+      expect(r.elegibilidad).not.toBeNull()
+      expect(r.elegibilidad.estado).toBe('CUMPLE_REQUISITOS_EN_FECHA_OBJETIVO')
+      expect(r.elegibilidad.semanasActuales.cantidad).toBe(semanas)
+      expect(r.elegibilidad.semanasTotalesEnFechaObjetivo).toBeGreaterThan(1300)
+
+      // Cuantía: no calculable con los datos actuales (sin historia real, horizonte corto).
+      expect(r.disponibilidadCuantia).not.toBeNull()
+      expect(r.disponibilidadCuantia.estado).toBe('CUANTIA_NO_CALCULABLE_TODAVIA')
+
+      // El resultado nunca presenta el caso como "no cumples semanas" — el orientacion.codigo
+      // sigue siendo el de historia insuficiente para el IBL, nunca SEMANAS_INSUFICIENTES.
+      expect(r.orientacion.codigo).toBe('HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA')
+      expect(r.orientacion.codigo).not.toBe('SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM')
+
+      // Ninguna cifra inventada: escenarios vacío, sin pensión ni aporte en ningún lugar
+      // del resultado.
+      expect(r.escenarios).toEqual([])
+      expect(r.semanas).toBeNull()
+      expect(r.barrido).toBeNull()
+    }
+  })
+
+  it('edad y semanas insuficientes a la vez → EDAD_Y_SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM, con elegibilidad.estado POR_AMBOS', () => {
+    const r = generarCaminosRPM({
+      ...PERFIL_BASE,
+      fechaNacimiento: '1990-01-01',
+      edadJubilacionDeseada: 50, // < 62
+      historiaCotizacion: [],
+      semanasReferenciaDeclaradas: { cantidad: 50, certeza: 'conocido' },
+    })
+    expect(r.orientacion.codigo).toBe('EDAD_Y_SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM')
+    expect(r.elegibilidad.estado).toBe('NO_CUMPLE_EDAD_NI_SEMANAS_EN_FECHA_OBJETIVO')
+    expect(r.escenarios).toEqual([])
+  })
+
+  it('no existe doble cálculo divergente: cuando el camino base sí se calcula, elegibilidad.semanasTotalesEnFechaObjetivo coincide exactamente con resultadoBase.semanasCotizadas.total (misma fórmula compartida, resolverSemanasProyectadasRPM.js)', () => {
+    const r = generarCaminosRPM(PERFIL_BASE)
+    expect(r.elegibilidad.semanasTotalesEnFechaObjetivo).toBe(r.semanas.total)
+  })
+
+  it('IBL no calculable no cambia un CUMPLE_REQUISITOS_EN_FECHA_OBJETIVO a un estado de no cumplimiento — la elegibilidad de Oscar 3A permanece idéntica con y sin historia real (solo cambia disponibilidadCuantia)', () => {
+    const base = {
+      regimenActual: 'RPM',
+      sexo: 'Hombre',
+      fechaNacimiento: '1972-06-15',
+      edadJubilacionDeseada: 62,
+      ibcAplicableSimulacion: 1751000,
+      objetivoValorMensual: 1751000,
+      semanasReferenciaDeclaradas: { cantidad: 1300, certeza: 'conocido' },
+      fecha: FECHA_CALCULO,
+    }
+    const sinHistoria = generarCaminosRPM({ ...base, historiaCotizacion: [] })
+    const conHistoria = generarCaminosRPM({
+      ...base,
+      historiaCotizacion: [{ fechaDesde: '2010-01-01', fechaHasta: '2025-12-31', ibc: 1800000, diasCotizados: 5844 }],
+    })
+
+    expect(sinHistoria.elegibilidad.estado).toBe('CUMPLE_REQUISITOS_EN_FECHA_OBJETIVO')
+    expect(conHistoria.elegibilidad.estado).toBe('CUMPLE_REQUISITOS_EN_FECHA_OBJETIVO')
+    expect(sinHistoria.disponibilidadCuantia.estado).toBe('CUANTIA_NO_CALCULABLE_TODAVIA')
+    expect(conHistoria.disponibilidadCuantia.estado).toBe('CUANTIA_CALCULABLE')
+  })
+})
+
+// Corrección de riesgo funcional (Carlos/Atlas, 2026-09-04, previa al commit de E2):
+// historia con períodos posteriores a fechaCalculo — integración end-to-end. Verifica que
+// generarCaminosRPM.js se detiene ANTES de llegar a calcularProyeccionRPM cuando la
+// historia es temporalmente inconsistente, incluso con una declaración agregada válida
+// presente — nunca hay doble conteo del futuro, y calcularProyeccionRPM.js (que hubiera
+// rechazado la misma historia con el mismo código, si se hubiera llegado a invocar) nunca
+// llega a ejecutarse.
+describe('generarCaminosRPM — E2 corrección: historia con períodos posteriores a fechaCalculo (integración end-to-end)', () => {
+  const PERFIL_HISTORIA_FUTURA = {
+    regimenActual: 'RPM',
+    sexo: 'Hombre',
+    fechaNacimiento: '1964-01-01',
+    edadJubilacionDeseada: 65,
+    ibcAplicableSimulacion: 2000000,
+    objetivoValorMensual: 1600000,
+    fecha: FECHA_CALCULO,
+  }
+
+  it('historia futura + declaración agregada válida: se detiene en DATOS_INCOMPLETOS, con elegibilidad adjunta y razón precisa — disponibilidadCuantia nunca se calcula (calcularProyeccionRPM.js nunca se invoca)', () => {
+    const r = generarCaminosRPM({
+      ...PERFIL_HISTORIA_FUTURA,
+      historiaCotizacion: [{ fechaDesde: '2027-01-01', fechaHasta: '2027-12-31', ibc: 2000000, diasCotizados: 365 }],
+      semanasReferenciaDeclaradas: { cantidad: 1400, certeza: 'conocido' },
+    })
+    expect(r.orientacion.codigo).toBe('DATOS_INCOMPLETOS')
+    expect(r.escenarios).toEqual([])
+    expect(r.elegibilidad).not.toBeNull()
+    expect(r.elegibilidad.estado).toBe('NO_EVALUABLE_DATOS_INSUFICIENTES')
+    expect(r.elegibilidad.razones[0].codigo).toBe('HISTORIA_CON_PERIODO_POSTERIOR_A_FECHA_CALCULO')
+    // disponibilidadCuantia nunca se calcula en este camino — hard stop antes de llamar a
+    // calcularProyeccionRPM (a diferencia del camino "sin evidencia", que sí deja continuar).
+    expect(r.disponibilidadCuantia).toBeNull()
+  })
+
+  it('el mismo período, pasado directamente a calcularProyeccionRPM (llamada aislada), lo rechaza con el MISMO código de razón — confirma que ambas capas están de acuerdo, no que una "adivinó" el rechazo de la otra', () => {
+    const historiaFutura = [{ fechaDesde: '2027-01-01', fechaHasta: '2027-12-31', ibc: 2000000, diasCotizados: 365 }]
+    const resultadoDirecto = calcularProyeccionRPM({
+      historiaCotizacion: historiaFutura,
+      fechaNacimiento: PERFIL_HISTORIA_FUTURA.fechaNacimiento,
+      edadJubilacionDeseada: PERFIL_HISTORIA_FUTURA.edadJubilacionDeseada,
+      escenarioIbcFuturo: { valor: PERFIL_HISTORIA_FUTURA.ibcAplicableSimulacion, origen: 'continuidad_ibc_actual' },
+      fecha: FECHA_CALCULO,
+    })
+    expect(resultadoDirecto.estado).toBe('no_evaluable')
+    expect(resultadoDirecto.razonNoEvaluable).toBe('HISTORIA_CON_PERIODO_POSTERIOR_A_FECHA_CALCULO')
+  })
+
+  it('período con fechas invertidas: también se detiene en DATOS_INCOMPLETOS antes de intentar cualquier cálculo económico', () => {
+    const r = generarCaminosRPM({
+      ...PERFIL_HISTORIA_FUTURA,
+      historiaCotizacion: [{ fechaDesde: '2020-06-01', fechaHasta: '2020-01-01', ibc: 2000000, diasCotizados: 30 }],
+      semanasReferenciaDeclaradas: null,
+    })
+    expect(r.orientacion.codigo).toBe('DATOS_INCOMPLETOS')
+    expect(r.elegibilidad.razones[0].codigo).toBe('HISTORIA_CON_PERIODO_DE_FECHAS_INVERTIDAS')
+    expect(r.escenarios).toEqual([])
+  })
+})

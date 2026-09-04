@@ -767,3 +767,106 @@ describe('calcularProyeccionRPM — contrato GO-B: el gate del IBL alternativo S
     expect(sinParametroNuevo.semanasCotizadas.fuente).toBe('historia_estructurada')
   })
 })
+
+// Cierre de integridad (Carlos/Atlas, 2026-09-04): calcularProyeccionRPM.js es una frontera
+// pública del motor y debe defender sus propias precondiciones de historiaCotizacion, sin
+// depender de que quien la invoque ya haya pasado por evaluarElegibilidadProyectadaRPM.js.
+// Estas pruebas invocan calcularProyeccionRPM DIRECTAMENTE (nunca a través de
+// generarCaminosRPM.js) para los mismos casos que validarHistoriaCotizacionTemporal.test.js
+// ya cubre a nivel de función pura — aquí se verifica la integración real.
+describe('calcularProyeccionRPM — cierre de integridad: valida historiaCotizacion al comienzo, antes de cualquier cifra', () => {
+  // edadJubilacionDeseada: 90 (no 65) — horizonte de ~24 años, muy por encima de los 3.650
+  // días que exige la ventana del IBL, para que los casos "CONSERVADO" (que sí deben
+  // llegar a `estado: 'calculado'`) no fallen por una razón no relacionada con esta
+  // corrección (ventana incompleta) — los casos de rechazo no dependen del horizonte, se
+  // detienen antes de resolverlo.
+  const PARAMS_BASE = {
+    fechaNacimiento: '1964-01-01',
+    edadJubilacionDeseada: 90,
+    escenarioIbcFuturo: escenarioContinuidad(2000000),
+    fecha: FECHA_CALCULO,
+  }
+
+  it('historiaCotizacion no-arreglo (null): se detiene limpiamente, sin lanzar, con HISTORIA_NO_ES_ARREGLO_VALIDO', () => {
+    expect(() => calcularProyeccionRPM({ ...PARAMS_BASE, historiaCotizacion: null })).not.toThrow()
+    const r = calcularProyeccionRPM({ ...PARAMS_BASE, historiaCotizacion: null })
+    expect(r.estado).toBe('no_evaluable')
+    expect(r.razonNoEvaluable).toBe('HISTORIA_NO_ES_ARREGLO_VALIDO')
+    expect(r.pensionMensualProyectada).toBeNull()
+    expect(r.ibl).toBeNull()
+    expect(r.tasaReemplazo).toBeNull()
+  })
+
+  it('historiaCotizacion no-arreglo (string): se detiene limpiamente, sin lanzar', () => {
+    expect(() => calcularProyeccionRPM({ ...PARAMS_BASE, historiaCotizacion: 'no-es-un-arreglo' })).not.toThrow()
+    const r = calcularProyeccionRPM({ ...PARAMS_BASE, historiaCotizacion: 'no-es-un-arreglo' })
+    expect(r.razonNoEvaluable).toBe('HISTORIA_NO_ES_ARREGLO_VALIDO')
+  })
+
+  it('período con fecha inválida: HISTORIA_CON_PERIODO_DE_FECHA_INVALIDA, sin NaN en ningún campo de salida', () => {
+    const r = calcularProyeccionRPM({
+      ...PARAMS_BASE,
+      historiaCotizacion: [{ fechaDesde: 'no-es-una-fecha', fechaHasta: '2020-12-31', ibc: 1000000, diasCotizados: 300 }],
+    })
+    expect(r.estado).toBe('no_evaluable')
+    expect(r.razonNoEvaluable).toBe('HISTORIA_CON_PERIODO_DE_FECHA_INVALIDA')
+    expect(r.pensionMensualProyectada).toBeNull()
+  })
+
+  it('período con fechas invertidas: HISTORIA_CON_PERIODO_DE_FECHAS_INVERTIDAS — antes de esta corrección, este caso caía en un código distinto (INCONSISTENCIA_DIAS_COTIZADOS_INVALIDOS) más adelante en seleccionarPeriodosIBL.js; ahora se rechaza aquí, al comienzo, con el código canónico', () => {
+    const r = calcularProyeccionRPM({
+      ...PARAMS_BASE,
+      historiaCotizacion: [{ fechaDesde: '2020-06-01', fechaHasta: '2020-01-01', ibc: 1000000, diasCotizados: 30 }],
+    })
+    expect(r.estado).toBe('no_evaluable')
+    expect(r.razonNoEvaluable).toBe('HISTORIA_CON_PERIODO_DE_FECHAS_INVERTIDAS')
+  })
+
+  it('período totalmente posterior a fechaCalculo: HISTORIA_CON_PERIODO_POSTERIOR_A_FECHA_CALCULO — mismo código que antes de esta corrección (comportamiento vigente conservado)', () => {
+    const r = calcularProyeccionRPM({
+      ...PARAMS_BASE,
+      historiaCotizacion: [{ fechaDesde: '2027-01-01', fechaHasta: '2027-12-31', ibc: 1000000, diasCotizados: 365 }],
+    })
+    expect(r.estado).toBe('no_evaluable')
+    expect(r.razonNoEvaluable).toBe('HISTORIA_CON_PERIODO_POSTERIOR_A_FECHA_CALCULO')
+  })
+
+  it('período parcialmente posterior a fechaCalculo (empieza antes, termina después): mismo código, comportamiento vigente conservado', () => {
+    const r = calcularProyeccionRPM({
+      ...PARAMS_BASE,
+      historiaCotizacion: [{ fechaDesde: '2025-06-01', fechaHasta: '2026-06-30', ibc: 1000000, diasCotizados: 395 }],
+    })
+    expect(r.estado).toBe('no_evaluable')
+    expect(r.razonNoEvaluable).toBe('HISTORIA_CON_PERIODO_POSTERIOR_A_FECHA_CALCULO')
+  })
+
+  it('CONSERVADO — arreglo vacío (valor por defecto): comportamiento vigente sin cambios, calcula normalmente', () => {
+    const r = calcularProyeccionRPM(PARAMS_BASE)
+    expect(r.estado).toBe('calculado')
+  })
+
+  it('CONSERVADO — historia válida (sin ningún período futuro ni inconsistente): comportamiento vigente sin cambios', () => {
+    const r = calcularProyeccionRPM({
+      ...PARAMS_BASE,
+      historiaCotizacion: [{ fechaDesde: '2020-01-01', fechaHasta: '2025-12-31', ibc: 1500000, diasCotizados: 2192 }],
+    })
+    expect(r.estado).toBe('calculado')
+    expect(r.pensionMensualProyectada).toBeGreaterThan(0)
+  })
+
+  it('CONSERVADO — período que termina EXACTAMENTE en fechaCalculo: no se rechaza (límite inclusive), comportamiento vigente sin cambios', () => {
+    const r = calcularProyeccionRPM({
+      ...PARAMS_BASE,
+      historiaCotizacion: [{ fechaDesde: '2020-01-01', fechaHasta: FECHA_CALCULO, ibc: 1500000, diasCotizados: 2192 }],
+    })
+    expect(r.estado).toBe('calculado')
+  })
+
+  it('CONSERVADO — período que termina el día calendario anterior a fechaCalculo: no se rechaza, comportamiento vigente sin cambios', () => {
+    const r = calcularProyeccionRPM({
+      ...PARAMS_BASE,
+      historiaCotizacion: [{ fechaDesde: '2020-01-01', fechaHasta: '2025-12-31', ibc: 1500000, diasCotizados: 2191 }],
+    })
+    expect(r.estado).toBe('calculado')
+  })
+})

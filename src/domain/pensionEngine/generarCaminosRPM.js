@@ -41,9 +41,10 @@
 // construido (por eso el barrido se calcula al final de esta función, no en paralelo).
 
 import { calcularProyeccionRPM } from './calcularProyeccionRPM.js'
-import { calcularFechaPorEdad } from '../calcularFechaPorEdad.js'
-import { obtenerTasaCotizacion, obtenerEdadPension, obtenerSemanasMinimas } from '../../data/legal/index.js'
-import { objetivoValorMensualEsValido, edadJubilacionDeseadaEsValida } from './requisitosDatosImprescindiblesRPM.js'
+import { obtenerTasaCotizacion } from '../../data/legal/index.js'
+import { objetivoValorMensualEsValido } from './requisitosDatosImprescindiblesRPM.js'
+import { evaluarElegibilidadProyectadaRPM, ESTADOS_ELEGIBILIDAD_RPM } from './evaluarElegibilidadProyectadaRPM.js'
+import { evaluarDisponibilidadCuantiaRPM } from './evaluarDisponibilidadCuantiaRPM.js'
 
 function hoyISO() {
   return new Date().toISOString().slice(0, 10)
@@ -70,7 +71,12 @@ const LIMITACION_RESTRICCION_COSTO_LIMITA_RESULTADO = {
 // real RPM/Colpensiones).
 const DIAS_REFERENCIA_VENTANA_IBL = 3650
 
-function resultadoVacio(codigo, razon, detalleElegibilidad = null) {
+// elegibilidad/disponibilidadCuantia (E2, PL-260 Contratos A/B): parámetros aditivos, con
+// default null — cada resultadoVacio existente antes de E2 sigue produciendo exactamente
+// la misma forma que antes en esos dos campos nuevos cuando no aplica (ej. PERFIL_NO_EVALUABLE,
+// antes de poder evaluar elegibilidad). Nunca reemplazan ni transforman detalleElegibilidad,
+// que se conserva tal cual por compatibilidad con los consumidores ya existentes.
+function resultadoVacio(codigo, razon, detalleElegibilidad = null, elegibilidad = null, disponibilidadCuantia = null) {
   return {
     escenarios: [],
     orientacion: { caminoMasAlineadoId: null, codigo, razon, objetivoLegalmenteInalcanzable: false },
@@ -78,6 +84,8 @@ function resultadoVacio(codigo, razon, detalleElegibilidad = null) {
     barrido: null,
     horizonte: null,
     semanas: null,
+    elegibilidad,
+    disponibilidadCuantia,
   }
 }
 
@@ -498,37 +506,97 @@ export function generarCaminosRPM({
     return resultadoVacio('PERFIL_NO_EVALUABLE', 'Este análisis de caminos solo está disponible hoy para régimen RPM.')
   }
 
-  // --- Datos imprescindibles ---
-  if (sexo !== 'Mujer' && sexo !== 'Hombre') {
-    return resultadoVacio('DATOS_INCOMPLETOS', 'Todavía falta declarar tu sexo para poder resolver los requisitos legales de edad y semanas mínimas.')
+  // --- Elegibilidad proyectada (E2, PL-260 Contrato A) ---
+  // Responde "¿cumplirías edad y semanas?" de forma completamente independiente de si el
+  // IBL es calculable — se evalúa primero, y no requiere ibcAplicableSimulacion ni
+  // objetivoValorMensual (esos pertenecen a la simulación económica, no a la elegibilidad).
+  // Antes de este Slice, el requisito de semanas solo podía confirmarse DESPUÉS de que
+  // calcularProyeccionRPM tuviera éxito (leyendo resultadoBase.semanasCotizadas.total) —
+  // así que una historia insuficiente para la ventana del IBL bloqueaba también la
+  // respuesta a "¿cumples semanas?", aunque esa respuesta fuera perfectamente calculable
+  // con los datos ya disponibles (hallazgo de diagnóstico, caso real Oscar/Colpensiones).
+  const elegibilidad = evaluarElegibilidadProyectadaRPM({
+    sexo,
+    fechaNacimiento,
+    edadJubilacionDeseada,
+    historiaCotizacion,
+    semanasReferenciaDeclaradas,
+    fecha,
+  })
+
+  if (elegibilidad.estado === ESTADOS_ELEGIBILIDAD_RPM.NO_EVALUABLE) {
+    // Punto 5/8 (corrección E2) + corrección de riesgo funcional (2026-09-04): lista de
+    // causas estructurales ampliada con las razones que evaluarElegibilidadProyectadaRPM.js
+    // puede devolver desde la corrección de fecha/edad (punto 1/3/4) y con las cuatro
+    // razones de historia temporalmente inconsistente (validarHistoriaCotizacionTemporal.js)
+    // — todas hard-stop: sin datos estructurales válidos, o con una historia que
+    // calcularProyeccionRPM.js rechazaría de todas formas (o que produciría doble conteo
+    // del futuro si se dejara pasar), no tiene sentido intentar calcularProyeccionRPM.
+    const razonEstructural = elegibilidad.razones.find((r) =>
+      [
+        'SEXO_NO_DECLARADO',
+        'FECHA_NACIMIENTO_NO_VALIDA',
+        'EDAD_JUBILACION_NO_VALIDA',
+        'EDAD_JUBILACION_FUERA_DE_RANGO_FUNCIONAL',
+        'FECHA_OBJETIVO_NO_POSTERIOR_A_FECHA_CALCULO',
+        'HISTORIA_NO_ES_ARREGLO_VALIDO',
+        'HISTORIA_CON_PERIODO_DE_FECHA_INVALIDA',
+        'HISTORIA_CON_PERIODO_DE_FECHAS_INVERTIDAS',
+        'HISTORIA_CON_PERIODO_POSTERIOR_A_FECHA_CALCULO',
+      ].includes(r.codigo)
+    )
+    // Datos estructurales realmente ausentes o inconsistentes — hard stop: sin ellos no se
+    // puede calcular nada, ni siquiera intentar calcularProyeccionRPM. Mismos mensajes que
+    // antes de este Slice (sin cambio de texto) para las tres causas originales.
+    if (razonEstructural) {
+      return resultadoVacio('DATOS_INCOMPLETOS', razonEstructural.mensaje, null, elegibilidad)
+    }
+    // Único otro caso posible: SEMANAS_ACTUALES_SIN_EVIDENCIA (sin historia ni
+    // declaración) — no hay evidencia suficiente para CONFIRMAR ni para DESCARTAR el
+    // requisito de semanas, aunque edad/fecha/sexo sí están completos. No se bloquea aquí
+    // a propósito: se deja continuar para que calcularProyeccionRPM dé su propio
+    // diagnóstico específico (p. ej. HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA) en
+    // vez de una afirmación de "no cumples semanas" que los datos no sustentan.
+  } else if (elegibilidad.estado !== ESTADOS_ELEGIBILIDAD_RPM.CUMPLE) {
+    const razonEdad = elegibilidad.razones.find((r) => r.codigo === 'EDAD_INSUFICIENTE')
+    const razonSemanas = elegibilidad.razones.find((r) => r.codigo === 'SEMANAS_INSUFICIENTES')
+
+    if (elegibilidad.estado === ESTADOS_ELEGIBILIDAD_RPM.NO_CUMPLE_NINGUNO) {
+      return resultadoVacio(
+        'EDAD_Y_SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM',
+        `${razonEdad.mensaje} ${razonSemanas.mensaje}`,
+        { ...razonEdad.detalle, ...razonSemanas.detalle, fuenteSemanas: elegibilidad.semanasActuales.procedencia },
+        elegibilidad
+      )
+    }
+    if (elegibilidad.estado === ESTADOS_ELEGIBILIDAD_RPM.NO_CUMPLE_EDAD) {
+      return resultadoVacio('EDAD_JUBILACION_INFERIOR_A_EDAD_MINIMA_LEGAL', razonEdad.mensaje, razonEdad.detalle, elegibilidad)
+    }
+    // NO_CUMPLE_SEMANAS_EN_FECHA_OBJETIVO — misma redacción sensible a la fuente ya
+    // aprobada antes de este Slice (contrato GO-B): "con la historia..." vs "con las
+    // semanas que declaraste...", construida ahora desde `elegibilidad` (mismos números
+    // exactos que antes, verificado: misma fórmula que resultadoBase.semanasCotizadas
+    // habría dado, vía resolverSemanasProyectadasRPM.js compartido).
+    const fraseFuente =
+      elegibilidad.semanasActuales.procedencia === 'declaracion_agregada'
+        ? 'Con las semanas que declaraste y el escenario de cotización futuro utilizado'
+        : 'Con la historia y el escenario de cotización utilizados'
+    return resultadoVacio(
+      'SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM',
+      `${fraseFuente}, a esa fecha proyectamos ${elegibilidad.semanasTotalesEnFechaObjetivo.toFixed(1)} semanas. El requisito legal aplicable es ${elegibilidad.semanasMinimasAplicables.valor}; faltarían ${(elegibilidad.semanasMinimasAplicables.valor - elegibilidad.semanasTotalesEnFechaObjetivo).toFixed(1)} semanas.`,
+      { ...razonSemanas.detalle, fuenteSemanas: elegibilidad.semanasActuales.procedencia },
+      elegibilidad
+    )
   }
+
+  // --- Datos imprescindibles restantes ---
+  // No forman parte de la elegibilidad (edad/semanas ya se resolvieron arriba sin
+  // necesitarlos): pertenecen a la simulación económica.
   if (!esNumeroValido(ibcAplicableSimulacion) || ibcAplicableSimulacion <= 0) {
-    return resultadoVacio('DATOS_INCOMPLETOS', 'Todavía falta una base de cotización apta para simular.')
+    return resultadoVacio('DATOS_INCOMPLETOS', 'Todavía falta una base de cotización apta para simular.', null, elegibilidad)
   }
   if (!objetivoValorMensualEsValido(objetivoValorMensual)) {
-    return resultadoVacio('DATOS_INCOMPLETOS', 'Todavía falta declarar tu objetivo de pensión mensual.')
-  }
-  if (!edadJubilacionDeseadaEsValida(edadJubilacionDeseada)) {
-    return resultadoVacio('DATOS_INCOMPLETOS', 'Todavía falta declarar la edad hasta la que quieres explorar.')
-  }
-
-  // --- Elegibilidad legal RPM (auditoría 2026-08-21) ---
-  // Requisito de edad: se resuelve a fechaReconocimiento, no a fecha — no es un valor
-  // legal futuro desconocido, es aplicar hoy una constante ya vigente (57/62, sin
-  // cronograma) a la fecha en que efectivamente se evaluaría. Se verifica ANTES de
-  // llamar a calcularProyeccionRPM: no depende de historia ni de IBC, así que no tiene
-  // sentido calcular nada si la edad elegida ya descarta el reconocimiento.
-  const sexoResuelto = sexo === 'Mujer' ? 'F' : 'M'
-  const fechaReconocimiento = calcularFechaPorEdad(fechaNacimiento, edadJubilacionDeseada)
-  const edadMinima = obtenerEdadPension(fechaReconocimiento, sexoResuelto)
-
-  if (edadJubilacionDeseada < edadMinima.valor) {
-    const aniosFaltantes = edadMinima.valor - edadJubilacionDeseada
-    return resultadoVacio(
-      'EDAD_JUBILACION_INFERIOR_A_EDAD_MINIMA_LEGAL',
-      `A los ${edadJubilacionDeseada} años no cumplirías el requisito legal de edad para RPM (${edadMinima.valor} años) — te faltarían ${aniosFaltantes} años.`,
-      { edadMinima: edadMinima.valor, edadElegida: edadJubilacionDeseada, aniosFaltantes }
-    )
+    return resultadoVacio('DATOS_INCOMPLETOS', 'Todavía falta declarar tu objetivo de pensión mensual.', null, elegibilidad)
   }
 
   const escenarioBaseInput = {
@@ -546,62 +614,70 @@ export function generarCaminosRPM({
 
   const resultadoBase = calcularProyeccionRPM(escenarioBaseInput)
 
-  if (resultadoBase.estado !== 'calculado') {
-    // Hallazgo de prueba manual (2026-08-27, caso real RPM/Colpensiones): el contrato
-    // GO-B (semanasReferenciaDeclaradas, arriba) nunca llega a leerse aquí cuando el
-    // horizonte es corto y no hay historia real — calcularProyeccionRPM ya rechazó el
-    // escenario por HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA antes de ese punto.
-    // Se conserva y propaga esa razón específica (nunca el cálculo ni el criterio de
-    // viabilidad, solo esta capa de resultado/orientación) para que la UI pueda ofrecer
-    // de inmediato la profundización opcional ya construida (HistoriaCotizacionRPM.jsx)
-    // en vez de un mensaje genérico sin ninguna acción.
+  // --- Disponibilidad de cuantía (E2, PL-260 Contrato B) ---
+  // Interpreta el resultado ya producido arriba — nunca vuelve a llamar
+  // calcularProyeccionRPM ni recalcula la ventana del IBL.
+  const disponibilidadCuantia = evaluarDisponibilidadCuantiaRPM(resultadoBase, { historiaCotizacion })
+
+  if (disponibilidadCuantia.estado !== 'CUANTIA_CALCULABLE') {
+    // Hallazgo de prueba manual (2026-08-27, caso real RPM/Colpensiones), preservado tal
+    // cual de antes de este Slice: cuando la causa es específicamente la ventana del IBL,
+    // se conserva la razón exacta con cifras, nunca el mensaje genérico de
+    // SIN_CAMINOS_VIABLES — con `elegibilidad` ahora siempre adjunta (E2), de modo que un
+    // caso elegible por edad y semanas nunca se confunde con uno que no cumple requisitos.
     if (resultadoBase.razonNoEvaluable === 'HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA') {
-      const diasEfectivos = resultadoBase.trazabilidadVentana?.diasEfectivosAcumulados ?? null
+      const diasEfectivos = disponibilidadCuantia.diasIBLCubiertos
       const razon =
         diasEfectivos !== null
           ? `Para calcular esta proyección todavía necesitamos completar una parte de tu historia de ` +
             `cotización — con la información disponible identificamos ${diasEfectivos} de los ` +
             `${DIAS_REFERENCIA_VENTANA_IBL} días de cotización que esta proyección necesita.`
           : 'Para calcular esta proyección todavía necesitamos completar una parte de tu historia de cotización.'
-      return resultadoVacio('HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA', razon, {
-        diasEfectivosAcumulados: diasEfectivos,
-        diasVentanaRequeridos: DIAS_REFERENCIA_VENTANA_IBL,
-      })
+      return resultadoVacio(
+        'HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA',
+        razon,
+        { diasEfectivosAcumulados: diasEfectivos, diasVentanaRequeridos: DIAS_REFERENCIA_VENTANA_IBL },
+        elegibilidad,
+        disponibilidadCuantia
+      )
     }
-    return resultadoVacio('SIN_CAMINOS_VIABLES', 'No fue posible calcular ni siquiera el camino base con los datos actuales.')
+    return resultadoVacio(
+      'SIN_CAMINOS_VIABLES',
+      'No fue posible calcular ni siquiera el camino base con los datos actuales.',
+      null,
+      elegibilidad,
+      disponibilidadCuantia
+    )
   }
 
-  // Requisito de semanas: igual criterio de fecha que la edad (fechaReconocimiento, no
-  // fecha) — semanasMinimasPensionMujer sí tiene un cronograma legal ya vigente
-  // (Sentencia C-197/2023) que sería incorrecto ignorar. Se compara contra
-  // semanasCotizadas.total — que, desde el contrato GO-B, es la MISMA cifra que ya
-  // alimentó la tasa de reemplazo dentro de calcularProyeccionRPM (declaradas+futuras
-  // cuando hay una declaración agregada válida; historia+futuro en caso contrario) —
-  // nunca dos cifras distintas para elegibilidad y tasa. Una sola verificación basta:
-  // semanasCotizadas.total no depende de escenarioIbcFuturo.valor (invariante ya
-  // establecida), así que si el camino base cumple, cualquier alternativo también.
-  const semanasMinimas = obtenerSemanasMinimas(fechaReconocimiento, sexoResuelto, 'RPM')
-  const semanasProyectadas = resultadoBase.semanasCotizadas.total
-
-  if (semanasProyectadas < semanasMinimas.valor) {
-    const semanasFaltantes = semanasMinimas.valor - semanasProyectadas
-    // Redacción sensible a la fuente (contrato GO-B) — "con la historia... utilizados"
-    // sería inexacto cuando la fuente real es la declaración agregada (p. ej.
-    // historiaCotizacion=[]): no hay ninguna historia detrás de esa cifra todavía.
-    const fraseFuente =
-      resultadoBase.semanasCotizadas.fuente === 'declaracion_agregada'
-        ? 'Con las semanas que declaraste y el escenario de cotización futuro utilizado'
-        : 'Con la historia y el escenario de cotización utilizados'
-    return resultadoVacio(
-      'SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM',
-      `${fraseFuente}, a esa fecha proyectamos ${semanasProyectadas.toFixed(1)} semanas. El requisito legal aplicable es ${semanasMinimas.valor}; faltarían ${semanasFaltantes.toFixed(1)} semanas.`,
-      {
-        semanasMinimas: semanasMinimas.valor,
-        semanasProyectadas,
-        semanasFaltantes,
-        fuenteSemanas: resultadoBase.semanasCotizadas.fuente,
-      }
-    )
+  // --- Verificación de semanas diferida (E2) ---
+  // Se ejecuta ÚNICAMENTE cuando elegibilidad quedó en NO_EVALUABLE_DATOS_INSUFICIENTES
+  // por falta de evidencia de semanas (sin historia ni declaración agregada — el único
+  // otro motivo posible de ese estado, SEXO/FECHA/EDAD inválidos, ya hizo hard stop más
+  // arriba). En ese caso específico, elegibilidad no pudo confirmar ni descartar el
+  // requisito de semanas con un límite inferior de 0 — pero calcularProyeccionRPM, si
+  // llegó hasta aquí, ya resolvió con éxito la ventana del IBL y su
+  // resultadoBase.semanasCotizadas.total es ahora la cifra autoritativa (misma fórmula,
+  // resolverSemanasProyectadasRPM.js, que elegibilidad ya usó — nunca diverge). Cuando
+  // elegibilidad ya fue confiada arriba (CUMPLE_REQUISITOS_EN_FECHA_OBJETIVO), esta verificación NUNCA se
+  // repite: sería recalcular con certeza algo que ya se resolvió con certeza.
+  if (elegibilidad.estado === ESTADOS_ELEGIBILIDAD_RPM.NO_EVALUABLE) {
+    const semanasMinimasValor = elegibilidad.semanasMinimasAplicables.valor
+    const semanasProyectadas = resultadoBase.semanasCotizadas.total
+    if (semanasProyectadas < semanasMinimasValor) {
+      const semanasFaltantes = semanasMinimasValor - semanasProyectadas
+      const fraseFuente =
+        resultadoBase.semanasCotizadas.fuente === 'declaracion_agregada'
+          ? 'Con las semanas que declaraste y el escenario de cotización futuro utilizado'
+          : 'Con la historia y el escenario de cotización utilizados'
+      return resultadoVacio(
+        'SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM',
+        `${fraseFuente}, a esa fecha proyectamos ${semanasProyectadas.toFixed(1)} semanas. El requisito legal aplicable es ${semanasMinimasValor}; faltarían ${semanasFaltantes.toFixed(1)} semanas.`,
+        { semanasMinimas: semanasMinimasValor, semanasProyectadas, semanasFaltantes, fuenteSemanas: resultadoBase.semanasCotizadas.fuente },
+        elegibilidad,
+        disponibilidadCuantia
+      )
+    }
   }
 
   const tasaCotizacion = obtenerTasaCotizacion(fecha)
@@ -819,5 +895,10 @@ export function generarCaminosRPM({
     barrido,
     horizonte,
     semanas,
+    // E2, PL-260 Contratos A/B — aditivos: ningún consumidor existente antes de este
+    // Slice lee estas dos claves, así que su presencia no cambia el comportamiento de
+    // ProyectaTuPensionRPM.jsx ni de ningún otro consumidor ya desplegado.
+    elegibilidad,
+    disponibilidadCuantia,
   }
 }

@@ -15,10 +15,12 @@
 // calcularProyeccionRAIS evalúa un único ibcAplicableSimulacion por llamada — la misma
 // forma que S4-003 reutilizará repetidamente con distintos candidatos.
 
-import { seleccionarPeriodosIBL, diasCalendarioEnRango, diaSiguiente } from '../seleccionarPeriodosIBL.js'
+import { seleccionarPeriodosIBL } from '../seleccionarPeriodosIBL.js'
 import { calcularPromedioIBL, dividirPeriodoPorAnio } from '../formulas/formulaIBL.js'
 import { calcularTasaReemplazoRPM, formulaRPM } from '../formulas/formulaRPM.js'
-import { calcularFechaPorEdad } from '../calcularFechaPorEdad.js'
+import { resolverHorizonteFuturoRPM } from '../resolverHorizonteFuturoRPM.js'
+import { resolverSemanasProyectadasRPM } from './resolverSemanasProyectadasRPM.js'
+import { esFechaValida, validarHistoriaCotizacionTemporal } from './validarHistoriaCotizacionTemporal.js'
 import {
   obtenerIPC,
   obtenerParametrosTasaReemplazoRPM,
@@ -32,21 +34,26 @@ function hoyISO() {
   return new Date().toISOString().slice(0, 10)
 }
 
-// Guarda el propio contrato de la función pública (Principio 11) en vez de confiar en
-// que quien la llama ya entregó una fecha válida — hallazgo de la revisión de S4-002
-// (2026-08-20): sin esta comprobación, calcularFechaPorEdad podía lanzar
-// "RangeError: Invalid time value" sin capturar, en vez de declarar no_evaluable.
-function esFechaValida(fechaISO) {
-  return typeof fechaISO === 'string' && !Number.isNaN(new Date(fechaISO).getTime())
-}
-
-// Ninguna fecha de historiaCotizacion puede ser posterior a `fecha` — un período
-// "histórico" fechado en el futuro no es historia real, y mezclarlo con el período
-// futuro sintético (más abajo) le haría perder su propio ibc en silencio (hallazgo de la
-// revisión de S4-002, 2026-08-20). Se rechaza explícitamente en vez de reinterpretarlo.
-function tienePeriodoPosteriorAFecha(historiaCotizacion, fecha) {
-  return historiaCotizacion.some((p) => p.fechaDesde > fecha || (p.fechaHasta != null && p.fechaHasta > fecha))
-}
+// esFechaValida (Principio 11 — hallazgo de la revisión de S4-002, 2026-08-20) y la
+// validación de historiaCotizacion (misma revisión: ningún período "histórico" puede estar
+// fechado en el futuro, o pierde su propio ibc en silencio al mezclarse con el tramo
+// futuro sintético) viven en validarHistoriaCotizacionTemporal.js — única fuente, sin
+// duplicar reglas, para evaluarElegibilidadProyectadaRPM.js y este archivo.
+//
+// Cierre de integridad (Carlos/Atlas, 2026-09-04): calcularProyeccionRPM.js es una
+// frontera pública del motor (se invoca directamente en tests y, potencialmente, fuera de
+// generarCaminosRPM.js) — no puede depender de que quien la invoque ya haya pasado por la
+// validación de evaluarElegibilidadProyectadaRPM.js. Antes de esta corrección, este archivo
+// solo rechazaba explícitamente el caso de período futuro (vía la extracción de
+// tienePeriodoPosteriorAFecha) y quedaba vulnerable, si se invoca directamente, a
+// historiaCotizacion no-arreglo (crash: TypeError sin capturar), fechas invertidas
+// (rechazadas indirectamente y con un código de razón distinto, más adelante, en
+// seleccionarPeriodosIBL.js) y fechas con formato inválido (comportamiento inconsistente,
+// podía producir NaN silencioso). Ahora llama a validarHistoriaCotizacionTemporal completa,
+// al comienzo, antes de seleccionar períodos, calcular días, IBL o producir cualquier
+// cifra — mismos cuatro códigos de razón que evaluarElegibilidadProyectadaRPM.js ya usa,
+// reutilizados tal cual (nunca reimplementados), incluido el caso de período futuro, que
+// ya se comportaba así y no cambia.
 
 const LIMITACION_NO_ES_PENSION_FINAL = {
   codigo: 'NO_ES_TU_PENSION_FINAL',
@@ -199,7 +206,7 @@ function promediarConFuturo({ periodosObservados, diasFuturos, valorAplicado, an
  *   antes de GO-B (test de regresión dedicado).
  * @returns {{
  *   estado: 'calculado' | 'no_evaluable',
- *   razonNoEvaluable: ('EDAD_JUBILACION_NO_DECLARADA'|'FECHA_NACIMIENTO_NO_VALIDA'|'IBC_FUTURO_NO_VALIDO'|'HISTORIA_CON_PERIODO_POSTERIOR_A_FECHA_CALCULO'|'EDAD_JUBILACION_NO_POSTERIOR_A_HOY'|'HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA'|'COTIZACION_PARCIAL_EN_LIMITE_VENTANA_IBL_NO_SOPORTADA'|'PERIODOS_SUPERPUESTOS_NO_SOPORTADOS'|'INCONSISTENCIA_DIAS_COTIZADOS_INVALIDOS'|'COBERTURA_IPC_INSUFICIENTE_PARA_IBL_ORDINARIO'|null),
+ *   razonNoEvaluable: ('EDAD_JUBILACION_NO_DECLARADA'|'FECHA_NACIMIENTO_NO_VALIDA'|'IBC_FUTURO_NO_VALIDO'|'HISTORIA_NO_ES_ARREGLO_VALIDO'|'HISTORIA_CON_PERIODO_DE_FECHA_INVALIDA'|'HISTORIA_CON_PERIODO_DE_FECHAS_INVERTIDAS'|'HISTORIA_CON_PERIODO_POSTERIOR_A_FECHA_CALCULO'|'EDAD_JUBILACION_NO_POSTERIOR_A_HOY'|'HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA'|'COTIZACION_PARCIAL_EN_LIMITE_VENTANA_IBL_NO_SOPORTADA'|'PERIODOS_SUPERPUESTOS_NO_SOPORTADOS'|'INCONSISTENCIA_DIAS_COTIZADOS_INVALIDOS'|'COBERTURA_IPC_INSUFICIENTE_PARA_IBL_ORDINARIO'|null),
  *   fechaBaseMonetaria: string | null,
  *   fechaReconocimiento: string | null,
  *   horizonteFuturo: {fechaInicio: string, fechaFin: string, diasCotizados: number} | null,
@@ -246,14 +253,26 @@ export function calcularProyeccionRPM({
     return noEvaluable('IBC_FUTURO_NO_VALIDO', null)
   }
 
-  if (tienePeriodoPosteriorAFecha(historiaCotizacion, fecha)) {
-    return noEvaluable('HISTORIA_CON_PERIODO_POSTERIOR_A_FECHA_CALCULO', null)
+  // Cierre de integridad (2026-09-04): validación temporal completa de historiaCotizacion
+  // ANTES de seleccionar períodos, calcular días, IBL o producir cualquier cifra — nunca
+  // solo el caso de período futuro. razonNoEvaluable es exactamente
+  // validacionHistoria.codigo (nunca un literal propio): reutiliza los mismos cuatro
+  // códigos que evaluarElegibilidadProyectadaRPM.js ya expone, sin duplicar la condición
+  // de ninguno de los cuatro casos.
+  const validacionHistoria = validarHistoriaCotizacionTemporal(historiaCotizacion, fecha)
+  if (!validacionHistoria.valida) {
+    return noEvaluable(validacionHistoria.codigo, null)
   }
 
-  const fechaReconocimiento = calcularFechaPorEdad(fechaNacimiento, edadJubilacionDeseada)
-  if (fechaReconocimiento <= fecha) {
+  // Punto 4 (corrección E2, sprint-4-correcciones-oscar-baldor): fechaReconocimiento y los
+  // días futuros se resuelven ahora en resolverHorizonteFuturoRPM.js — única fuente,
+  // compartida con evaluarElegibilidadProyectadaRPM.js — para eliminar la doble
+  // implementación de la misma fórmula que existía antes de esta corrección.
+  const horizonte = resolverHorizonteFuturoRPM({ fechaNacimiento, edadObjetivo: edadJubilacionDeseada, fecha })
+  if (!horizonte.valido) {
     return noEvaluable('EDAD_JUBILACION_NO_POSTERIOR_A_HOY', null)
   }
+  const fechaReconocimiento = horizonte.fechaObjetivo
 
   const smlv = obtenerSmlv(fecha)
   const tope = obtenerTopeMaximoIBC(fecha)
@@ -262,10 +281,10 @@ export function calcularProyeccionRPM({
   const valorAplicado = Math.min(valorDeclarado, topeAplicado)
 
   const periodoFuturo = {
-    fechaDesde: diaSiguiente(fecha),
+    fechaDesde: horizonte.fechaInicioFuturo,
     fechaHasta: fechaReconocimiento,
     ibc: valorAplicado,
-    diasCotizados: diasCalendarioEnRango(diaSiguiente(fecha), fechaReconocimiento),
+    diasCotizados: horizonte.diasFuturos,
     esEscenarioFuturo: true,
   }
 
@@ -297,45 +316,20 @@ export function calcularProyeccionRPM({
     })
   }
 
-  const diasObservadosTotal = sumaDias(historiaCotizacion)
-  const semanasObservadas = diasObservadosTotal / 7
-  const semanasFuturas = periodoFuturo.diasCotizados / 7
-  // Única magnitud sustentada por evidencia (historiaCotizacion + el mismo período futuro
-  // sintético que ya usa el IBL ordinario) — nunca incluye una declaración. Es la única
-  // que puede habilitar el IBL alternativo de vida laboral completa (contrato GO-B, más
-  // abajo) — las semanas declaradas jamás fabrican cobertura salarial que no existe.
-  const semanasSustentadasPorHistoria = semanasObservadas + semanasFuturas
-
-  // Contrato GO-B: cuando hay una declaración válida, tiene precedencia TOTAL sobre la
-  // historia para elegibilidad/tasa — nunca se suman ambas fuentes (representan el mismo
-  // pasado), y la sola presencia de historia parcial NO la reemplaza automáticamente (sin
-  // heurística de "historia suficientemente completa" — decisión explícita, fuera de
-  // alcance de este slice).
+  // Extraído a resolverSemanasProyectadasRPM.js (E2, Slice "separación elegibilidad/
+  // cuantía") para que evaluarElegibilidadProyectadaRPM.js pueda resolver la misma
+  // pregunta sin duplicar esta lógica — mismo resultado exacto que antes de la
+  // extracción, verificado por la suite existente de este archivo.
+  const semanasCotizadas = resolverSemanasProyectadasRPM({
+    historiaCotizacion,
+    semanasReferenciaDeclaradas,
+    diasFuturos: periodoFuturo.diasCotizados,
+  })
+  const semanasSustentadasPorHistoria = semanasCotizadas.sustentadasPorHistoria
+  const fuenteSemanas = semanasCotizadas.fuente
+  const semanasParaProyeccion = semanasCotizadas.total
   const declaracionValida =
-    semanasReferenciaDeclaradas !== null &&
-    Number.isFinite(semanasReferenciaDeclaradas.cantidad) &&
-    semanasReferenciaDeclaradas.cantidad >= 0 &&
-    (semanasReferenciaDeclaradas.certeza === 'conocido' || semanasReferenciaDeclaradas.certeza === 'aproximado')
-      ? semanasReferenciaDeclaradas
-      : null
-
-  const fuenteSemanas = declaracionValida !== null ? 'declaracion_agregada' : 'historia_estructurada'
-  // Semanas que efectivamente alimentan ESTA proyección (elegibilidad + tasa de
-  // reemplazo) — nunca dos cifras distintas para cada una. PROHIBIDO declaradas +
-  // observadas + futuras: cuando la fuente es la declaración, semanasObservadas ni
-  // siquiera participa de esta suma.
-  const semanasParaProyeccion =
-    declaracionValida !== null ? declaracionValida.cantidad + semanasFuturas : semanasSustentadasPorHistoria
-
-  const semanasCotizadas = {
-    observadas: semanasObservadas,
-    futuras: semanasFuturas,
-    sustentadasPorHistoria: semanasSustentadasPorHistoria,
-    declaradas: declaracionValida !== null ? declaracionValida.cantidad : null,
-    certeza: declaracionValida !== null ? declaracionValida.certeza : null,
-    total: semanasParaProyeccion,
-    fuente: fuenteSemanas,
-  }
+    semanasCotizadas.declaradas !== null ? { cantidad: semanasCotizadas.declaradas, certeza: semanasCotizadas.certeza } : null
 
   const umbralAlternativa = obtenerSemanasHabilitanAlternativaIBL(fecha)
 

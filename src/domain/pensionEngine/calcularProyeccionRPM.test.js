@@ -63,6 +63,177 @@ function fechaNacimientoParaObjetivo(fechaReconocimientoObjetivo) {
   return `${anio - 100}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
 }
 
+describe('calcularProyeccionRPM — E3-C1: vigencia del SMLV (mismas fechas de frontera de E3-A)', () => {
+  const perfilBase = {
+    historiaCotizacion: historiaDiezAniosCompleta(),
+    fechaNacimiento: '1976-01-01',
+    edadJubilacionDeseada: 62,
+    escenarioIbcFuturo: escenarioContinuidad(2000000),
+  }
+
+  it('2026-02-11 (Decreto 1469/2025, firme): calcula normalmente', () => {
+    const resultado = calcularProyeccionRPM({ ...perfilBase, fecha: '2026-02-11' })
+    expect(resultado.estado).toBe('calculado')
+    expect(resultado.vigenciaSmlv.aptoParaCalculoEnFechaBase).toBe(true)
+    expect(resultado.pensionMensualProyectada).toBeGreaterThan(0)
+  })
+
+  it('2026-02-12 (expedición del auto, efecto no confirmado): no evaluable, no fabrica pensión, conserva fechas ya resueltas', () => {
+    let resultado
+    expect(() => {
+      resultado = calcularProyeccionRPM({ ...perfilBase, fecha: '2026-02-12' })
+    }).not.toThrow()
+
+    expect(resultado.estado).toBe('no_evaluable')
+    expect(resultado.razonNoEvaluable).toBe('FUNDAMENTO_NORMATIVO_NO_VERIFICADO')
+    expect(resultado.pensionMensualProyectada).toBeNull()
+    expect(resultado.tasaReemplazo).toBeNull()
+    expect(resultado.escenarioIbcFuturo).toBeNull()
+    expect(resultado.pensionMensualProyectada).not.toBe(0)
+    expect(Number.isNaN(resultado.pensionMensualProyectada)).toBe(false)
+    // Datos intermedios seguros (no dependen del SMLV: solo de fechaNacimiento/edad/fecha).
+    expect(resultado.fechaBaseMonetaria).toBe('2026-02-12')
+    expect(resultado.fechaReconocimiento).not.toBeNull()
+    expect(resultado.horizonteFuturo).not.toBeNull()
+    expect(resultado.vigenciaSmlv.advertencia.codigo).toBe('FUNDAMENTO_NORMATIVO_NO_VERIFICADO')
+    expect(resultado.razonNoEvaluable).not.toBe('MEDIDA_CAUTELAR_ACTIVA')
+    expect(resultado.razonNoEvaluable).not.toBe('FUERA_DE_VIGENCIA')
+    expect(resultado.razonNoEvaluable).not.toBe('FUENTE_INSUFICIENTE')
+    expect(resultado.razonNoEvaluable).not.toBe('FUENTE_LEGAL_NO_ENCONTRADA')
+  })
+
+  it('2026-02-18 (último día de la ventana no verificada): mismo comportamiento que el 12 de febrero', () => {
+    const resultado = calcularProyeccionRPM({ ...perfilBase, fecha: '2026-02-18' })
+    expect(resultado.estado).toBe('no_evaluable')
+    expect(resultado.razonNoEvaluable).toBe('FUNDAMENTO_NORMATIVO_NO_VERIFICADO')
+    expect(resultado.pensionMensualProyectada).toBeNull()
+    expect(resultado.fechaReconocimiento).not.toBeNull()
+  })
+
+  it('2026-02-19 (Decreto 0159/2026, expedición/publicación real): calcula', () => {
+    const resultado = calcularProyeccionRPM({ ...perfilBase, fecha: '2026-02-19' })
+    expect(resultado.estado).toBe('calculado')
+    expect(resultado.vigenciaSmlv.aptoParaCalculoEnFechaBase).toBe(true)
+  })
+
+  it('2026-07-16 (último día del Decreto 0159/2026): calcula', () => {
+    const resultado = calcularProyeccionRPM({ ...perfilBase, fecha: '2026-07-16' })
+    expect(resultado.estado).toBe('calculado')
+  })
+
+  it('2026-07-17 (Decreto 1469/2025 reactivado): calcula', () => {
+    const resultado = calcularProyeccionRPM({ ...perfilBase, fecha: '2026-07-17' })
+    expect(resultado.estado).toBe('calculado')
+  })
+
+  it('litigio pendiente sin suspensión (hoy, 2026-09-07): genera advertencia pero no bloquea, no altera la aritmética', () => {
+    const resultado = calcularProyeccionRPM({ ...perfilBase, fecha: '2026-09-07' })
+    expect(resultado.estado).toBe('calculado')
+    expect(resultado.vigenciaSmlv.litigioPendiente).toBe(true)
+    expect(resultado.vigenciaSmlv.medidaCautelarActiva).toBe(false)
+    expect(resultado.vigenciaSmlv.advertencia.codigo).toBe('LITIGIO_DE_FONDO_PENDIENTE')
+    expect(resultado.pensionMensualProyectada).toBeGreaterThan(0)
+  })
+
+  it('fecha apta (FECHA_CALCULO, ya cubierta por los tests existentes de este archivo): mismo camino numérico, topeAplicado usa el mismo SMLV_2026', () => {
+    const resultado = calcularProyeccionRPM({ ...perfilBase, fecha: FECHA_CALCULO })
+    expect(resultado.estado).toBe('calculado')
+    expect(resultado.vigenciaSmlv.aptoParaCalculoEnFechaBase).toBe(true)
+    expect(resultado.escenarioIbcFuturo.topeAplicado).toBeCloseTo(TOPE_IBC_2026, 6)
+    expect(resultado.pensionMensualProyectada).toBeGreaterThan(0)
+  })
+
+  it('fecha anterior a la cobertura de SMLV disponible (2025-12-31): no evaluable, FUENTE_LEGAL_NO_ENCONTRADA, sin inventar un SMLV histórico', () => {
+    let resultado
+    expect(() => {
+      resultado = calcularProyeccionRPM({ ...perfilBase, fecha: '2025-12-31' })
+    }).not.toThrow()
+
+    expect(resultado.estado).toBe('no_evaluable')
+    expect(resultado.razonNoEvaluable).toBe('FUENTE_LEGAL_NO_ENCONTRADA')
+    expect(resultado.pensionMensualProyectada).toBeNull()
+    expect(resultado.vigenciaSmlv.encontrado).toBe(false)
+    expect(resultado.vigenciaSmlv.valor).toBeNull()
+  })
+
+  // Prueba directa, no solo argumentada: construida para que fechaReconocimiento y `fecha`
+  // (fechaBaseMonetaria) caigan en tramos de vigencia DISTINTOS del SMLV — si el código
+  // usara por error fechaReconocimiento para resolver el SMLV, este caso bloquearía
+  // (fechaReconocimiento cae en la ventana de fundamento no verificado); como usa `fecha`
+  // (firme, apto), calcula con normalidad. fechaNacimiento='1964-02-13' + edadJubilacionDeseada=62
+  // + fecha='2026-02-11' (edadActual=61, el cumpleaños del 13 aún no ocurrió) produce
+  // fechaReconocimiento='2026-02-13', dentro de 2026-02-12 a 2026-02-18.
+  it('fechaReconocimiento no se usa para resolver el SMLV — solo fechaBaseMonetaria (fecha)', () => {
+    const resultado = calcularProyeccionRPM({
+      ...perfilBase,
+      fechaNacimiento: '1964-02-13',
+      edadJubilacionDeseada: 62,
+      fecha: '2026-02-11',
+    })
+    expect(resultado.fechaReconocimiento).toBe('2026-02-13')
+    expect(resultado.fechaBaseMonetaria).toBe('2026-02-11')
+    // Si el código hubiera usado fechaReconocimiento (2026-02-13, fundamento no verificado)
+    // para el SMLV, esto sería 'no_evaluable'. Usa fecha (2026-02-11, firme) → calcula.
+    expect(resultado.estado).toBe('calculado')
+    expect(resultado.vigenciaSmlv.fechaBase).toBe('2026-02-11')
+    expect(resultado.vigenciaSmlv.tipoVigencia).toBe('firme')
+  })
+
+  // Cierre de diseño, quinta ronda (revisión Atlas, 2026-09-08): antes de esta ronda, una
+  // fecha inválida llegaba sin filtrar hasta validarHistoriaCotizacionTemporal/
+  // resolverHorizonteFuturoRPM y producía un throw sin control ("Invalid time value") —
+  // verificado que ya ocurría en HEAD, ajeno a E3-C1, pero incompatible con el contrato de
+  // detención segura de esta función. Ese comportamiento NO se consagra como contrato: se
+  // reemplaza por una detención segura, validada ANTES de que la fecha toque
+  // validarHistoriaCotizacionTemporal o resolverHorizonteFuturoRPM.
+  // 'undefined' se excluye deliberadamente de esta lista: calcularProyeccionRPM tiene
+  // `fecha = hoyISO()` como valor por defecto — pasar `fecha: undefined` activa ese default
+  // (comportamiento estándar de JavaScript, no distinguible de omitir `fecha`), así que
+  // nunca llega a resolverSmlvVigenteRPM como "undefined". Se documenta aparte, abajo.
+  const casosFechaInvalida = [
+    ['null', null],
+    ['cadena vacía', ''],
+    ["'no-es-fecha'", 'no-es-fecha'],
+    ["'2026-13-01' (mes fuera de rango)", '2026-13-01'],
+    ["'2026-02-30' (día fuera de rango)", '2026-02-30'],
+  ]
+
+  for (const [descripcion, valor] of casosFechaInvalida) {
+    it(`fecha ${descripcion}: no lanza, no_evaluable, FECHA_BASE_MONETARIA_INVALIDA, sin proyección ni NaN`, () => {
+      expect(() => calcularProyeccionRPM({ ...perfilBase, fecha: valor })).not.toThrow()
+      const resultado = calcularProyeccionRPM({ ...perfilBase, fecha: valor })
+
+      expect(resultado.estado).toBe('no_evaluable')
+      expect(resultado.razonNoEvaluable).toBe('FECHA_BASE_MONETARIA_INVALIDA')
+      expect(resultado.vigenciaSmlv).not.toBeNull()
+      expect(resultado.vigenciaSmlv.encontrado).toBe(false)
+      expect(resultado.vigenciaSmlv.aptoParaCalculoEnFechaBase).toBe(false)
+      expect(resultado.vigenciaSmlv.advertencia.codigo).toBe('FECHA_BASE_MONETARIA_INVALIDA')
+      // Ninguna cifra final calculada — nunca 0/NaN como sustituto.
+      expect(resultado.pensionMensualProyectada).toBeNull()
+      expect(resultado.tasaReemplazo).toBeNull()
+      expect(resultado.escenarioIbcFuturo).toBeNull()
+      expect(Number.isNaN(resultado.pensionMensualProyectada)).toBe(false)
+      // Nada calculado todavía en este punto (la fecha se validó antes de historia/horizonte).
+      expect(resultado.fechaBaseMonetaria).toBeNull()
+      expect(resultado.fechaReconocimiento).toBeNull()
+      expect(resultado.horizonteFuturo).toBeNull()
+      // Nunca confundida con la fuente-no-encontrada (fecha válida sin cobertura).
+      expect(resultado.razonNoEvaluable).not.toBe('FUENTE_LEGAL_NO_ENCONTRADA')
+    })
+  }
+
+  it('fecha undefined: NO es un caso inválido aquí — activa el valor por defecto (hoyISO()), igual que omitir fecha; calcula con normalidad', () => {
+    // perfilBase no declara `fecha` — omitirla o pasarla explícitamente como undefined son
+    // indistinguibles para JavaScript (ambas activan `fecha = hoyISO()`).
+    const conUndefined = calcularProyeccionRPM({ ...perfilBase, fecha: undefined })
+    const sinFecha = calcularProyeccionRPM(perfilBase)
+    expect(conUndefined.estado).toBe('calculado')
+    expect(conUndefined.razonNoEvaluable).not.toBe('FECHA_BASE_MONETARIA_INVALIDA')
+    expect(conUndefined).toEqual(sinFecha)
+  })
+})
+
 describe('calcularProyeccionRPM — no evaluable', () => {
   it('edadJubilacionDeseada no declarada → EDAD_JUBILACION_NO_DECLARADA', () => {
     const resultado = calcularProyeccionRPM({

@@ -21,6 +21,17 @@
 // convención de producto (a diferencia de la "Convención Económica v1" de RAIS).
 //
 // formulaRPM.js y calcularTasaReemplazoRPM NO se modifican — se reutilizan tal cual.
+//
+// E3-C1 (2026-09-08): el SMLV ya no se lee directamente vía obtenerSmlv(fecha) — se resuelve
+// vía resolverSmlvVigenteRPM(fechaBaseMonetaria) (domain/pensionEngine/), que además
+// interpreta su vigencia jurídica (evaluarVigenciaSmlv(), E3-A) antes de que este archivo lo
+// use para nada. El parámetro `fecha` de ESTA función es exactamente esa fechaBaseMonetaria
+// (nunca una fecha de reconocimiento futura — este archivo no proyecta, todo se calcula "como
+// si fuera hoy"), así que se pasa tal cual. Un SMLV que existe pero no es apto para calcular
+// en esa fecha (ej. la ventana 2026-02-12 a 2026-02-18, fundamento normativo no verificado) ya
+// NO produce silenciosamente una tasa/pensión como si el valor fuera confiable — antes de este
+// cambio, sí lo hacía. Para una fecha apta, el valor de SMLV y toda la aritmética posterior
+// son idénticos a como eran antes de este cambio (mismo número, mismo camino de cálculo).
 
 import { seleccionarPeriodosIBL } from '../seleccionarPeriodosIBL.js'
 import { calcularPromedioIBL, dividirPeriodoPorAnio } from '../formulas/formulaIBL.js'
@@ -29,9 +40,9 @@ import {
   obtenerIPC,
   obtenerParametrosTasaReemplazoRPM,
   obtenerSemanasHabilitanAlternativaIBL,
-  obtenerSmlv,
   tieneIPC,
 } from '../../data/legal/index.js'
+import { resolverSmlvVigenteRPM } from './resolverSmlvVigenteRPM.js'
 
 function hoyISO() {
   return new Date().toISOString().slice(0, 10)
@@ -46,18 +57,28 @@ const LIMITACION_NO_ES_PROYECCION_FUTURA = {
     'tu situación acumulada hasta este momento.',
 }
 
-function noEvaluable(razonNoEvaluable, trazabilidadVentana, datosFaltantes) {
+// `datosIntermedios` (E3-C1, aditivo, default null — ningún llamador existente lo pasa, así
+// que ningún caso previo a este cambio cambia de forma): cuando el bloqueo ocurre DESPUÉS de
+// haber calculado con éxito el IBL/semanas (el único caso hoy: SMLV no apto), esos valores ya
+// calculados se conservan aquí en vez de descartarse — nunca se recalculan ni se inventan
+// para los demás razonNoEvaluable, que siguen sin tener nada seguro que conservar en ese
+// punto del flujo.
+function noEvaluable(razonNoEvaluable, trazabilidadVentana, datosFaltantes, datosIntermedios = null) {
   return {
     estado: 'no_evaluable',
     razonNoEvaluable,
-    ibl: null,
-    totalDiasCotizados: null,
-    semanasObservadas: null,
+    ibl: datosIntermedios?.ibl ?? null,
+    totalDiasCotizados: datosIntermedios?.totalDiasCotizados ?? null,
+    semanasObservadas: datosIntermedios?.semanasObservadas ?? null,
     tasaReemplazo: null,
     resultadoEconomicoActual: null,
     limitaciones: [],
     trazabilidadVentana: trazabilidadVentana ?? null,
     datosFaltantes: datosFaltantes ?? null,
+    // Aditivo (E3-C1): null salvo cuando razonNoEvaluable proviene específicamente de la
+    // vigencia del SMLV — permite a un consumidor futuro distinguir esta causa de todas las
+    // demás sin tener que interpretar el string de razonNoEvaluable.
+    vigenciaSmlv: datosIntermedios?.vigenciaSmlv ?? null,
   }
 }
 
@@ -120,9 +141,28 @@ function construirTablaIPC(anios) {
  *   datosFaltantes: {ipcAnios: number[]} | null - solo poblado cuando razonNoEvaluable es
  *     COBERTURA_IPC_INSUFICIENTE_PARA_IBL_ORDINARIO; los años exactos que faltan en
  *     ipc-historico.json para valorar económicamente la ventana ya seleccionada.
+ *   vigenciaSmlv: ReturnType<typeof import('./resolverSmlvVigenteRPM.js').resolverSmlvVigenteRPM> | null -
+ *     (E3-C1, aditivo) presente siempre que se llegó a resolver el SMLV — tanto en
+ *     'calculado' (incluye advertencia de litigio si existe, sin bloquear) como en
+ *     'no_evaluable' cuando razonNoEvaluable es el código de una vigencia no apta. null solo
+ *     cuando el flujo nunca llegó a resolver el SMLV (razones anteriores: ventana IBL, IPC).
  * }}
  */
 export function calcularPensionRPM({ historiaCotizacion = [], fecha = hoyISO() } = {}) {
+  // Cierre de diseño, quinta ronda (revisión Atlas, 2026-09-08): `fecha` se valida ANTES de
+  // cualquier operación que dependa de ella — `seleccionarPeriodosIBL` y
+  // `new Date(fecha).getUTCFullYear()` (dos líneas más abajo) ya la usan de inmediato. Una
+  // `fecha` inválida no debe llegar a ninguna de las dos: antes de esta ronda producía
+  // COBERTURA_IPC_INSUFICIENTE_PARA_IBL_ORDINARIO (semánticamente incorrecto — el problema
+  // real nunca fue el IPC) vía `anioReferenciaIPC = NaN`. `resolverSmlvVigenteRPM` es el
+  // ÚNICO punto de validación de formato de fecha (nunca duplicada aquí) — se llama una sola
+  // vez, aquí, y su resultado se reutiliza más abajo (sin una segunda llamada) para decidir
+  // la aptitud del SMLV una vez que el resto de los datos ya se resolvió con éxito.
+  const smlvVigente = resolverSmlvVigenteRPM(fecha)
+  if (smlvVigente.advertencia?.codigo === 'FECHA_BASE_MONETARIA_INVALIDA') {
+    return noEvaluable('FECHA_BASE_MONETARIA_INVALIDA', null, null, { vigenciaSmlv: smlvVigente })
+  }
+
   const seleccion = seleccionarPeriodosIBL({ historiaCotizacion, fechaCalculo: fecha })
 
   if (!seleccion.evaluable) {
@@ -194,8 +234,28 @@ export function calcularPensionRPM({ historiaCotizacion = [], fecha = hoyISO() }
   const esOpcionLegal = iblVidaLaboral !== null && iblVidaLaboral.promedio > iblOrdinario.promedio
   const iblAplicable = esOpcionLegal ? iblVidaLaboral.promedio : iblOrdinario.promedio
 
-  const smlv = obtenerSmlv(fecha)
-  const parametrosLegales = { ...obtenerParametrosTasaReemplazoRPM(fecha), smlv: smlv.valor }
+  const iblResultado = {
+    ordinario: { valor: iblOrdinario.promedio, detalle: iblOrdinario.detalle },
+    vidaLaboral: iblVidaLaboral ? { valor: iblVidaLaboral.promedio, detalle: iblVidaLaboral.detalle } : null,
+    aplicable: iblAplicable,
+    esOpcionLegal,
+    razonVidaLaboralNoEvaluada,
+  }
+
+  // `smlvVigente` ya se resolvió arriba, al comienzo de la función (una sola llamada, nunca
+  // dos) — aquí solo se comprueba su aptitud, ahora que IBL/semanas/ventana ya están
+  // calculados con éxito. Si `fechaBaseMonetaria` hubiera sido inválida, la función ya
+  // habría retornado arriba, antes de intentar ninguno de esos cálculos.
+  if (!smlvVigente.aptoParaCalculoEnFechaBase) {
+    return noEvaluable(smlvVigente.advertencia.codigo, seleccion.trazabilidadVentana, null, {
+      ibl: iblResultado,
+      totalDiasCotizados: seleccion.totalDiasCotizados,
+      semanasObservadas,
+      vigenciaSmlv: smlvVigente,
+    })
+  }
+
+  const parametrosLegales = { ...obtenerParametrosTasaReemplazoRPM(fecha), smlv: smlvVigente.valor }
   const datosUsuario = { ibl: iblAplicable, semanasCotizadas: semanasObservadas }
 
   const tasaReemplazo = calcularTasaReemplazoRPM({ datosUsuario, parametrosLegales })
@@ -204,13 +264,7 @@ export function calcularPensionRPM({ historiaCotizacion = [], fecha = hoyISO() }
   return {
     estado: 'calculado',
     razonNoEvaluable: null,
-    ibl: {
-      ordinario: { valor: iblOrdinario.promedio, detalle: iblOrdinario.detalle },
-      vidaLaboral: iblVidaLaboral ? { valor: iblVidaLaboral.promedio, detalle: iblVidaLaboral.detalle } : null,
-      aplicable: iblAplicable,
-      esOpcionLegal,
-      razonVidaLaboralNoEvaluada,
-    },
+    ibl: iblResultado,
     totalDiasCotizados: seleccion.totalDiasCotizados,
     semanasObservadas,
     tasaReemplazo,
@@ -218,5 +272,9 @@ export function calcularPensionRPM({ historiaCotizacion = [], fecha = hoyISO() }
     limitaciones: [LIMITACION_NO_ES_PROYECCION_FUTURA],
     trazabilidadVentana: seleccion.trazabilidadVentana,
     datosFaltantes: null,
+    // Aditivo (E3-C1): advertencia de litigio (si existe) viaja aquí, nunca bloquea ni
+    // altera resultadoEconomicoActual — "la existencia de una demanda no equivale por sí
+    // sola a falta de vigencia" (mismo criterio ya establecido en E3-A).
+    vigenciaSmlv: smlvVigente,
   }
 }

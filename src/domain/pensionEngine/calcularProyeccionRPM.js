@@ -14,18 +14,33 @@
 // — eso es S4-003. Esta función evalúa un único escenario por llamada, exactamente como
 // calcularProyeccionRAIS evalúa un único ibcAplicableSimulacion por llamada — la misma
 // forma que S4-003 reutilizará repetidamente con distintos candidatos.
+//
+// E3-C1 (2026-09-08): el SMLV ya no se lee directamente vía obtenerSmlv(fecha) — se resuelve
+// vía resolverSmlvVigenteRPM(fechaBaseMonetaria) (mismo contrato que ya usa
+// calcularPensionRPM.js), que interpreta su vigencia jurídica antes de usarlo. El parámetro
+// `fecha` de ESTA función ES la fechaBaseMonetaria (documentado más abajo, "Principio
+// rector") — nunca fechaReconocimiento (la fecha futura proyectada, resuelta por separado,
+// más abajo, vía resolverHorizonteFuturoRPM) — así que se pasa tal cual, sin traducción. El
+// SMLV se necesita aquí en DOS puntos: (1) para topar escenarioIbcFuturo.valorAplicado
+// (topeAplicado = tope × smlv) — temprano, antes de construir el período futuro sintético y
+// de seleccionar la ventana del IBL; y (2) al final, para la tasa de reemplazo. Por eso el
+// chequeo de vigencia se hace en el punto (1): si el SMLV no es apto, NADA de lo que depende
+// de él —ni siquiera el tope de IBC futuro— puede considerarse dato intermedio seguro; solo
+// fechaBaseMonetaria/fechaReconocimiento/horizonteFuturo (ya resueltos antes, y que no
+// dependen del SMLV) se conservan. Para una fecha apta, el valor de SMLV y toda la
+// aritmética posterior son idénticos a como eran antes de este cambio.
 
 import { seleccionarPeriodosIBL } from '../seleccionarPeriodosIBL.js'
 import { calcularPromedioIBL, dividirPeriodoPorAnio } from '../formulas/formulaIBL.js'
 import { calcularTasaReemplazoRPM, formulaRPM } from '../formulas/formulaRPM.js'
 import { resolverHorizonteFuturoRPM } from '../resolverHorizonteFuturoRPM.js'
 import { resolverSemanasProyectadasRPM } from './resolverSemanasProyectadasRPM.js'
+import { resolverSmlvVigenteRPM } from './resolverSmlvVigenteRPM.js'
 import { esFechaValida, validarHistoriaCotizacionTemporal } from './validarHistoriaCotizacionTemporal.js'
 import {
   obtenerIPC,
   obtenerParametrosTasaReemplazoRPM,
   obtenerSemanasHabilitanAlternativaIBL,
-  obtenerSmlv,
   obtenerTopeMaximoIBC,
   tieneIPC,
 } from '../../data/legal/index.js'
@@ -78,13 +93,18 @@ const LIMITACION_CONTINUIDAD_FUTURA = {
     'tu fecha de jubilación — cualquier hueco real cambiaría el resultado.',
 }
 
-function noEvaluable(razonNoEvaluable, trazabilidadVentana, datosFaltantes) {
+// `datosIntermedios` (E3-C1, aditivo, default null — ningún llamador existente lo pasa, así
+// que ningún razonNoEvaluable previo a este cambio cambia de forma): fechaBaseMonetaria/
+// fechaReconocimiento/horizonteFuturo ya están resueltos antes de tocar el SMLV (dependen
+// solo de fechaNacimiento/edadJubilacionDeseada/fecha) — se conservan cuando el bloqueo es
+// específicamente la vigencia del SMLV, en vez de descartarse.
+function noEvaluable(razonNoEvaluable, trazabilidadVentana, datosFaltantes, datosIntermedios = null) {
   return {
     estado: 'no_evaluable',
     razonNoEvaluable,
-    fechaBaseMonetaria: null,
-    fechaReconocimiento: null,
-    horizonteFuturo: null,
+    fechaBaseMonetaria: datosIntermedios?.fechaBaseMonetaria ?? null,
+    fechaReconocimiento: datosIntermedios?.fechaReconocimiento ?? null,
+    horizonteFuturo: datosIntermedios?.horizonteFuturo ?? null,
     escenarioIbcFuturo: null,
     ibl: null,
     composicionVentanaOrdinaria: null,
@@ -94,6 +114,9 @@ function noEvaluable(razonNoEvaluable, trazabilidadVentana, datosFaltantes) {
     limitaciones: [],
     trazabilidadVentana: trazabilidadVentana ?? null,
     datosFaltantes: datosFaltantes ?? null,
+    // Aditivo (E3-C1): null salvo cuando razonNoEvaluable proviene específicamente de la
+    // vigencia del SMLV.
+    vigenciaSmlv: datosIntermedios?.vigenciaSmlv ?? null,
   }
 }
 
@@ -227,6 +250,11 @@ function promediarConFuturo({ periodosObservados, diasFuturos, valorAplicado, an
  *   limitaciones: Array<{codigo: string, mensaje: string}>,
  *   trazabilidadVentana: Object | null,
  *   datosFaltantes: {ipcAnios: number[]} | null,
+ *   vigenciaSmlv: ReturnType<typeof import('./resolverSmlvVigenteRPM.js').resolverSmlvVigenteRPM> | null -
+ *     (E3-C1, aditivo) presente siempre que se llegó a resolver el SMLV — en 'calculado'
+ *     (incluye advertencia de litigio si existe, sin bloquear) y en 'no_evaluable' cuando
+ *     razonNoEvaluable es el código de una vigencia no apta. null cuando el flujo nunca
+ *     llegó a resolver el SMLV (razones estructurales anteriores: edad, fecha, historia).
  * }}
  */
 export function calcularProyeccionRPM({
@@ -253,6 +281,20 @@ export function calcularProyeccionRPM({
     return noEvaluable('IBC_FUTURO_NO_VALIDO', null)
   }
 
+  // Cierre de diseño, quinta ronda (revisión Atlas, 2026-09-08): `fecha` se valida ANTES de
+  // cualquier operación que dependa de ella — `validarHistoriaCotizacionTemporal` (dos líneas
+  // más abajo) y `resolverHorizonteFuturoRPM` ya la usan para aritmética de fechas. Antes de
+  // esta ronda, una `fecha` inválida llegaba sin filtrar hasta esas dos funciones y producía
+  // un throw sin control ("Invalid time value") — incompatible con el contrato de detención
+  // segura que el resto de esta función ya respeta. `resolverSmlvVigenteRPM` es el ÚNICO
+  // punto de validación de formato de fecha (nunca duplicada aquí) — se llama una sola vez,
+  // aquí, y su resultado se reutiliza más abajo (sin una segunda llamada) para decidir la
+  // aptitud del SMLV una vez que horizonte/fechaReconocimiento ya se resolvieron con éxito.
+  const smlvVigente = resolverSmlvVigenteRPM(fecha)
+  if (smlvVigente.advertencia?.codigo === 'FECHA_BASE_MONETARIA_INVALIDA') {
+    return noEvaluable('FECHA_BASE_MONETARIA_INVALIDA', null, null, { vigenciaSmlv: smlvVigente })
+  }
+
   // Cierre de integridad (2026-09-04): validación temporal completa de historiaCotizacion
   // ANTES de seleccionar períodos, calcular días, IBL o producir cualquier cifra — nunca
   // solo el caso de período futuro. razonNoEvaluable es exactamente
@@ -273,10 +315,31 @@ export function calcularProyeccionRPM({
     return noEvaluable('EDAD_JUBILACION_NO_POSTERIOR_A_HOY', null)
   }
   const fechaReconocimiento = horizonte.fechaObjetivo
+  const horizonteFuturo = {
+    fechaInicio: horizonte.fechaInicioFuturo,
+    fechaFin: fechaReconocimiento,
+    diasCotizados: horizonte.diasFuturos,
+  }
 
-  const smlv = obtenerSmlv(fecha)
+  // `smlvVigente` ya se resolvió arriba (una sola llamada, nunca dos) — el formato de
+  // `fecha` ya se descartó como causa (si lo hubiera sido, ya se habría retornado arriba,
+  // antes de tocar historia/horizonte). Aquí solo se comprueba su aptitud JURÍDICA, ahora
+  // que fechaBaseMonetaria/fechaReconocimiento/horizonteFuturo ya están resueltos con éxito
+  // — el SMLV se necesita de inmediato (línea siguiente, para topeAplicado) antes de
+  // construir el período futuro sintético: si no es apto, ni siquiera ese tope puede
+  // considerarse confiable, así que el chequeo va aquí, no al final junto a la tasa de
+  // reemplazo.
+  if (!smlvVigente.aptoParaCalculoEnFechaBase) {
+    return noEvaluable(smlvVigente.advertencia.codigo, null, null, {
+      fechaBaseMonetaria: fecha,
+      fechaReconocimiento,
+      horizonteFuturo,
+      vigenciaSmlv: smlvVigente,
+    })
+  }
+
   const tope = obtenerTopeMaximoIBC(fecha)
-  const topeAplicado = tope.valor * smlv.valor
+  const topeAplicado = tope.valor * smlvVigente.valor
   const valorDeclarado = escenarioIbcFuturo.valor
   const valorAplicado = Math.min(valorDeclarado, topeAplicado)
 
@@ -369,7 +432,7 @@ export function calcularProyeccionRPM({
   const esOpcionLegal = iblVidaLaboral !== null && iblVidaLaboral.valor > ordinario.promedio
   const iblAplicable = esOpcionLegal ? iblVidaLaboral.valor : ordinario.promedio
 
-  const parametrosLegales = { ...obtenerParametrosTasaReemplazoRPM(fecha), smlv: smlv.valor }
+  const parametrosLegales = { ...obtenerParametrosTasaReemplazoRPM(fecha), smlv: smlvVigente.valor }
   // Misma cifra que alimentó la elegibilidad de generarCaminosRPM.js (semanasCotizadas.total)
   // — nunca una distinta para la tasa de reemplazo (contrato GO-B).
   const datosUsuario = { ibl: iblAplicable, semanasCotizadas: semanasCotizadas.total }
@@ -434,5 +497,9 @@ export function calcularProyeccionRPM({
     limitaciones,
     trazabilidadVentana: seleccion.trazabilidadVentana,
     datosFaltantes: null,
+    // Aditivo (E3-C1): advertencia de litigio (si existe) viaja aquí, nunca bloquea ni
+    // altera pensionMensualProyectada — misma advertencia ya interpretada por
+    // evaluarVigenciaSmlv() (E3-A).
+    vigenciaSmlv: smlvVigente,
   }
 }

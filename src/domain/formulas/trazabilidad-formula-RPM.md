@@ -69,6 +69,87 @@ señalado como requisito para cuando se construya `explainCalculation.js`.
 > resolver por vía judicial. Si esa disputa se resuelve formalmente (ej. jurisprudencia
 > unificada o cambio de criterio de Colpensiones), este valor debe revisarse.
 
+## E3-B (2026-09-08) — investigación jurídica y capa comparativa pura (sin integración)
+
+Cierra la investigación pendiente desde Sprint 1 sobre el "Punto de controversia" de
+arriba, con evidencia jurídica reunida en fuentes oficiales primarias (Función Pública/
+Gestor Normativo, Cancillería, MinCIT, Corte Constitucional). **Conclusión de la
+investigación: ninguna de las dos interpretaciones tiene respaldo oficial expreso.**
+
+- **`ANCLA_FIJA_1300`** — semanas adicionales contadas desde 1.300, fijo para ambos sexos.
+  Reproduce la metodología operacional **reportada** de Colpensiones (fuente secundaria, sin
+  concepto oficial primario localizado que la confirme). **Nunca debe describirse como
+  posición oficial demostrada de Colpensiones** — solo como cálculo base/conservador.
+- **`ANCLA_MINIMO_DINAMICO`** — semanas adicionales contadas desde el mínimo aplicable por
+  sexo y fecha (`obtenerSemanasMinimas(fecha, sexo, 'RPM')`, cronograma de la Sentencia
+  C-197 de 2023). Fundamento: la expresión abierta "las mínimas requeridas" del Art. 34/
+  Art. 10 Ley 797/2003, que la investigación no encontró que la Corte haya vinculado
+  expresamente al Art. 33 en su parte resolutiva localizada. **Nunca debe describirse como
+  derecho definitivamente reconocido ni como cifra que Colpensiones necesariamente
+  pagará** — es interpretación jurídica no resuelta.
+- **Elección provisional de Carlos/Atlas (2026-09-08):** `ANCLA_FIJA_1300` permanece como
+  interpretación **principal** (statu quo, cálculo base/conservador) hasta que exista
+  evidencia oficial que resuelva la controversia; `ANCLA_MINIMO_DINAMICO` se expone como
+  **alternativa**, nunca oculta. Ninguna sustituye a la otra en silencio.
+
+**Capa nueva, sin integración:** `compararAnclaIncrementoRPM.js`
+(`src/domain/pensionEngine/`) — función que calcula ambas interpretaciones para un caso
+concreto, con firma pública mínima: `{ fecha, sexo, semanasCotizadas, ibl }`. **No acepta
+ningún parámetro legal externo** (cierre de diseño, segunda ronda, 2026-09-08): resuelve
+internamente, siempre con la misma `fecha`, tanto la ancla fija
+(`obtenerParametrosTasaReemplazoRPM(fecha).semanasBaseIncrementoRPM` — la MISMA fuente que
+ya usan `calcularPensionRPM.js`/`calcularProyeccionRPM.js`, nunca `sexo: 'M'` como atajo)
+como el SMLV (`obtenerSmlv(fecha)`) y el mínimo dinámico
+(`obtenerSemanasMinimas(fecha, sexo, 'RPM')`, con el sexo real de la persona, nunca para la
+ancla fija). Esto elimina por construcción el riesgo de mezclar una fecha de cálculo con
+parámetros legales resueltos para otra fecha. Reutiliza `desglosarTasaReemplazoRPM` como
+única fuente aritmética (nunca duplica la fórmula, el incremento por bloques ni el límite
+del 80%). Cada interpretación incluye su propia `referenciaInterpretativa`
+(`codigo, fuente, articulo, alcance, certeza`) — trazabilidad dentro del propio resultado,
+sin que el consumidor tenga que inferir a cuál interpretación corresponde cada cita por su
+posición en un arreglo. **No tiene consumidores reales todavía** — `calcularPensionRPM.js`,
+`calcularProyeccionRPM.js`, `generarCaminosRPM.js` y toda la UI permanecen sin cambios; el
+comportamiento visible del producto sigue siendo exactamente el de antes de E3-B (ancla
+fija, sin comparación visible).
+
+**Cierre de diseño, tercera ronda (2026-09-08) — consume el contrato de vigencia de E3-A:**
+el SMLV resuelto vía `obtenerSmlv(fecha)` nunca se usa directamente para calcular una tasa —
+se interpreta primero con `evaluarVigenciaSmlv(smlvResuelto, fecha)` (mismo contrato ya
+creado en E3-A para `ajustarMesadaLegalRPM.js`) y solo se calcula alguna tasa (en cualquiera
+de las dos interpretaciones) cuando `aptoParaCalculoEnFechaBase === true`. Sin este chequeo,
+`compararAnclaIncrementoRPM` habría podido calcular una tasa usando un SMLV que E3-A ya
+clasificó como `fundamento_no_verificado` (ventana 2026-02-12 a 2026-02-18) — el mismo valor
+de SMLV que `ajustarMesadaLegalRPM.js` bloquea para piso/techo en esa ventana exacta. Cuando
+no está apto, la función propaga **tal cual** la `advertencia` estructurada de
+`evaluarVigenciaSmlv()` como `razon` — nunca la reinterpreta como `FUENTE_LEGAL_NO_ENCONTRADA`
+(código reservado exclusivamente para ausencia real de una regla o dato, ej. SMLV no cargado
+para una fecha anterior a 2026) ni la confunde con `MEDIDA_CAUTELAR_ACTIVA`,
+`FUERA_DE_VIGENCIA` ni `FUENTE_INSUFICIENTE`. Mismo orden de comprobación que
+`ajustarMesadaLegalRPM.js`: elegibilidad por semanas primero, vigencia del SMLV después.
+
+Ver el informe de investigación E3-B (sesión 2026-09-08) para el detalle completo de
+fuentes consultadas, la tabla de impacto de 18 casos y el diagnóstico técnico de blast
+radius: afecta exclusivamente a mujeres con fecha ≥ 2026-01-01 (hombres, en cualquier
+fecha, y mujeres antes de 2026 comparten la misma ancla en ambas interpretaciones —
+demostrado empíricamente, no solo argumentado). **Limitación de datos encontrada durante
+el cierre de diseño (no una limitación del diseño en sí):** `data/legal` solo tiene cargada
+una entrada de SMLV vigente desde 2026-01-01 en adelante — para cualquier fecha anterior,
+`compararAnclaIncrementoRPM` resulta `evaluable: false` (`FUENTE_LEGAL_NO_ENCONTRADA`) para
+ambos sexos por igual, porque `desglosarTasaReemplazoRPM` necesita el SMLV para la tasa
+inicial en las dos interpretaciones, no solo para la comparación del ancla. Mismo
+comportamiento que ya tendrían hoy `calcularPensionRPM.js`/`calcularProyeccionRPM.js` si se
+invocaran con una fecha anterior a 2026 — no es una regresión introducida por este archivo.
+
+**Prohibición explícita, vigente para cualquier consumidor futuro de esta función:**
+ninguna interpretación debe presentarse como posición oficial confirmada sin fuente
+primaria — ni `ANCLA_FIJA_1300` como "lo que Colpensiones aplica" (afirmación no
+verificada), ni `ANCLA_MINIMO_DINAMICO` como "lo que la ley exige" (interpretación, no
+hecho normativo). Fuentes secundarias (blogs especializados, firmas de abogados, prensa)
+usadas durante la investigación **nunca se citan como fundamento en `trazabilidadNormativa`
+ni en ningún texto que llegue al usuario** — solo el Art. 34 Ley 100/Art. 10 Ley 797/2003,
+la Sentencia C-197 de 2023, y la advertencia explícita de que su interacción no tiene
+interpretación oficial localizada.
+
 ## Contrato de funciones
 
 Parámetros separados en `datosUsuario` (lo que aporta el usuario) y `parametrosLegales`

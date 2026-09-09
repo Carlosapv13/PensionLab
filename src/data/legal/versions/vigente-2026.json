@@ -73,11 +73,50 @@
       "campo": "smlv",
       "valor": 1750905,
       "unidad": "COP",
-      "fuente": "Decreto del Gobierno Nacional (Ministerio del Trabajo)",
-      "articulo": "Decreto 1469 de 2025, suspendido provisionalmente por el Consejo de Estado (auto 12-feb-2026); valor sostenido transitoriamente por el Decreto 0159 de 2026 mientras se resuelve el litigio de fondo",
+      "fuente": "Decreto del Gobierno Nacional (Ministerio del Trabajo) — cadena de tres fundamentos sucesivos durante 2026, ver cadenaNormativa",
+      "articulo": "El valor de $1.750.905 rigió sin interrupción durante toda la vigencia 2026 según la evidencia reunida, bajo tres fundamentos normativos sucesivos (Decreto 1469/2025 vigente; Decreto 1469/2025 suspendido con el mismo valor sostenido transitoriamente por el Decreto 0159/2026; Decreto 1469/2025 reactivado) — ver cadenaNormativa para el detalle exacto por tramo. No usar este campo plano para resolver una fecha específica: usar evaluarVigenciaSmlv(), que resuelve el tramo correcto de cadenaNormativa.",
       "vigencia": { "desde": "2026-01-01", "hasta": null },
       "periodo": 2026,
-      "estadoJuridico": "transitorio"
+      "estadoJuridico": "transitorio",
+      "estadoEvaluadoAl": "2026-09-07",
+      "litigioPendiente": true,
+      "medidaCautelarActiva": false,
+      "cadenaNormativa": [
+        {
+          "desde": "2026-01-01",
+          "hasta": "2026-02-11",
+          "fuente": "Decreto del Gobierno Nacional (Ministerio del Trabajo)",
+          "articulo": "Decreto 1469 de 2025 (29-dic-2025), en plena vigencia, previo a cualquier medida cautelar sobre este decreto.",
+          "litigioPendiente": false,
+          "medidaCautelarActiva": false
+        },
+        {
+          "desde": "2026-02-12",
+          "hasta": "2026-02-18",
+          "fuente": null,
+          "articulo": "FUNDAMENTO NO VERIFICADO CON FUENTE OFICIAL PRIMARIA. El auto de suspensión provisional del Decreto 1469/2025 (Consejo de Estado, Sección Segunda, proceso de nulidad radicado 11001-03-25-000-2026-00004-00) fue expedido el 12-feb-2026 — esa fecha de expedición sí está confirmada. Lo que esta investigación NO pudo confirmar mediante lectura directa del texto oficial del auto (falla de red de la herramienta de consulta hacia Diario Oficial/SUIN-Juriscol/relatoría del Consejo de Estado en la sesión de investigación) es si sus efectos fueron inmediatos desde esa fecha o si el propio auto los difirió hasta la publicación del decreto transitorio sustituto (19-feb-2026). Fuentes jurídicas especializadas convergentes pero secundarias (firmas de abogados, gremios profesionales — Holland & Knight, INCP, Centro Colombiano de Derecho Procesal Constitucional) describen que el auto habría diferido sus propios efectos hasta esa publicación, lo que implicaría que el Decreto 1469/2025 siguió aplicándose sin interrupción durante esta ventana — pero esa hipótesis no está confirmada con fuente oficial primaria. No se afirma continuidad jurídica demostrada del Decreto 1469/2025 ni un vacío normativo demostrado: el valor de $1.750.905 se conserva únicamente como referencia histórica (ningún indicio de que haya cambiado), sin fundamento normativo verificado para aplicarlo a un cálculo de piso/techo.",
+          "litigioPendiente": true,
+          "medidaCautelarActiva": null,
+          "fundamentoNoVerificado": true
+        },
+        {
+          "desde": "2026-02-19",
+          "hasta": "2026-07-16",
+          "fuente": "Decreto del Gobierno Nacional (Ministerio del Trabajo y Ministerio de Hacienda)",
+          "articulo": "Decreto 0159 de 2026, expedido y publicado el 19-feb-2026 (Diario Oficial No. 53.403), fija transitoriamente el mismo valor ($1.750.905) mientras se resuelve el proceso de nulidad contra el Decreto 1469/2025 (radicado 11001-03-25-000-2026-00004-00) — norma distinta del 1469/2025 y nunca objeto de la medida cautelar de ese proceso. Vigente desde su publicación (19-feb-2026); no se encontró evidencia de cláusula de retroactividad al 12-feb-2026. Fecha de expedición y número de Diario Oficial confirmados por convergencia consistente entre múltiples fuentes profesionales especializadas independientes; no se logró lectura directa del texto oficial completo por falla de red de la herramienta de consulta en la sesión de investigación.",
+          "litigioPendiente": true,
+          "medidaCautelarActiva": false
+        },
+        {
+          "desde": "2026-07-17",
+          "hasta": null,
+          "fuente": "Decreto del Gobierno Nacional (Ministerio del Trabajo)",
+          "articulo": "Decreto 1469 de 2025 reactivado — suspensión revocada por el Consejo de Estado, Sección Segunda, al resolver un recurso de súplica del Gobierno Nacional. Revocatoria confirmada por comunicación oficial del Consejo de Estado (índice de noticias oficiales, consejodeestado.gov.co/noticias, entrada del 2026-07-17 07:49:33, título \"Decreto que impuso el alza del salario mínimo permanecerá vigente hasta que se juzgue su legalidad\"; PDF: linkce.consejodeestado.gov.co/docum/prensa/PQRSDFeb986e.pdf); texto íntegro del auto no localizado. El Decreto 0159/2026 quedó sin efecto al revivir el decreto que reemplazaba. El propio comunicado aclara que el examen de legalidad de fondo se hará al decidirse el proceso de nulidad — sin fallo definitivo a la fecha de consulta, y sin pronunciamiento sobre retroactividad.",
+          "litigioPendiente": true,
+          "medidaCautelarActiva": false
+        }
+      ],
+      "notas": "Corrección 2026-09-07 (E3-A, cierre del modelo de vigencia — segunda ronda): se reemplazan los campos planos litigioPendiente/medidaCautelarActiva como única fuente de verdad por una cadenaNormativa, para que evaluarVigenciaSmlv() no concluya que el valor era inutilizable durante la ventana de suspensión cuando en realidad el Decreto 0159/2026 lo sostenía. Los campos planos litigioPendiente/medidaCautelarActiva se conservan como snapshot del tramo más reciente (compatibilidad), pero evaluarVigenciaSmlv() resuelve siempre por cadenaNormativa. Se agrega estadoEvaluadoAl ('2026-09-07'): fecha desde la cual se conoce el estado procesal descrito aquí, distinta de la ventana de vigencia del valor y de la fecha de cálculo que use cada consumidor. estadoJuridico permanece 'transitorio' sin cambios; listoParaProduccion del archivo permanece false — la aptitud de esta regla para cálculo se resuelve por tramo vía evaluarVigenciaSmlv(), nunca marcando todo el archivo como listo. Corrección 2026-09-07 (tercera ronda, cierre de inconsistencia temporal): el tramo que originalmente atribuía el 12-feb-2026 al Decreto 0159/2026 estaba mal fechado — el Decreto 0159/2026 fue expedido el 19-feb-2026, no el 12-feb-2026, así que no puede cubrir fechas anteriores a su propia expedición. Se dividió ese tramo en dos: (a) 12-feb a 18-feb-2026, marcado explícitamente 'fundamentoNoVerificado: true' — no se pudo confirmar con fuente oficial primaria si el auto de suspensión del 12-feb-2026 produjo efectos inmediatos o si los difirió hasta la publicación del decreto sustituto (lectura directa del texto del auto no lograda por falla de red de la herramienta en la sesión de investigación); (b) 19-feb en adelante, correctamente atribuido al Decreto 0159/2026 desde su fecha real de expedición/publicación (Diario Oficial No. 53.403). El tramo (a) nunca se declara apto para calcular piso/techo — evaluarVigenciaSmlv() lo resuelve como tipoVigencia 'fundamento_no_verificado', aptoParaCalculoEnFechaBase:false."
     },
     {
       "id": "tasa-reemplazo-constante",

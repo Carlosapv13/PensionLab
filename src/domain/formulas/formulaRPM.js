@@ -12,6 +12,13 @@ function clamp(valor, minimo, maximo) {
 }
 
 /**
+ * Desglosa el cálculo de la tasa de reemplazo en sus componentes (Art. 34 Ley 100/1993,
+ * mod. Art. 10 Ley 797/2003) — misma aritmética exacta que calcularTasaReemplazoRPM,
+ * expuesta paso a paso para que una capa posterior (ajustarMesadaLegalRPM.js, E3-A) pueda
+ * preservar/citar cada componente sin recalcularlo ni duplicar el límite del 80%: ese
+ * límite vive únicamente aquí (decisión Carlos/Atlas, E3-A — "la tasa máxima del 80%
+ * permanece dentro de formulaRPM, no se duplica como ajuste posterior").
+ *
  * @param {Object} params
  * @param {{ibl: number, semanasCotizadas: number}} params.datosUsuario
  * @param {{
@@ -24,9 +31,17 @@ function clamp(valor, minimo, maximo) {
  *   semanasPorIncrementoAdicional: number,
  *   incrementoPorcentualPorTramo: number,
  * }} params.parametrosLegales
- * @returns {number} Tasa de reemplazo aplicada, en % (ej. 68.5). Sin redondear.
+ * @returns {{
+ *   s: number,
+ *   tasaInicial: number,
+ *   bloquesAdicionales: number,
+ *   incrementoPorSemanas: number,
+ *   tasaFinalAplicada: number,
+ *   limiteOchentaPorcientoAplicado: boolean,
+ *   limiteCincuentaYCincoPorcientoAplicado: boolean,
+ * }}
  */
-export function calcularTasaReemplazoRPM({ datosUsuario, parametrosLegales }) {
+export function desglosarTasaReemplazoRPM({ datosUsuario, parametrosLegales }) {
   const { ibl, semanasCotizadas } = datosUsuario
   const {
     smlv,
@@ -40,18 +55,47 @@ export function calcularTasaReemplazoRPM({ datosUsuario, parametrosLegales }) {
   } = parametrosLegales
 
   const s = ibl / smlv
-  const base = clamp(
-    tasaReemplazoConstante - tasaReemplazoPendiente * s,
-    tasaReemplazoMinima,
-    tasaReemplazoMaxima
-  )
+  const baseSinClamp = tasaReemplazoConstante - tasaReemplazoPendiente * s
+  const tasaInicial = clamp(baseSinClamp, tasaReemplazoMinima, tasaReemplazoMaxima)
 
-  const tramos = Math.floor(
+  const bloquesAdicionales = Math.floor(
     Math.max(0, semanasCotizadas - semanasBaseIncrementoRPM) / semanasPorIncrementoAdicional
   )
-  const incremento = tramos * incrementoPorcentualPorTramo
+  const incrementoPorSemanas = bloquesAdicionales * incrementoPorcentualPorTramo
 
-  return clamp(base + incremento, tasaReemplazoMinima, tasaReemplazoMaxima)
+  const antesDelClampFinal = tasaInicial + incrementoPorSemanas
+  const tasaFinalAplicada = clamp(antesDelClampFinal, tasaReemplazoMinima, tasaReemplazoMaxima)
+
+  return {
+    s,
+    tasaInicial,
+    bloquesAdicionales,
+    incrementoPorSemanas,
+    tasaFinalAplicada,
+    limiteOchentaPorcientoAplicado: antesDelClampFinal > tasaReemplazoMaxima,
+    limiteCincuentaYCincoPorcientoAplicado: baseSinClamp < tasaReemplazoMinima,
+  }
+}
+
+/**
+ * @param {Object} params
+ * @param {{ibl: number, semanasCotizadas: number}} params.datosUsuario
+ * @param {{
+ *   smlv: number,
+ *   tasaReemplazoConstante: number,
+ *   tasaReemplazoPendiente: number,
+ *   tasaReemplazoMinima: number,
+ *   tasaReemplazoMaxima: number,
+ *   semanasBaseIncrementoRPM: number,
+ *   semanasPorIncrementoAdicional: number,
+ *   incrementoPorcentualPorTramo: number,
+ * }} params.parametrosLegales
+ * @returns {number} Tasa de reemplazo aplicada, en % (ej. 68.5). Sin redondear. Wrapper de
+ *   desglosarTasaReemplazoRPM(params).tasaFinalAplicada — misma aritmética exacta, sin
+ *   duplicarla; API y comportamiento sin cambios respecto a antes de E3-A.
+ */
+export function calcularTasaReemplazoRPM(params) {
+  return desglosarTasaReemplazoRPM(params).tasaFinalAplicada
 }
 
 /**

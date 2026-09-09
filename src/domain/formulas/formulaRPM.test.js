@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calcularTasaReemplazoRPM, formulaRPM } from './formulaRPM.js'
+import { calcularTasaReemplazoRPM, desglosarTasaReemplazoRPM, formulaRPM } from './formulaRPM.js'
 
 // Parámetros legales de referencia (Art. 34 Ley 100 / Art. 10 Ley 797 de 2003), tomados
 // de vigente-2026.json. smlv=1 para que ibl quede expresado directamente en SMLV, igual
@@ -59,4 +59,53 @@ describe('formulaRPM', () => {
       expect(pension).toBeCloseTo(caso.pensionEsperada, 10)
     })
   }
+})
+
+// E3-A: desglosarTasaReemplazoRPM debe ser exactamente equivalente a calcularTasaReemplazoRPM
+// en su tasaFinalAplicada (calcularTasaReemplazoRPM ahora es un wrapper de este desglose) —
+// mismos 4 casos de referencia, sin cambiar ningún valor esperado ya validado arriba.
+describe('desglosarTasaReemplazoRPM', () => {
+  for (const caso of casos) {
+    it(`${caso.nombre} — tasaFinalAplicada coincide con calcularTasaReemplazoRPM`, () => {
+      const desglose = desglosarTasaReemplazoRPM({ datosUsuario: caso.datosUsuario, parametrosLegales })
+      expect(desglose.tasaFinalAplicada).toBeCloseTo(caso.tasaEsperada, 10)
+    })
+  }
+
+  it('no aplica el límite del 80% cuando la tasa no lo alcanza', () => {
+    const desglose = desglosarTasaReemplazoRPM({
+      datosUsuario: { ibl: 1, semanasCotizadas: 1300 },
+      parametrosLegales,
+    })
+    expect(desglose.limiteOchentaPorcientoAplicado).toBe(false)
+  })
+
+  it('marca limiteOchentaPorcientoAplicado cuando semanas extra empujarían la tasa por encima de 80', () => {
+    const desglose = desglosarTasaReemplazoRPM({
+      datosUsuario: { ibl: 1, semanasCotizadas: 1300 + 50 * 20 }, // 20 tramos × 1.5 = 30 pts, 65+30=95 > 80
+      parametrosLegales,
+    })
+    expect(desglose.limiteOchentaPorcientoAplicado).toBe(true)
+    expect(desglose.tasaFinalAplicada).toBe(80)
+  })
+
+  it('marca limiteCincuentaYCincoPorcientoAplicado en el caso de ingreso alto en el tope IBC', () => {
+    const desglose = desglosarTasaReemplazoRPM({
+      datosUsuario: { ibl: 25, semanasCotizadas: 1300 },
+      parametrosLegales,
+    })
+    expect(desglose.limiteCincuentaYCincoPorcientoAplicado).toBe(true)
+    expect(desglose.tasaInicial).toBe(55)
+  })
+
+  it('reporta bloquesAdicionales e incrementoPorSemanas por separado, sin fusionarlos en tasaInicial', () => {
+    const desglose = desglosarTasaReemplazoRPM({
+      datosUsuario: { ibl: 5, semanasCotizadas: 1500 },
+      parametrosLegales,
+    })
+    expect(desglose.tasaInicial).toBeCloseTo(63, 10) // 65.5 - 0.5*5
+    expect(desglose.bloquesAdicionales).toBe(4) // floor((1500-1300)/50)
+    expect(desglose.incrementoPorSemanas).toBeCloseTo(6, 10) // 4 * 1.5
+    expect(desglose.tasaFinalAplicada).toBeCloseTo(69, 10)
+  })
 })

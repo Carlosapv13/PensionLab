@@ -227,6 +227,20 @@ export function obtenerTopeMaximoIBC(fecha) {
  * consumidor use este valor sin saber que no está firme. No decide si es
  * aceptable usarlo — esa decisión pertenece a quien lo consume (Principio 11).
  *
+ * `cadenaNormativa` (cierre E3-A, 2026-09-07) — algunas entradas de SMLMV rigen mediante
+ * más de un fundamento normativo sucesivo dentro de la misma ventana de vigencia (ej. 2026:
+ * Decreto 1469/2025 vigente → auto de suspensión del 12-feb-2026, con una ventana breve de
+ * fundamento NO VERIFICADO hasta el 18-feb-2026 (ver `fundamentoNoVerificado`) → sostenido
+ * desde el 19-feb-2026 por el Decreto 0159/2026 → Decreto 1469/2025 reactivado el
+ * 17-jul-2026 — mismo valor, $1.750.905, en todos los tramos con fundamento confirmado).
+ * Cada tramo puede declarar `fundamentoNoVerificado: true` cuando no hay fuente oficial
+ * primaria que confirme qué norma regía esa ventana — en ese caso `fuente` es `null` y
+ * `evaluarVigenciaSmlv()` nunca lo trata como vigente ni como suspendido, solo como
+ * incertidumbre explícita. Se propaga tal cual (o `[]` si la entrada no la declara) para
+ * que `evaluarVigenciaSmlv()` resuelva cuál tramo aplica según la fecha, en vez de asumir
+ * que el estado más reciente describe
+ * todo el período — ver evaluarVigenciaSmlv() más abajo.
+ *
  * @param {string} fecha - Fecha ISO en la que se evalúa el requisito
  * @returns {{
  *   valor: number,
@@ -238,6 +252,10 @@ export function obtenerTopeMaximoIBC(fecha) {
  *   vigenciaDesde: string | null,
  *   vigenciaHasta: string | null,
  *   estadoJuridico: string,
+ *   estadoEvaluadoAl: string | null,
+ *   litigioPendiente: boolean,
+ *   medidaCautelarActiva: boolean,
+ *   cadenaNormativa: Array<{desde: string, hasta: (string|null), fuente: (string|null), articulo: string, litigioPendiente: boolean, medidaCautelarActiva: (boolean|null), fundamentoNoVerificado?: boolean}>,
  * }}
  */
 export function obtenerSmlv(fecha) {
@@ -258,6 +276,213 @@ export function obtenerSmlv(fecha) {
     vigenciaDesde: entrada.vigencia?.desde ?? null,
     vigenciaHasta: entrada.vigencia?.hasta ?? null,
     estadoJuridico: entrada.estadoJuridico ?? 'firme',
+    // fechaConsultaJuridica: fecha desde la cual se conoce el estado procesal descrito por
+    // esta entrada (ej. "verificamos el 2026-09-07 que la suspensión seguía revocada") —
+    // distinta de `vigenciaDesde/vigenciaHasta` (ventana en la que el VALOR rige) y de
+    // `fechaBaseMonetaria` (la fecha de cálculo que un consumidor pasará más adelante).
+    estadoEvaluadoAl: entrada.estadoEvaluadoAl ?? null,
+    // Hechos crudos "actuales" (snapshot del tramo más reciente de la cadena, si existe) —
+    // conservados por compatibilidad con consumidores que solo necesitan el estado de hoy;
+    // evaluarVigenciaSmlv() usa `cadenaNormativa`, nunca estos dos campos planos, para
+    // resolver una fecha histórica.
+    litigioPendiente: entrada.litigioPendiente === true,
+    medidaCautelarActiva: entrada.medidaCautelarActiva === true,
+    cadenaNormativa: Array.isArray(entrada.cadenaNormativa) ? entrada.cadenaNormativa : [],
+  }
+}
+
+/**
+ * Interpreta el estado de un valor de SMLMV ya resuelto (obtenerSmlv) en un contrato de
+ * VIGENCIA explícito, separado de la incertidumbre jurídica — cierre E3-A (2026-09-07),
+ * corrigiendo dos defectos reales encontrados en revisión:
+ *
+ * 1. `ajustarMesadaLegalRPM.js` exigía `estadoJuridico === 'firme'` para aplicar el piso
+ *    legal, lo que dejaba el ajuste inerte mientras el litigio de fondo del SMLMV 2026
+ *    siguiera abierto — aunque la suspensión provisional que sí impedía usar el valor ya
+ *    había sido revocada (Consejo de Estado, Sección Segunda, 17-jul-2026). La existencia
+ *    de una demanda no equivale por sí sola a falta de vigencia: solo una medida cautelar
+ *    efectivamente activa (para el fundamento que rige EN ESA FECHA), un valor fuera de su
+ *    ventana temporal, o una fuente insuficiente, hacen el valor no apto para cálculo.
+ * 2. Evaluar la vigencia usando únicamente el estado MÁS RECIENTE de la norma (ej. "hoy no
+ *    hay medida cautelar activa") sería engañoso para una `fechaBaseMonetaria` histórica
+ *    dentro de la ventana de suspensión (19-feb a 16-jul-2026): durante esos días, el
+ *    Decreto 1469/2025 estaba suspendido, pero el MISMO VALOR ($1.750.905) siguió rigiendo
+ *    mediante el Decreto 0159/2026 (expedido/publicado el 19-feb-2026), una norma distinta
+ *    y nunca suspendida. Por eso esta función resuelve, dentro de `cadenaNormativa`, cuál
+ *    tramo (y por tanto cuál fundamento y cuál estado de medida cautelar) corresponde a
+ *    `fechaBaseMonetaria` — nunca aplica retroactivamente el estado de hoy a fechas
+ *    anteriores.
+ * 3. Cierre de una inconsistencia temporal encontrada en revisión posterior (2026-09-07,
+ *    tercera ronda): un tramo de `cadenaNormativa` puede declararse explícitamente
+ *    `fundamentoNoVerificado: true` cuando no se pudo confirmar, con fuente oficial
+ *    primaria, qué norma respaldaba el valor en una ventana concreta (ej. el 12-feb-2026,
+ *    fecha de expedición del auto de suspensión, hasta el 18-feb-2026, día previo a la
+ *    publicación real del Decreto 0159/2026 — el 0159/2026 no puede cubrir fechas
+ *    anteriores a su propia expedición). Esta función NUNCA convierte esa ausencia de
+ *    evidencia en una suspensión asumida ni en una continuidad asumida: devuelve
+ *    `tipoVigencia: 'fundamento_no_verificado'`, `aptoParaCalculoEnFechaBase: false`, con
+ *    el valor conservado solo como referencia histórica en `valorSmlmvAplicable`.
+ *
+ * Ningún consumidor de este contrato (ej. ajustarMesadaLegalRPM.js) necesita conocer
+ * `estadoJuridico`/`listoParaProduccion` — el esquema interno de LegalRuleEntry — para
+ * decidir si puede usar el SMLMV: solo lee `aptoParaCalculoEnFechaBase` y `advertencia`.
+ *
+ * @param {ReturnType<typeof obtenerSmlv>} smlvResuelto
+ * @param {string} fechaBaseMonetaria - ISO, fecha a la que se quiere aplicar este SMLMV
+ * @returns {{
+ *   valorSmlmvAplicable: number | null,
+ *   vigenteDesde: string | null,
+ *   vigenteHasta: string | null,
+ *   fundamentoNormativoAplicable: {fuente: string, articulo: string} | null,
+ *   estadoEvaluadoAl: string | null,
+ *   vigenteOperativamente: boolean,
+ *   tipoVigencia: ('firme'|'vigente_con_litigio'|'suspendido'|'fundamento_no_verificado'|'fuera_de_vigencia'|'fuente_insuficiente'),
+ *   litigioPendiente: boolean | null,
+ *   medidaCautelarActiva: boolean | null,
+ *   aptoParaCalculoEnFechaBase: boolean,
+ *   advertencia: {codigo: string, mensaje: string} | null,
+ * }}
+ */
+export function evaluarVigenciaSmlv(smlvResuelto, fechaBaseMonetaria) {
+  const fuenteSuficiente =
+    Boolean(smlvResuelto) &&
+    typeof smlvResuelto.valor === 'number' &&
+    Number.isFinite(smlvResuelto.valor) &&
+    Boolean(smlvResuelto.id) &&
+    Boolean(smlvResuelto.fuente) &&
+    Boolean(smlvResuelto.articulo)
+
+  if (!fuenteSuficiente) {
+    return {
+      valorSmlmvAplicable: null,
+      vigenteDesde: null,
+      vigenteHasta: null,
+      fundamentoNormativoAplicable: null,
+      estadoEvaluadoAl: null,
+      vigenteOperativamente: false,
+      tipoVigencia: 'fuente_insuficiente',
+      litigioPendiente: null,
+      medidaCautelarActiva: null,
+      aptoParaCalculoEnFechaBase: false,
+      advertencia: {
+        codigo: 'FUENTE_INSUFICIENTE',
+        mensaje: 'El valor de SMLMV recibido no trae id/fuente/artículo suficientes para trazabilidad.',
+      },
+    }
+  }
+
+  const camposComunes = {
+    valorSmlmvAplicable: smlvResuelto.valor,
+    vigenteDesde: smlvResuelto.vigenciaDesde ?? null,
+    vigenteHasta: smlvResuelto.vigenciaHasta ?? null,
+    estadoEvaluadoAl: smlvResuelto.estadoEvaluadoAl ?? null,
+  }
+
+  const entradaVigencia = { vigencia: { desde: smlvResuelto.vigenciaDesde, hasta: smlvResuelto.vigenciaHasta } }
+  if (!dentroDeVigencia(entradaVigencia, fechaBaseMonetaria)) {
+    return {
+      ...camposComunes,
+      fundamentoNormativoAplicable: null,
+      vigenteOperativamente: false,
+      tipoVigencia: 'fuera_de_vigencia',
+      litigioPendiente: null,
+      medidaCautelarActiva: null,
+      aptoParaCalculoEnFechaBase: false,
+      advertencia: {
+        codigo: 'FUERA_DE_VIGENCIA',
+        mensaje: `El SMLMV consultado (vigente ${smlvResuelto.vigenciaDesde ?? '—'} a ${smlvResuelto.vigenciaHasta ?? 'hoy'}) no corresponde al período de ${fechaBaseMonetaria}.`,
+      },
+    }
+  }
+
+  // Resuelve el tramo de la cadena normativa que gobierna fechaBaseMonetaria — nunca el
+  // estado más reciente de la entrada. Si la entrada no declara cadena (o ningún tramo
+  // cubre esa fecha, ej. entradas de prueba simples), cae a los campos planos de la propia
+  // entrada como fundamento único — comportamiento de respaldo, no un error.
+  const cadena = Array.isArray(smlvResuelto.cadenaNormativa) ? smlvResuelto.cadenaNormativa : []
+  const tramo = cadena.find((eslabon) => dentroDeVigencia({ vigencia: { desde: eslabon.desde, hasta: eslabon.hasta } }, fechaBaseMonetaria))
+  const fundamento = tramo
+    ? { fuente: tramo.fuente, articulo: tramo.articulo }
+    : { fuente: smlvResuelto.fuente, articulo: smlvResuelto.articulo }
+  const medidaCautelarActiva = (tramo ?? smlvResuelto).medidaCautelarActiva === true
+  const litigioPendiente = (tramo ?? smlvResuelto).litigioPendiente === true
+
+  // Ausencia de evidencia ≠ suspensión asumida (cierre E3-A, tercera ronda, 2026-09-07):
+  // un tramo puede declarar explícitamente que no se pudo confirmar, con fuente oficial
+  // primaria, qué norma respaldaba el valor en esa ventana — ej. la ventana entre la
+  // expedición de un auto de suspensión y la publicación del decreto sustituto, cuando no
+  // se pudo verificar si el auto produjo efectos inmediatos o los difirió. Este caso se
+  // resuelve ANTES de medidaCautelarActiva/litigioPendiente porque no es ninguno de los
+  // dos con certeza — es incertidumbre normativa genuina, con su propio código, nunca
+  // reinterpretada como "suspendido" (que afirmaría una suspensión no demostrada) ni como
+  // "vigente_con_litigio" (que afirmaría continuidad no demostrada). El valor se conserva
+  // en `camposComunes.valorSmlmvAplicable` únicamente como referencia histórica.
+  if (tramo?.fundamentoNoVerificado === true) {
+    return {
+      ...camposComunes,
+      fundamentoNormativoAplicable: fundamento,
+      vigenteOperativamente: false,
+      tipoVigencia: 'fundamento_no_verificado',
+      litigioPendiente: tramo.litigioPendiente ?? null,
+      medidaCautelarActiva: tramo.medidaCautelarActiva ?? null,
+      aptoParaCalculoEnFechaBase: false,
+      advertencia: {
+        codigo: 'FUNDAMENTO_NORMATIVO_NO_VERIFICADO',
+        mensaje:
+          `No se pudo confirmar con fuente oficial primaria qué norma respaldaba el SMLMV el ${fechaBaseMonetaria} ` +
+          '— el valor se conserva como referencia histórica, pero no se aplica piso ni techo sobre un fundamento ' +
+          'normativo no verificado.',
+      },
+    }
+  }
+
+  if (medidaCautelarActiva) {
+    return {
+      ...camposComunes,
+      fundamentoNormativoAplicable: fundamento,
+      vigenteOperativamente: false,
+      tipoVigencia: 'suspendido',
+      litigioPendiente: true,
+      medidaCautelarActiva: true,
+      aptoParaCalculoEnFechaBase: false,
+      advertencia: {
+        codigo: 'MEDIDA_CAUTELAR_ACTIVA',
+        mensaje:
+          `El fundamento normativo aplicable a ${fechaBaseMonetaria} (${fundamento.fuente}) tiene una medida ` +
+          'cautelar de suspensión vigente en esa fecha — no debe usarse para calcular piso/techo.',
+      },
+    }
+  }
+
+  if (litigioPendiente) {
+    return {
+      ...camposComunes,
+      fundamentoNormativoAplicable: fundamento,
+      vigenteOperativamente: true,
+      tipoVigencia: 'vigente_con_litigio',
+      litigioPendiente: true,
+      medidaCautelarActiva: false,
+      aptoParaCalculoEnFechaBase: true,
+      advertencia: {
+        codigo: 'LITIGIO_DE_FONDO_PENDIENTE',
+        mensaje:
+          `El fundamento normativo aplicable a ${fechaBaseMonetaria} (${fundamento.fuente}) está operativamente ` +
+          'vigente (sin ninguna suspensión activa en esa fecha), pero existe un litigio de fondo sin resolver ' +
+          'que podría modificar su marco aplicable — el resultado de este cálculo podría cambiar si hay una ' +
+          'decisión judicial posterior.',
+      },
+    }
+  }
+
+  return {
+    ...camposComunes,
+    fundamentoNormativoAplicable: fundamento,
+    vigenteOperativamente: true,
+    tipoVigencia: 'firme',
+    litigioPendiente: false,
+    medidaCautelarActiva: false,
+    aptoParaCalculoEnFechaBase: true,
+    advertencia: null,
   }
 }
 

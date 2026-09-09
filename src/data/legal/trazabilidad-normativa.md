@@ -66,6 +66,37 @@ trazabilidad.
    2026 en $1.750.905 (+23%), pero el Consejo de Estado suspendió provisionalmente
    ese decreto (auto del 12-feb-2026); el Gobierno lo reemplazó transitoriamente con
    el Decreto 0159 de 2026 mientras se resuelve el litigio de fondo.
+   **Actualización 2026-09-07 (auditoría previa a E3-A):** la Sección Segunda del
+   Consejo de Estado REVOCÓ esa suspensión provisional mediante auto del 17-jul-2026
+   (recurso de súplica del Gobierno), reactivando el Decreto 1469 de 2025 como norma
+   operativa vigente — el Decreto 0159/2026 quedó sin efecto. El valor ($1.750.905)
+   no cambió en ningún momento. El litigio de FONDO (nulidad del decreto) sigue
+   abierto y sin fallo a la fecha de consulta.
+   **Fuente oficial (no prensa):** índice de noticias oficiales del Consejo de Estado
+   (consejodeestado.gov.co/noticias/index.php), entrada del 2026-07-17 07:49:33,
+   título "Decreto que impuso el alza del salario mínimo permanecerá vigente hasta
+   que se juzgue su legalidad" — Sección Segunda, revocatoria por recurso de súplica
+   del Gobierno Nacional; PDF del comunicado:
+   linkce.consejodeestado.gov.co/docum/prensa/PQRSDFeb986e.pdf.
+   **Revocatoria confirmada por comunicación oficial del Consejo de Estado; texto
+   íntegro del auto no localizado** (el PDF del comunicado no pudo abrirse — error de
+   red — y no se ubicó el número de radicado del proceso de nulidad). Prensa jurídica
+   especializada (La República, Portafolio, Vanguardia, El Colombiano, LaFM) queda
+   como fuente auxiliar convergente, nunca como fundamento principal.
+   **Cierre 2026-09-07 (segunda ronda):** `estadoJuridico: 'transitorio'` se mantiene
+   sin cambios en `vigente-2026.json` — el mecanismo genérico de exclusión de
+   `resolverReglasVigentes` no se toca. Se agregó, en cambio, un modelo de vigencia
+   explícito (`litigioPendiente`/`medidaCautelarActiva` en la entrada,
+   `evaluarVigenciaSmlv()` en `data/legal/index.js`) que separa "existe una demanda de
+   fondo sin resolver" (no impide el uso) de "hay una suspensión provisional vigente
+   ahora mismo" (si impide el uso) — el propio comunicado oficial confirma que hoy no
+   hay ninguna suspensión activa: `litigioPendiente: true`, `medidaCautelarActiva:
+   false`. Riesgo de vigencia, sin afirmar categóricamente retroactividad (la fuente
+   oficial no se pronuncia sobre eso): el comunicado del Consejo de Estado aclara
+   textualmente que "el examen sobre su legalidad debe producirse cuando se tome la
+   decisión final dentro de este proceso de nulidad" — un fallo de fondo desfavorable
+   podría modificar el marco aplicable, sin que esta investigación pueda establecer si
+   ese efecto sería retroactivo.
 4. **El tope de IBC de 25 SMLMV tiene una ampliación condicional a 45 SMLMV**
    (Decreto 2322 de 2022), pero solo se activa si se cumplen simultáneamente
    crecimiento económico > 4% en los últimos 3 años fiscales y gasto pensional
@@ -80,7 +111,7 @@ trazabilidad.
 | `edadPensionHombre` | Ley 100 de 1993, modificada por Ley 797 de 2003 | Art. 33 Ley 100 de 1993, modificado por Art. 9 Ley 797 de 2003 | 62 años | Vigente desde 2003, sin cambio | Sí — reforma 2024 suspendida | Validado |
 | `semanasMinimasPensionHombre` | Ley 100 de 1993, modificada por Ley 797 de 2003 | Art. 33 Ley 100 de 1993, modificado por Art. 9 Ley 797 de 2003 | 1300 semanas (sin cambio, C-197/2023 no modificó el requisito de hombres) | Vigente desde 2003, sin cambio | Sí — reforma 2024 suspendida | Validado |
 | `semanasMinimasPensionMujer` | Ley 100 de 1993 / Ley 797 de 2003, modulado por Sentencia C-197 de 2023 (Corte Constitucional) | Art. 9 Ley 797 de 2003 (pre-2026, entrada separada); Sentencia C-197 de 2023 (desde 2026-01-01) | 1300 semanas antes de 2026-01-01; desde entonces 1250 en 2026, -25/año hasta piso de 1000 (~2036) — **se consume vía `obtenerSemanasMinimas(fecha, sexo, regimen)`, cargado en vigente-2026.json como dos entradas (plana + cronograma)** | Pre-2026: vigente 2003–2025-12-31. Desde 2026-01-01: cronograma progresivo | Sí, a través del resolver — implementado y probado | Validado |
-| `smlv` | Decreto del Gobierno Nacional (Ministerio del Trabajo), anual | Decreto 1469 de 2025 (29-dic-2025), suspendido provisionalmente por el Consejo de Estado (auto 12-feb-2026); reemplazado transitoriamente por Decreto 0159 de 2026 (19-feb-2026) | $1.750.905 (cargado en vigente-2026.json con `estadoJuridico: 'transitorio'`) | Desde 2026-01-01, valor no firme | Cargado pero **inerte por defecto** (`resolverReglasVigentes` lo excluye salvo `permitirTransitorio: true`) | Requiere revisión |
+| `smlv` | Decreto del Gobierno Nacional (Ministerio del Trabajo), anual | Decreto 1469 de 2025 (29-dic-2025); suspendido provisionalmente (auto 12-feb-2026), suspensión REVOCADA por el Consejo de Estado, Sección Segunda — comunicado oficial 17-jul-2026 (consejodeestado.gov.co/noticias, texto íntegro del auto no localizado) — Decreto 1469/2025 reactivado, Decreto 0159/2026 sin efecto. Litigio de fondo (nulidad) sigue abierto, sin medida cautelar activa hoy | $1.750.905 (`estadoJuridico: 'transitorio'`, `litigioPendiente: true`, `medidaCautelarActiva: false`) | Desde 2026-01-01, operativamente vigente (medida cautelar revocada; fondo pendiente) | `estadoJuridico` sigue excluido por defecto de `resolverReglasVigentes` (mecanismo genérico sin cambios). Aptitud real para cálculo resuelta por `evaluarVigenciaSmlv()` (data/legal/index.js): `aptoParaCalculoEnFechaBase: true`, `tipoVigencia: 'vigente_con_litigio'` — apto con advertencia, no bloqueado | Requiere revisión (modelo de vigencia cerrado 2026-09-07) |
 | `tasaCotizacion` | Ley 100 de 1993, modificada por Ley 797 de 2003 | Art. 20 Ley 100 de 1993, modificado por Art. 7 Ley 797 de 2003 | 16% (fase final de incrementos graduales 2003-2006) | Vigente desde 2006, sin cambio | Sí — reforma 2024 suspendida | Validado |
 | `topeMaximoIBC` | Ley 100 de 1993, modificada por Ley 797 de 2003; Decreto Reglamentario 510 de 2003; Decreto 2322 de 2022 (ampliación condicional, no activa) | Art. 18 Ley 100 de 1993, modificado por Art. 5 Ley 797 de 2003 | 25 SMLMV — condición del Decreto 2322/2022 (crecimiento PIB > 4% en 3 años fiscales) NO se cumple: PIB DANE 0.8%/2.5%/2.6% en 2023/2024/2025 | 25 SMLMV vigente | Sí — condición de ampliación a 45 SMLMV confirmada como no activa | Validado |
 

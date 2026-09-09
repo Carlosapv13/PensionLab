@@ -11,6 +11,7 @@ import {
   obtenerParametrosTasaReemplazoRPM,
   obtenerSemanasHabilitanAlternativaIBL,
   resolverReglasVigentes,
+  evaluarVigenciaSmlv,
 } from './index.js'
 
 // obtenerSemanasMinimas no tenía pruebas propias pese a estar implementado — estos casos
@@ -187,6 +188,160 @@ describe('obtenerSmlv', () => {
     // aparece entre las reglas vigentes.
     const reglasPorDefecto = resolverReglasVigentes('2026-06-15')
     expect(reglasPorDefecto.find((r) => r.campo === 'smlv')).toBeUndefined()
+  })
+
+  it('cierre E3-A (2026-09-07): expone litigioPendiente=true y medidaCautelarActiva=false — la suspensión provisional fue revocada', () => {
+    const resultado = obtenerSmlv('2026-09-07')
+    expect(resultado.litigioPendiente).toBe(true)
+    expect(resultado.medidaCautelarActiva).toBe(false)
+  })
+})
+
+describe('evaluarVigenciaSmlv', () => {
+  const smlvBase = {
+    valor: 1750905,
+    id: 'smlv-2026',
+    fuente: 'Decreto del Gobierno Nacional (Ministerio del Trabajo)',
+    articulo: 'Decreto 1469 de 2025 (reactivado)',
+    vigenciaDesde: '2026-01-01',
+    vigenciaHasta: null,
+    litigioPendiente: true,
+    medidaCautelarActiva: false,
+  }
+
+  it('vigente con litigio pendiente y sin medida cautelar activa → apto, con advertencia (caso real SMLMV 2026 a hoy)', () => {
+    const r = evaluarVigenciaSmlv(smlvBase, '2026-09-07')
+    expect(r.vigenteOperativamente).toBe(true)
+    expect(r.tipoVigencia).toBe('vigente_con_litigio')
+    expect(r.aptoParaCalculoEnFechaBase).toBe(true)
+    expect(r.advertencia.codigo).toBe('LITIGIO_DE_FONDO_PENDIENTE')
+  })
+
+  it('firme, sin litigio ni medida cautelar → apto, sin advertencia', () => {
+    const r = evaluarVigenciaSmlv({ ...smlvBase, litigioPendiente: false }, '2026-09-07')
+    expect(r.tipoVigencia).toBe('firme')
+    expect(r.aptoParaCalculoEnFechaBase).toBe(true)
+    expect(r.advertencia).toBeNull()
+  })
+
+  it('CASO GENÉRICO (hipotético, no el caso real del SMLMV 2026) — medida cautelar activa y sin cadenaNormativa que la sustituya → no apto', () => {
+    // No confundir con marzo de 2026 real (ver más abajo): esta es una regla hipotética de
+    // prueba, sin ninguna norma sustituta que sostuviera el valor durante la suspensión.
+    const reglaHipoteticaSinSustituto = { ...smlvBase, id: 'regla-hipotetica-test', medidaCautelarActiva: true, cadenaNormativa: [] }
+    const r = evaluarVigenciaSmlv(reglaHipoteticaSinSustituto, '2026-09-07')
+    expect(r.vigenteOperativamente).toBe(false)
+    expect(r.tipoVigencia).toBe('suspendido')
+    expect(r.aptoParaCalculoEnFechaBase).toBe(false)
+    expect(r.advertencia.codigo).toBe('MEDIDA_CAUTELAR_ACTIVA')
+  })
+
+  it('CASO HISTÓRICO REAL — marzo de 2026 (dentro de la ventana de suspensión del Decreto 1469/2025): apto, porque la cadena normativa real resuelve el fundamento mediante el Decreto 0159/2026 (nunca suspendido), no mediante el estado más reciente de hoy', () => {
+    const smlvResueltoMarzo = obtenerSmlv('2026-03-01')
+    const r = evaluarVigenciaSmlv(smlvResueltoMarzo, '2026-03-01')
+    expect(r.tipoVigencia).toBe('vigente_con_litigio')
+    expect(r.aptoParaCalculoEnFechaBase).toBe(true)
+    expect(r.fundamentoNormativoAplicable.articulo).toContain('Decreto 0159')
+    expect(r.valorSmlmvAplicable).toBe(1750905)
+  })
+
+  it('la cadena normativa distingue el fundamento del tramo previo a la suspensión (enero de 2026), sin litigio ni cautelar', () => {
+    const smlvResueltoEnero = obtenerSmlv('2026-01-15')
+    const r = evaluarVigenciaSmlv(smlvResueltoEnero, '2026-01-15')
+    expect(r.tipoVigencia).toBe('firme')
+    expect(r.litigioPendiente).toBe(false)
+    expect(r.fundamentoNormativoAplicable.articulo).toContain('1469')
+  })
+
+  // Fronteras temporales exactas de la cadena normativa 2026 (cierre E3-A, tercera ronda) —
+  // cada expectativa se deriva de las fechas jurídicas efectivamente investigadas (fecha de
+  // expedición del auto: 12-feb-2026, confirmada; fecha de expedición/publicación del
+  // Decreto 0159/2026: 19-feb-2026, Diario Oficial No. 53.403, confirmada por convergencia
+  // de fuentes profesionales; fecha de la revocatoria: 17-jul-2026, comunicación oficial del
+  // Consejo de Estado) — nunca de la estructura del código.
+  describe('fronteras temporales exactas de la cadena normativa 2026', () => {
+    it('2026-02-11 (último día confirmado de Decreto 1469/2025 sin incidencia) → firme, apto', () => {
+      const r = evaluarVigenciaSmlv(obtenerSmlv('2026-02-11'), '2026-02-11')
+      expect(r.tipoVigencia).toBe('firme')
+      expect(r.aptoParaCalculoEnFechaBase).toBe(true)
+      expect(r.fundamentoNormativoAplicable.articulo).toContain('1469')
+    })
+
+    it('2026-02-12 (fecha de expedición confirmada del auto de suspensión — efecto no confirmado) → fundamento_no_verificado, NO apto', () => {
+      const r = evaluarVigenciaSmlv(obtenerSmlv('2026-02-12'), '2026-02-12')
+      expect(r.tipoVigencia).toBe('fundamento_no_verificado')
+      expect(r.aptoParaCalculoEnFechaBase).toBe(false)
+      expect(r.advertencia.codigo).toBe('FUNDAMENTO_NORMATIVO_NO_VERIFICADO')
+      // El valor se conserva como referencia histórica, nunca declarado apto.
+      expect(r.valorSmlmvAplicable).toBe(1750905)
+      expect(r.fundamentoNormativoAplicable.fuente).toBeNull()
+    })
+
+    it('2026-02-18 (último día antes de la expedición real del Decreto 0159/2026) → fundamento_no_verificado, NO apto', () => {
+      const r = evaluarVigenciaSmlv(obtenerSmlv('2026-02-18'), '2026-02-18')
+      expect(r.tipoVigencia).toBe('fundamento_no_verificado')
+      expect(r.aptoParaCalculoEnFechaBase).toBe(false)
+    })
+
+    it('2026-02-19 (fecha real de expedición/publicación del Decreto 0159/2026, Diario Oficial No. 53.403) → vigente_con_litigio, apto', () => {
+      const r = evaluarVigenciaSmlv(obtenerSmlv('2026-02-19'), '2026-02-19')
+      expect(r.tipoVigencia).toBe('vigente_con_litigio')
+      expect(r.aptoParaCalculoEnFechaBase).toBe(true)
+      expect(r.fundamentoNormativoAplicable.articulo).toContain('Decreto 0159')
+      expect(r.fundamentoNormativoAplicable.articulo).toContain('19-feb-2026')
+    })
+
+    it('2026-07-16 (último día del Decreto 0159/2026, previo a la revocatoria) → vigente_con_litigio, apto, fundamento Decreto 0159', () => {
+      const r = evaluarVigenciaSmlv(obtenerSmlv('2026-07-16'), '2026-07-16')
+      expect(r.tipoVigencia).toBe('vigente_con_litigio')
+      expect(r.aptoParaCalculoEnFechaBase).toBe(true)
+      expect(r.fundamentoNormativoAplicable.articulo).toContain('Decreto 0159')
+    })
+
+    it('2026-07-17 (fecha de la comunicación oficial de revocatoria — Decreto 1469/2025 reactivado) → vigente_con_litigio, apto, fundamento Decreto 1469/2025', () => {
+      const r = evaluarVigenciaSmlv(obtenerSmlv('2026-07-17'), '2026-07-17')
+      expect(r.tipoVigencia).toBe('vigente_con_litigio')
+      expect(r.aptoParaCalculoEnFechaBase).toBe(true)
+      expect(r.fundamentoNormativoAplicable.articulo).toContain('reactivado')
+    })
+  })
+
+  it('estadoEvaluadoAl se propaga desde la entrada — fecha de conocimiento del estado procesal, distinta de fechaBaseMonetaria', () => {
+    const r = evaluarVigenciaSmlv(smlvBase, '2026-09-07')
+    // smlvBase (fixture local, sin estadoEvaluadoAl) → null; la entrada real sí lo trae.
+    expect(r.estadoEvaluadoAl).toBeNull()
+    const smlvResueltoReal = obtenerSmlv('2026-09-07')
+    expect(evaluarVigenciaSmlv(smlvResueltoReal, '2026-09-07').estadoEvaluadoAl).toBe('2026-09-07')
+  })
+
+  it('fecha base fuera del período de vigencia de la regla → no apto', () => {
+    const r = evaluarVigenciaSmlv(smlvBase, '2025-06-01')
+    expect(r.tipoVigencia).toBe('fuera_de_vigencia')
+    expect(r.aptoParaCalculoEnFechaBase).toBe(false)
+  })
+
+  it('regla ya derogada (vigenciaHasta en el pasado respecto a la fecha base) → no apto', () => {
+    const smlvDerogado = { ...smlvBase, vigenciaDesde: '2025-01-01', vigenciaHasta: '2025-12-31' }
+    const r = evaluarVigenciaSmlv(smlvDerogado, '2026-09-07')
+    expect(r.tipoVigencia).toBe('fuera_de_vigencia')
+    expect(r.aptoParaCalculoEnFechaBase).toBe(false)
+  })
+
+  it('fuente insuficiente (sin id/fuente/articulo) → no apto', () => {
+    const r = evaluarVigenciaSmlv({ valor: 1750905 }, '2026-09-07')
+    expect(r.tipoVigencia).toBe('fuente_insuficiente')
+    expect(r.aptoParaCalculoEnFechaBase).toBe(false)
+  })
+
+  it('smlv ausente → no apto, sin lanzar', () => {
+    expect(() => evaluarVigenciaSmlv(null, '2026-09-07')).not.toThrow()
+    expect(evaluarVigenciaSmlv(null, '2026-09-07').aptoParaCalculoEnFechaBase).toBe(false)
+  })
+
+  it('el valor de obtenerSmlv(hoy) pasado por evaluarVigenciaSmlv resulta apto (integración real E3-A)', () => {
+    const smlvResuelto = obtenerSmlv('2026-09-07')
+    const r = evaluarVigenciaSmlv(smlvResuelto, '2026-09-07')
+    expect(r.aptoParaCalculoEnFechaBase).toBe(true)
+    expect(r.tipoVigencia).toBe('vigente_con_litigio')
   })
 })
 

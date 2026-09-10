@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { calcularProyeccionRPM } from './calcularProyeccionRPM.js'
 import { diasCalendarioEnRango } from '../seleccionarPeriodosIBL.js'
 import { calcularPromedioIBL } from '../formulas/formulaIBL.js'
+import { desglosarTasaReemplazoRPM, formulaRPM } from '../formulas/formulaRPM.js'
+import { obtenerParametrosTasaReemplazoRPM } from '../../data/legal/index.js'
+import { resolverSmlvVigenteRPM } from './resolverSmlvVigenteRPM.js'
 
 // Mismos valores reales que calcularPensionRPM.test.js — fecha de cálculo fija,
 // dentro del rango 2015-2025 verificado de ipc-historico.json.
@@ -1039,5 +1042,74 @@ describe('calcularProyeccionRPM — cierre de integridad: valida historiaCotizac
       historiaCotizacion: [{ fechaDesde: '2020-01-01', fechaHasta: '2025-12-31', ibc: 1500000, diasCotizados: 2191 }],
     })
     expect(r.estado).toBe('calculado')
+  })
+})
+
+// E3-C2a (plomería interna, sin integrar todavía ajustarMesadaLegalRPM.js): esta suite prueba
+// exclusivamente que sustituir calcularTasaReemplazoRPM() por desglosarTasaReemplazoRPM()
+// dentro de calcularProyeccionRPM.js es un cambio de plomería puro — cero diferencia numérica,
+// pensionMensualProyectada sigue siendo el resultado matemático crudo (nunca redefinido,
+// Decisión 1 de E3-C2), y el límite interno del 80% (que vive únicamente en
+// desglosarTasaReemplazoRPM, ver formulaRPM.js) no se aplica dos veces ni diverge entre las
+// dos rutas de cálculo (tasaReemplazo vía el desglose, pensionMensualProyectada vía
+// formulaRPM(), que internamente llama al mismo desglose). Cada test reconstruye
+// parametrosLegales/datosUsuario de forma independiente, con las mismas piezas públicas que
+// calcularProyeccionRPM.js ya usa (resolverSmlvVigenteRPM + obtenerParametrosTasaReemplazoRPM
+// + los campos ya expuestos del resultado) — nunca leyendo un campo interno no expuesto.
+describe('calcularProyeccionRPM — E3-C2a: tasaReemplazo vía desglosarTasaReemplazoRPM, pensionMensualProyectada sin cambios', () => {
+  const perfilBase = {
+    historiaCotizacion: historiaDiezAniosCompleta(),
+    fechaNacimiento: '1976-01-01',
+    edadJubilacionDeseada: 62,
+    escenarioIbcFuturo: escenarioContinuidad(2000000),
+  }
+
+  function desgloseIndependiente(fecha, resultado) {
+    const smlvVigente = resolverSmlvVigenteRPM(fecha)
+    const parametrosLegales = { ...obtenerParametrosTasaReemplazoRPM(fecha), smlv: smlvVigente.valor }
+    const datosUsuario = { ibl: resultado.ibl.aplicable, semanasCotizadas: resultado.semanasCotizadas.total }
+    return { desglose: desglosarTasaReemplazoRPM({ datosUsuario, parametrosLegales }), datosUsuario, parametrosLegales }
+  }
+
+  it('escenario base: tasaReemplazo coincide exactamente con desglosarTasaReemplazoRPM(...).tasaFinalAplicada', () => {
+    const fecha = '2026-02-11'
+    const resultado = calcularProyeccionRPM({ ...perfilBase, fecha })
+    expect(resultado.estado).toBe('calculado')
+
+    const { desglose } = desgloseIndependiente(fecha, resultado)
+    expect(resultado.tasaReemplazo).toBe(desglose.tasaFinalAplicada)
+  })
+
+  it('escenario base: pensionMensualProyectada sigue siendo exactamente formulaRPM(datosUsuario, parametrosLegales) — el resultado matemático crudo, nunca el ajustado', () => {
+    const fecha = '2026-02-11'
+    const resultado = calcularProyeccionRPM({ ...perfilBase, fecha })
+    const { datosUsuario, parametrosLegales } = desgloseIndependiente(fecha, resultado)
+
+    expect(resultado.pensionMensualProyectada).toBe(formulaRPM({ datosUsuario, parametrosLegales }))
+  })
+
+  it('escenario base: la relación pensionMensualProyectada = ibl.aplicable * tasaReemplazo/100 se mantiene (misma aritmética que antes de E3-C2a)', () => {
+    const fecha = '2026-02-11'
+    const resultado = calcularProyeccionRPM({ ...perfilBase, fecha })
+    const pensionEsperada = resultado.ibl.aplicable * (resultado.tasaReemplazo / 100)
+    expect(resultado.pensionMensualProyectada).toBeCloseTo(pensionEsperada, 6)
+  })
+
+  it('carrera larga (26 años, ~1356 semanas) con IBC futuro bajo — región donde el incremento por semanas puede acercar o superar el límite del 80%: tasaReemplazo y pensionMensualProyectada siguen sin divergir de una única aplicación del desglose (nunca doble aplicación del límite)', () => {
+    const historia = historiaVeintiseisAnios()
+    const fecha = FECHA_CALCULO
+    const resultado = calcularProyeccionRPM({
+      historiaCotizacion: historia,
+      fechaNacimiento: '1996-01-31',
+      edadJubilacionDeseada: 30,
+      escenarioIbcFuturo: escenarioContinuidad(1500000),
+      fecha,
+    })
+    expect(resultado.estado).toBe('calculado')
+    expect(resultado.tasaReemplazo).toBeLessThanOrEqual(80)
+
+    const { desglose, datosUsuario, parametrosLegales } = desgloseIndependiente(fecha, resultado)
+    expect(resultado.tasaReemplazo).toBe(desglose.tasaFinalAplicada)
+    expect(resultado.pensionMensualProyectada).toBe(formulaRPM({ datosUsuario, parametrosLegales }))
   })
 })

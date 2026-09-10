@@ -32,7 +32,7 @@
 
 import { seleccionarPeriodosIBL } from '../seleccionarPeriodosIBL.js'
 import { calcularPromedioIBL, dividirPeriodoPorAnio } from '../formulas/formulaIBL.js'
-import { calcularTasaReemplazoRPM, formulaRPM } from '../formulas/formulaRPM.js'
+import { desglosarTasaReemplazoRPM, formulaRPM } from '../formulas/formulaRPM.js'
 import { resolverHorizonteFuturoRPM } from '../resolverHorizonteFuturoRPM.js'
 import { resolverSemanasProyectadasRPM } from './resolverSemanasProyectadasRPM.js'
 import { resolverSmlvVigenteRPM } from './resolverSmlvVigenteRPM.js'
@@ -437,7 +437,17 @@ export function calcularProyeccionRPM({
   // — nunca una distinta para la tasa de reemplazo (contrato GO-B).
   const datosUsuario = { ibl: iblAplicable, semanasCotizadas: semanasCotizadas.total }
 
-  const tasaReemplazo = calcularTasaReemplazoRPM({ datosUsuario, parametrosLegales })
+  // E3-C2a (plomería, sin integrar todavía ajustarMesadaLegalRPM): se llama al desglose
+  // completo, no al wrapper, porque un checkpoint posterior necesitará cada componente
+  // (tasaInicial, bloquesAdicionales, incrementoPorSemanas, limiteOchentaPorcientoAplicado)
+  // como entrada de ajustarMesadaLegalRPM.js — nunca recalculado, mismo criterio ya usado
+  // por formulaRPM.js/desglosarTasaReemplazoRPM (E3-A). `tasaReemplazo` se deriva del
+  // desglose (misma aritmética exacta que calcularTasaReemplazoRPM ya garantizaba por
+  // contrato — ver formulaRPM.js), nunca una segunda fórmula. `pensionMensualProyectada`
+  // sigue viniendo de formulaRPM() sin ningún cambio — resultado matemático crudo, nunca
+  // redefinido (Decisión 1, E3-C2).
+  const desgloseTasa = desglosarTasaReemplazoRPM({ datosUsuario, parametrosLegales })
+  const tasaReemplazo = desgloseTasa.tasaFinalAplicada
   const pensionMensualProyectada = formulaRPM({ datosUsuario, parametrosLegales })
 
   // Limitación condicional (contrato GO-B) — solo cuando la fuente de esta proyección es

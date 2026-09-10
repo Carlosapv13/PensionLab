@@ -5,6 +5,8 @@ import { calcularPromedioIBL } from '../formulas/formulaIBL.js'
 import { desglosarTasaReemplazoRPM, formulaRPM } from '../formulas/formulaRPM.js'
 import { obtenerParametrosTasaReemplazoRPM } from '../../data/legal/index.js'
 import { resolverSmlvVigenteRPM } from './resolverSmlvVigenteRPM.js'
+import { ESTADOS_ELEGIBILIDAD_RPM } from './evaluarElegibilidadProyectadaRPM.js'
+import { REFERENCIAS_NORMATIVAS_AJUSTE_LEGAL_RPM } from '../../data/legal/referenciasNormativasAjusteLegalRPM.js'
 
 // Mismos valores reales que calcularPensionRPM.test.js — fecha de cálculo fija,
 // dentro del rango 2015-2025 verificado de ipc-historico.json.
@@ -1111,5 +1113,273 @@ describe('calcularProyeccionRPM — E3-C2a: tasaReemplazo vía desglosarTasaReem
     const { desglose, datosUsuario, parametrosLegales } = desgloseIndependiente(fecha, resultado)
     expect(resultado.tasaReemplazo).toBe(desglose.tasaFinalAplicada)
     expect(resultado.pensionMensualProyectada).toBe(formulaRPM({ datosUsuario, parametrosLegales }))
+  })
+})
+
+// E3-C2c (sprint-4-correcciones-oscar-baldor): integración de ajustarMesadaLegalRPM.js como
+// resultado ADICIONAL de calcularProyeccionRPM.js — nunca gobierna nada todavía (eso es
+// E3-C2d, en generarCaminosRPM.js). `pensionMensualProyectada` nunca se toca, nunca se
+// redefine: sigue siendo, en todos los casos, el resultado matemático crudo de formulaRPM().
+//
+// Fixtures deliberadamente separadas de "matemático<piso"/"matemático>=piso". Revisión Atlas
+// (2026-09-09): el fixture "bajo el piso" usa exactamente 1 SMLMV ($1.750.905, SMLV_2026)
+// como IBC histórico y futuro — nunca una base de cotización inferior al mínimo legal. Es
+// jurídicamente válido (1 SMLMV es la base de cotización más baja permitida) y, aun así,
+// matemáticamente insuficiente: el Art. 34 Ley 100/1993 topa la tasa de reemplazo en 80%, así
+// que ninguna combinación de semanas puede llevar una mesada calculada sobre un IBL de 1 SMLMV
+// por encima de 0,80 × 1 SMLMV — que sigue siendo menor que el propio SMLMV (0,80 < 1). Esto
+// es una garantía matemática, no una suposición: se verifica además como precondición
+// explícita en cada test, antes de cualquier aserción sobre ajusteLegal. El fixture "sobre el
+// piso" usa un IBC alto pero ordinario ($8.000.000, muy por debajo del tope de 25 SMLMV) en
+// vez del tope legal absoluto, para no presentar un escenario artificial como representativo.
+describe('calcularProyeccionRPM — E3-C2c: ajusteLegal como resultado adicional', () => {
+  const ELEGIBILIDAD_CUMPLE = { estado: ESTADOS_ELEGIBILIDAD_RPM.CUMPLE }
+
+  // Perfil base neutral: SMLV firme (misma fecha ya usada en el resto de este archivo),
+  // historia de 10 años, horizonte de ~12 años (edad 62 desde nacimiento 1976).
+  const PERFIL_BASE_C2C = {
+    fechaNacimiento: '1976-01-01',
+    edadJubilacionDeseada: 62,
+    fecha: '2026-02-11',
+  }
+
+  function historiaConIBC(ibcMensual) {
+    const periodos = []
+    for (let anio = 2016; anio <= 2025; anio++) periodos.push(periodoAnioCompleto(anio, ibcMensual))
+    return periodos
+  }
+
+  // IBC de exactamente 1 SMLMV ($1.750.905) — jurídicamente válido (es la base de cotización
+  // mínima legal, nunca una entrada inferior al mínimo) y, aun así, matemáticamente
+  // insuficiente frente al piso: con IBL = 1 SMLMV, incluso la tasa máxima legal (80%)
+  // produce 0,80 × 1 SMLMV < 1 SMLMV. Verificado como precondición explícita en cada test.
+  function perfilMatematicoBajoElPiso(overrides = {}) {
+    return {
+      ...PERFIL_BASE_C2C,
+      historiaCotizacion: historiaConIBC(SMLV_2026),
+      escenarioIbcFuturo: escenarioContinuidad(SMLV_2026),
+      ...overrides,
+    }
+  }
+
+  // IBC alto pero ordinario (8.000.000, muy por debajo del tope legal de 25 SMLMV) — el
+  // resultado matemático queda muy por encima de 1 SMLMV incluso al mínimo legal del 55%,
+  // sin recurrir a un escenario artificial en el límite absoluto permitido por la ley.
+  function perfilMatematicoSobreElPiso(overrides = {}) {
+    return {
+      ...PERFIL_BASE_C2C,
+      historiaCotizacion: historiaDiezAniosCompleta(),
+      escenarioIbcFuturo: escenarioContinuidad(8000000),
+      ...overrides,
+    }
+  }
+
+  it('A — sin elegibilidad: proyección matemática calculada con normalidad, ajusteLegal.estado="no_solicitado", nunca ENTRADA_INVALIDA, pensionMensualProyectada sin cambios', () => {
+    const perfil = perfilMatematicoBajoElPiso()
+    const resultado = calcularProyeccionRPM(perfil)
+
+    expect(resultado.estado).toBe('calculado')
+    expect(resultado.ajusteLegal.estado).toBe('no_solicitado')
+    expect(resultado.ajusteLegal.resultadoFinalAjustado).toBeNull()
+    expect(resultado.ajusteLegal.resultadoFinalEnSMLMV).toBeNull()
+    expect(resultado.ajusteLegal.pisoEvaluado).toBeNull()
+    expect(resultado.ajusteLegal.techoEvaluado).toBeNull()
+    expect(resultado.ajusteLegal.razon.codigo).toBe('AJUSTE_LEGAL_NO_SOLICITADO')
+    expect(resultado.ajusteLegal.razon.codigo).not.toBe('ENTRADA_INVALIDA')
+    expect(resultado.ajusteLegal.razon.mensaje).toMatch(/proyecci[oó]n matem[aá]tica/i)
+
+    // pensionMensualProyectada conserva exactamente el valor matemático crudo — misma
+    // técnica de verificación ya usada en la suite de E3-C2a (arriba en este archivo):
+    // recomputada de forma independiente, con las mismas piezas públicas.
+    const smlvVigente = resolverSmlvVigenteRPM(perfil.fecha)
+    const parametrosLegales = { ...obtenerParametrosTasaReemplazoRPM(perfil.fecha), smlv: smlvVigente.valor }
+    const datosUsuario = { ibl: resultado.ibl.aplicable, semanasCotizadas: resultado.semanasCotizadas.total }
+    expect(resultado.pensionMensualProyectada).toBe(formulaRPM({ datosUsuario, parametrosLegales }))
+  })
+
+  it('B — elegibilidad CUMPLE, matemático < piso: piso aplicado, resultadoFinalAjustado = SMLMV aplicable, pensionMensualProyectada NO se sobrescribe', () => {
+    const resultado = calcularProyeccionRPM({ ...perfilMatematicoBajoElPiso(), elegibilidad: ELEGIBILIDAD_CUMPLE })
+
+    // Precondición explícita (no asumida): el matemático realmente queda por debajo del piso.
+    expect(resultado.pensionMensualProyectada).toBeLessThan(SMLV_2026)
+
+    expect(resultado.ajusteLegal.estado).toBe('evaluado')
+    expect(resultado.ajusteLegal.pisoEvaluado.evaluable).toBe(true)
+    expect(resultado.ajusteLegal.pisoEvaluado.aplica).toBe(true)
+    expect(resultado.ajusteLegal.resultadoMatematico).toBe(resultado.pensionMensualProyectada)
+    expect(resultado.ajusteLegal.resultadoFinalAjustado).toBe(SMLV_2026)
+
+    // La cifra cruda nunca se sobrescribe ni se pierde, incluso cuando el piso la reemplaza
+    // en resultadoFinalAjustado — ambas cifras coexisten en el mismo objeto.
+    expect(resultado.pensionMensualProyectada).toBeLessThan(SMLV_2026)
+    expect(resultado.pensionMensualProyectada).not.toBe(resultado.ajusteLegal.resultadoFinalAjustado)
+  })
+
+  it('C — elegibilidad CUMPLE, matemático >= piso: resultadoFinalAjustado conserva el resultado matemático (ni piso ni techo aplican)', () => {
+    const resultado = calcularProyeccionRPM({ ...perfilMatematicoSobreElPiso(), elegibilidad: ELEGIBILIDAD_CUMPLE })
+
+    // Precondición explícita: el matemático realmente supera el piso.
+    expect(resultado.pensionMensualProyectada).toBeGreaterThan(SMLV_2026)
+
+    expect(resultado.ajusteLegal.estado).toBe('evaluado')
+    expect(resultado.ajusteLegal.pisoEvaluado.aplica).toBe(false)
+    expect(resultado.ajusteLegal.techoEvaluado.aplica).toBe(false) // techo estructuralmente inalcanzable en RPM puro
+    expect(resultado.ajusteLegal.resultadoFinalAjustado).toBe(resultado.pensionMensualProyectada)
+  })
+
+  it('D — NO_CUMPLE_EDAD: proyección matemática puede existir, ajusteLegal.estado="no_evaluable", resultadoFinalAjustado null, razón exacta, sin piso aplicado', () => {
+    const resultado = calcularProyeccionRPM({
+      ...perfilMatematicoBajoElPiso(),
+      elegibilidad: { estado: ESTADOS_ELEGIBILIDAD_RPM.NO_CUMPLE_EDAD },
+    })
+
+    expect(resultado.estado).toBe('calculado') // la cifra matemática SÍ existe
+    expect(resultado.pensionMensualProyectada).toBeGreaterThan(0)
+    expect(resultado.ajusteLegal.estado).toBe('no_evaluable')
+    expect(resultado.ajusteLegal.resultadoFinalAjustado).toBeNull()
+    expect(resultado.ajusteLegal.razon.codigo).toBe('NO_CUMPLE_REQUISITOS_EN_FECHA_OBJETIVO')
+    expect(resultado.ajusteLegal.pisoEvaluado.aplica).toBeNull()
+  })
+
+  it('E — NO_CUMPLE_SEMANAS: mismo contrato no evaluable, sin piso aplicado', () => {
+    const resultado = calcularProyeccionRPM({
+      ...perfilMatematicoBajoElPiso(),
+      elegibilidad: { estado: ESTADOS_ELEGIBILIDAD_RPM.NO_CUMPLE_SEMANAS },
+    })
+
+    expect(resultado.ajusteLegal.estado).toBe('no_evaluable')
+    expect(resultado.ajusteLegal.resultadoFinalAjustado).toBeNull()
+    expect(resultado.ajusteLegal.razon.codigo).toBe('NO_CUMPLE_REQUISITOS_EN_FECHA_OBJETIVO')
+  })
+
+  it('F — NO_CUMPLE_NINGUNO: mismo contrato no evaluable', () => {
+    const resultado = calcularProyeccionRPM({
+      ...perfilMatematicoBajoElPiso(),
+      elegibilidad: { estado: ESTADOS_ELEGIBILIDAD_RPM.NO_CUMPLE_NINGUNO },
+    })
+
+    expect(resultado.ajusteLegal.estado).toBe('no_evaluable')
+    expect(resultado.ajusteLegal.resultadoFinalAjustado).toBeNull()
+    expect(resultado.ajusteLegal.razon.codigo).toBe('NO_CUMPLE_REQUISITOS_EN_FECHA_OBJETIVO')
+  })
+
+  it('G — NO_EVALUABLE: ajusteLegal.estado="no_evaluable", razón ELEGIBILIDAD_NO_EVALUABLE, nunca interpretado como incumplimiento confirmado', () => {
+    const resultado = calcularProyeccionRPM({
+      ...perfilMatematicoBajoElPiso(),
+      elegibilidad: { estado: ESTADOS_ELEGIBILIDAD_RPM.NO_EVALUABLE },
+    })
+
+    expect(resultado.ajusteLegal.estado).toBe('no_evaluable')
+    expect(resultado.ajusteLegal.razon.codigo).toBe('ELEGIBILIDAD_NO_EVALUABLE')
+    expect(resultado.ajusteLegal.razon.codigo).not.toBe('NO_CUMPLE_REQUISITOS_EN_FECHA_OBJETIVO')
+    expect(resultado.ajusteLegal.resultadoFinalAjustado).toBeNull()
+  })
+
+  it('H — estado de elegibilidad desconocido: ajusteLegal.estado="no_evaluable", razón ENTRADA_INVALIDA, detalle.campo="elegibilidad"', () => {
+    const resultado = calcularProyeccionRPM({
+      ...perfilMatematicoBajoElPiso(),
+      elegibilidad: { estado: 'ESTADO_QUE_NO_EXISTE_EN_EL_ENUM' },
+    })
+
+    expect(resultado.ajusteLegal.estado).toBe('no_evaluable')
+    expect(resultado.ajusteLegal.razon.codigo).toBe('ENTRADA_INVALIDA')
+    expect(resultado.ajusteLegal.razon.detalle.campo).toBe('elegibilidad')
+  })
+
+  it('I — caso representativo "por debajo del piso" (equivalente al caso Oscar, sin fabricar una historia artificial frágil para acertar $1.243.210 exactos): elegible, piso aplicado, resultado final = SMLMV aplicable, ambas cifras conservadas', () => {
+    // El caso EXACTO de Oscar ($1.243.210 matemático / $1.750.905 SMLMV) ya está cubierto,
+    // bit a bit, en ajustarMesadaLegalRPM.test.js (función pura, entrada directa — sin
+    // depender de IBL/tasa/historia real). Reproducirlo aquí exigiría afinar una historia
+    // real hasta que formulaRPM() produjera exactamente esa cifra — frágil ante cualquier
+    // cambio futuro de constantes legales, y no aporta cobertura nueva sobre la integración
+    // (que es lo que este checkpoint prueba). Este test cubre la MISMA situación estructural
+    // (elegible, matemático<piso, ajuste evaluado, final=SMLMV) con una historia real,
+    // deliberadamente aproximada en vez de exacta.
+    const resultado = calcularProyeccionRPM({ ...perfilMatematicoBajoElPiso(), elegibilidad: ELEGIBILIDAD_CUMPLE })
+
+    expect(resultado.pensionMensualProyectada).toBeLessThan(SMLV_2026)
+    expect(resultado.ajusteLegal.estado).toBe('evaluado')
+    expect(resultado.ajusteLegal.pisoEvaluado.aplica).toBe(true)
+    expect(resultado.ajusteLegal.resultadoFinalAjustado).toBe(SMLV_2026)
+    // Ambas cifras, simultáneamente, en el mismo resultado — nunca una sustituye a la otra.
+    expect(resultado.pensionMensualProyectada).toBeGreaterThan(0)
+    expect(resultado.ajusteLegal.resultadoFinalAjustado).toBeGreaterThan(resultado.pensionMensualProyectada)
+  })
+
+  it('J — vigencia con litigio pendiente, sin medida cautelar activa (fecha real 2026-09-07): ajuste evaluable, advertencia conservada en supuestos, no bloquea el piso', () => {
+    const fecha = '2026-09-07' // misma fecha real ya verificada en resolverSmlvVigenteRPM.test.js
+    const smlvVigenteReal = resolverSmlvVigenteRPM(fecha)
+    expect(smlvVigenteReal.aptoParaCalculoEnFechaBase).toBe(true) // precondición del fixture real
+    expect(smlvVigenteReal.litigioPendiente).toBe(true)
+    expect(smlvVigenteReal.medidaCautelarActiva).toBe(false)
+
+    const resultado = calcularProyeccionRPM({
+      ...perfilMatematicoBajoElPiso({ fecha }),
+      elegibilidad: ELEGIBILIDAD_CUMPLE,
+    })
+
+    expect(resultado.ajusteLegal.estado).toBe('evaluado')
+    expect(resultado.ajusteLegal.pisoEvaluado.aplica).toBe(true) // el litigio no bloquea el piso
+    expect(resultado.ajusteLegal.supuestos.some((s) => s.codigo === 'LITIGIO_DE_FONDO_PENDIENTE')).toBe(true)
+  })
+
+  it('K — resultado global no evaluable ANTES de formulaRPM: ajusteLegal es null, incluso si se suministró elegibilidad', () => {
+    const resultado = calcularProyeccionRPM({
+      ...perfilMatematicoBajoElPiso(),
+      edadJubilacionDeseada: undefined, // hard stop inmediato, antes de tocar SMLV/IBL/tasa
+      elegibilidad: ELEGIBILIDAD_CUMPLE,
+    })
+
+    expect(resultado.estado).toBe('no_evaluable')
+    expect(resultado.razonNoEvaluable).toBe('EDAD_JUBILACION_NO_DECLARADA')
+    expect(resultado.pensionMensualProyectada).toBeNull()
+    expect(resultado.ajusteLegal).toBeNull()
+  })
+
+  it('L — no mutación: elegibilidad suministrada, smlvVigente expuesto y REFERENCIAS_NORMATIVAS_AJUSTE_LEGAL_RPM permanecen intactos tras la llamada', () => {
+    const elegibilidadOriginal = { estado: ESTADOS_ELEGIBILIDAD_RPM.CUMPLE }
+    const copiaElegibilidad = JSON.parse(JSON.stringify(elegibilidadOriginal))
+    const copiaReferencias = JSON.parse(JSON.stringify(REFERENCIAS_NORMATIVAS_AJUSTE_LEGAL_RPM))
+
+    const perfil = perfilMatematicoBajoElPiso()
+    const resultado = calcularProyeccionRPM({ ...perfil, elegibilidad: elegibilidadOriginal })
+
+    expect(elegibilidadOriginal).toEqual(copiaElegibilidad)
+    expect(REFERENCIAS_NORMATIVAS_AJUSTE_LEGAL_RPM).toEqual(copiaReferencias)
+
+    // smlvVigente expuesto en el resultado (`vigenciaSmlv`) coincide exactamente con una
+    // resolución independiente para la misma fecha — nunca alterado al construir ajusteLegal.
+    const smlvVigenteIndependiente = resolverSmlvVigenteRPM(perfil.fecha)
+    expect(resultado.vigenciaSmlv).toEqual(smlvVigenteIndependiente)
+  })
+
+  it('M — compatibilidad: fixture ya existente en este archivo (escenario base de las suites de vigencia/E3-C2a, sin elegibilidad) conserva todas sus cifras previas — solo aparece ajusteLegal.estado="no_solicitado"', () => {
+    // Mismos parámetros exactos que "perfilBase" (suite de vigencia del SMLV, arriba en este
+    // archivo) — reconstruidos aquí porque esa variable es local a su propio describe.
+    const resultado = calcularProyeccionRPM({
+      historiaCotizacion: historiaDiezAniosCompleta(),
+      fechaNacimiento: '1976-01-01',
+      edadJubilacionDeseada: 62,
+      escenarioIbcFuturo: escenarioContinuidad(2000000),
+      fecha: '2026-02-11',
+    })
+
+    expect(resultado.estado).toBe('calculado')
+    expect(resultado.vigenciaSmlv.aptoParaCalculoEnFechaBase).toBe(true)
+    expect(resultado.pensionMensualProyectada).toBeGreaterThan(0)
+    expect(resultado.tasaReemplazo).toBeGreaterThan(0)
+    expect(resultado.ibl.aplicable).toBeGreaterThan(0)
+    expect(resultado.semanasCotizadas.total).toBeGreaterThan(0)
+    expect(resultado.horizonteFuturo).not.toBeNull()
+    expect(resultado.escenarioIbcFuturo.valorAplicado).toBe(2000000)
+    // Único campo nuevo, aditivo.
+    expect(resultado.ajusteLegal).toEqual({
+      estado: 'no_solicitado',
+      resultadoFinalAjustado: null,
+      resultadoFinalEnSMLMV: null,
+      pisoEvaluado: null,
+      techoEvaluado: null,
+      razon: { codigo: 'AJUSTE_LEGAL_NO_SOLICITADO', mensaje: resultado.ajusteLegal.razon.mensaje },
+    })
   })
 })

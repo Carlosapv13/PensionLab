@@ -36,6 +36,8 @@ import { desglosarTasaReemplazoRPM, formulaRPM } from '../formulas/formulaRPM.js
 import { resolverHorizonteFuturoRPM } from '../resolverHorizonteFuturoRPM.js'
 import { resolverSemanasProyectadasRPM } from './resolverSemanasProyectadasRPM.js'
 import { resolverSmlvVigenteRPM } from './resolverSmlvVigenteRPM.js'
+import { construirEntradasAjusteLegalRPM } from './construirEntradasAjusteLegalRPM.js'
+import { ajustarMesadaLegalRPM } from './ajustarMesadaLegalRPM.js'
 import { esFechaValida, validarHistoriaCotizacionTemporal } from './validarHistoriaCotizacionTemporal.js'
 import {
   obtenerIPC,
@@ -44,6 +46,7 @@ import {
   obtenerTopeMaximoIBC,
   tieneIPC,
 } from '../../data/legal/index.js'
+import { REFERENCIAS_NORMATIVAS_AJUSTE_LEGAL_RPM } from '../../data/legal/referenciasNormativasAjusteLegalRPM.js'
 
 function hoyISO() {
   return new Date().toISOString().slice(0, 10)
@@ -93,6 +96,18 @@ const LIMITACION_CONTINUIDAD_FUTURA = {
     'tu fecha de jubilación — cualquier hueco real cambiaría el resultado.',
 }
 
+// E3-C2c (sprint-4-correcciones-oscar-baldor): mensaje neutral y técnico para cuando esta
+// función se invoca SIN `elegibilidad` (parámetro aditivo, default null) — nunca
+// ENTRADA_INVALIDA, que es la razón que usa ajustarMesadaLegalRPM.js cuando SÍ se le pasó
+// algo, pero mal formado. Aquí no se le pasó nada: es "no solicitado", no "solicitado e
+// inválido". Aclara explícitamente que la cifra matemática SÍ existe (pensionMensualProyectada
+// nunca depende de esto) — solo el ajuste legal de piso/techo queda sin evaluar.
+const MENSAJE_AJUSTE_LEGAL_NO_SOLICITADO =
+  'La proyección matemática se calculó normalmente. El ajuste legal de piso/techo (1/25 SMLMV) ' +
+  'no se evaluó porque esta llamada no suministró una elegibilidad proyectada canónica (ver ' +
+  'evaluarElegibilidadProyectadaRPM.js) — sin ella, el piso legal no puede aplicarse de forma ' +
+  'segura (ver ajustarMesadaLegalRPM.js, punto 3 de su contrato).'
+
 // `datosIntermedios` (E3-C1, aditivo, default null — ningún llamador existente lo pasa, así
 // que ningún razonNoEvaluable previo a este cambio cambia de forma): fechaBaseMonetaria/
 // fechaReconocimiento/horizonteFuturo ya están resueltos antes de tocar el SMLV (dependen
@@ -117,6 +132,10 @@ function noEvaluable(razonNoEvaluable, trazabilidadVentana, datosFaltantes, dato
     // Aditivo (E3-C1): null salvo cuando razonNoEvaluable proviene específicamente de la
     // vigencia del SMLV.
     vigenciaSmlv: datosIntermedios?.vigenciaSmlv ?? null,
+    // E3-C2c: en TODO resultado global no evaluable (nunca se llegó a formulaRPM — sin
+    // resultado matemático que ajustar), ajusteLegal es null, incondicionalmente. Nunca se
+    // intenta piso/techo sin una cifra matemática real detrás.
+    ajusteLegal: null,
   }
 }
 
@@ -227,6 +246,14 @@ function promediarConFuturo({ periodosObservados, diasFuturos, valorAplicado, an
  *   suficientemente completa" (decisión explícita: esa transición queda fuera de este
  *   slice). Default `null` — sin este parámetro, comportamiento idéntico al existente
  *   antes de GO-B (test de regresión dedicado).
+ * @param {{estado: string}|null} [input.elegibilidad] - (E3-C2c, aditivo) salida de
+ *   evaluarElegibilidadProyectadaRPM.js — nunca recalculada ni reinterpretada aquí, se pasa
+ *   tal cual a ajustarMesadaLegalRPM.js. `null` (default) o `undefined` significa "ajuste
+ *   legal no solicitado" (`ajusteLegal.estado = 'no_solicitado'`), nunca "elegibilidad
+ *   inválida" — un objeto malformado SÍ solicitado (`estado` no reconocido, por ejemplo)
+ *   produce `ajusteLegal.estado = 'no_evaluable'` con `razon.codigo = 'ENTRADA_INVALIDA'`
+ *   (mismo criterio que ya usa ajustarMesadaLegalRPM.js). Sin este parámetro, comportamiento
+ *   idéntico al existente antes de E3-C2c — nunca cambia pensionMensualProyectada.
  * @returns {{
  *   estado: 'calculado' | 'no_evaluable',
  *   razonNoEvaluable: ('EDAD_JUBILACION_NO_DECLARADA'|'FECHA_NACIMIENTO_NO_VALIDA'|'IBC_FUTURO_NO_VALIDO'|'HISTORIA_NO_ES_ARREGLO_VALIDO'|'HISTORIA_CON_PERIODO_DE_FECHA_INVALIDA'|'HISTORIA_CON_PERIODO_DE_FECHAS_INVERTIDAS'|'HISTORIA_CON_PERIODO_POSTERIOR_A_FECHA_CALCULO'|'EDAD_JUBILACION_NO_POSTERIOR_A_HOY'|'HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA'|'COTIZACION_PARCIAL_EN_LIMITE_VENTANA_IBL_NO_SOPORTADA'|'PERIODOS_SUPERPUESTOS_NO_SOPORTADOS'|'INCONSISTENCIA_DIAS_COTIZADOS_INVALIDOS'|'COBERTURA_IPC_INSUFICIENTE_PARA_IBL_ORDINARIO'|null),
@@ -255,6 +282,21 @@ function promediarConFuturo({ periodosObservados, diasFuturos, valorAplicado, an
  *     (incluye advertencia de litigio si existe, sin bloquear) y en 'no_evaluable' cuando
  *     razonNoEvaluable es el código de una vigencia no apta. null cuando el flujo nunca
  *     llegó a resolver el SMLV (razones estructurales anteriores: edad, fecha, historia).
+ *   ajusteLegal: {
+ *     estado: ('no_solicitado'|'evaluado'|'no_evaluable'),
+ *     resultadoFinalAjustado: number | null,
+ *     resultadoFinalEnSMLMV: number | null,
+ *     pisoEvaluado: Object | null,
+ *     techoEvaluado: Object | null,
+ *     razon: {codigo: string, mensaje: string, detalle?: Object} | null,
+ *     ...(resto de campos auditables de ajustarMesadaLegalRPM.js cuando estado !== 'no_solicitado'),
+ *   } | null - (E3-C2c, aditivo) `null` únicamente en todo resultado global no evaluable
+ *     (nunca se llegó a formulaRPM). `'no_solicitado'` cuando `elegibilidad` no se
+ *     suministró. `'evaluado'`/`'no_evaluable'` cuando sí se suministró — espejo directo de
+ *     ajustarMesadaLegalRPM.js más el propio campo `estado` de este contrato (nunca
+ *     sobrescribible por un campo del mismo nombre en esa salida — ver el código). NUNCA
+ *     gobierna pensionMensualProyectada/tasaReemplazo/ibl — esos siguen siendo el resultado
+ *     matemático crudo, siempre (Decisión 1, E3-C2).
  * }}
  */
 export function calcularProyeccionRPM({
@@ -264,6 +306,14 @@ export function calcularProyeccionRPM({
   escenarioIbcFuturo,
   fecha = hoyISO(),
   semanasReferenciaDeclaradas = null,
+  // E3-C2c (sprint-4-correcciones-oscar-baldor): parámetro aditivo, default null — ningún
+  // llamador existente antes de este checkpoint lo pasa, así que ningún caso previo cambia
+  // de forma ni de valor (mismo criterio ya usado para semanasReferenciaDeclaradas, GO-B).
+  // Salida esperada de evaluarElegibilidadProyectadaRPM.js — nunca se recalcula aquí, nunca
+  // se reinterpreta: se pasa tal cual a ajustarMesadaLegalRPM.js. `null`/`undefined` (ambos
+  // colapsan al default) significa "el ajuste legal no fue solicitado", nunca "elegibilidad
+  // inválida" — ver ajusteLegal.estado === 'no_solicitado' más abajo.
+  elegibilidad = null,
 } = {}) {
   if (edadJubilacionDeseada === null || edadJubilacionDeseada === undefined || !Number.isFinite(edadJubilacionDeseada)) {
     return noEvaluable('EDAD_JUBILACION_NO_DECLARADA', null)
@@ -468,6 +518,54 @@ export function calcularProyeccionRPM({
     })
   }
 
+  // E3-C2c: integración del ajuste legal (piso de 1 SMLMV / techo de 25 SMLMV) como resultado
+  // ADICIONAL — pensionMensualProyectada (arriba) nunca se toca, nunca se redefine. Reutiliza
+  // exclusivamente piezas ya resueltas en esta misma llamada (desgloseTasa, smlvVigente,
+  // fechaReconocimiento) — nunca una segunda resolución de tasa, SMLMV o vigencia.
+  let ajusteLegal
+  if (elegibilidad === null) {
+    // Sin elegibilidad, el ajuste ni siquiera se intenta (nunca ENTRADA_INVALIDA — eso es
+    // para cuando SÍ se suministró algo, pero mal formado; aquí no se suministró nada).
+    ajusteLegal = {
+      estado: 'no_solicitado',
+      resultadoFinalAjustado: null,
+      resultadoFinalEnSMLMV: null,
+      pisoEvaluado: null,
+      techoEvaluado: null,
+      razon: {
+        codigo: 'AJUSTE_LEGAL_NO_SOLICITADO',
+        mensaje: MENSAJE_AJUSTE_LEGAL_NO_SOLICITADO,
+      },
+    }
+  } else {
+    // construirEntradasAjusteLegalRPM traduce el mismo `smlvVigente` ya resuelto arriba
+    // (nunca una segunda llamada a resolverSmlvVigenteRPM) a los dos objetos separados que
+    // exige ajustarMesadaLegalRPM.js. `fechaBaseMonetaria` es `fecha` (nunca
+    // fechaReconocimiento): el SMLMV se resuelve en pesos de hoy, nunca pronosticado a la
+    // fecha futura de reconocimiento — esa fecha solo viaja como trazabilidad temporal.
+    const { smlv, vigenciaSmlv } = construirEntradasAjusteLegalRPM(smlvVigente)
+    const resultadoAjuste = ajustarMesadaLegalRPM({
+      resultadoMatematico: pensionMensualProyectada,
+      ibl: iblAplicable,
+      desgloseTasa,
+      smlv,
+      vigenciaSmlv,
+      elegibilidad,
+      fechaBaseMonetaria: fecha,
+      fechaReconocimientoProyectada: fechaReconocimiento,
+      referenciasNormativas: REFERENCIAS_NORMATIVAS_AJUSTE_LEGAL_RPM,
+    })
+    // Orden deliberado — el spread va PRIMERO, `estado` se fija DESPUÉS: garantiza que
+    // ajusteLegal.estado (evaluado/no_evaluable) nunca pueda quedar sobrescrito por un campo
+    // del mismo nombre proveniente de ajustarMesadaLegalRPM.js. Verificado por lectura directa
+    // de ajustarMesadaLegalRPM.js (2026-09-09): su salida hoy NUNCA incluye un campo `estado`
+    // — este orden es una defensa hacia adelante, no la corrección de un conflicto existente.
+    ajusteLegal = {
+      ...resultadoAjuste,
+      estado: resultadoAjuste.resultadoFinalAjustado !== null ? 'evaluado' : 'no_evaluable',
+    }
+  }
+
   return {
     estado: 'calculado',
     razonNoEvaluable: null,
@@ -511,5 +609,9 @@ export function calcularProyeccionRPM({
     // altera pensionMensualProyectada — misma advertencia ya interpretada por
     // evaluarVigenciaSmlv() (E3-A).
     vigenciaSmlv: smlvVigente,
+    // Aditivo (E3-C2c): resultado del ajuste legal (piso/techo), nunca gobierna nada todavía
+    // — generarCaminosRPM.js (E3-C2d) decidirá cuándo/cómo usarlo. pensionMensualProyectada,
+    // arriba, permanece el resultado matemático crudo, siempre.
+    ajusteLegal,
   }
 }

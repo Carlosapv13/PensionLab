@@ -152,6 +152,40 @@ function calcularOrientacion(escenarios) {
   }
 }
 
+// E3-C2d (sprint-4-correcciones-oscar-baldor): valor que gobierna las decisiones de un
+// camino — la mesada final ajustada (piso/techo legal) cuando el ajuste fue evaluado con
+// éxito, NUNCA el resultado matemático crudo como sustituto silencioso (decisión Carlos/
+// Atlas). Devuelve `null` cuando el ajuste no es evaluable — caso estructuralmente
+// inalcanzable en el flujo normal de este archivo (ver invariantes más abajo), pero
+// defendido explícitamente, nunca asumido sin verificar.
+//
+// Invariante que hace este `null` inalcanzable en la práctica, documentada aquí en vez de
+// repetida en cada llamador: por el momento en que este archivo llega a construir un camino
+// o a evaluar un candidato de bisección/barrido, `elegibilidad.estado` ya es exactamente
+// CUMPLE (todo NO_CUMPLE_*/NO_EVALUABLE ya hizo hard-stop antes, sin excepción — ver el
+// bloque de elegibilidad al inicio de generarCaminosRPM) y `vigenciaSmlv.aptoParaCalculoEnFechaBase`
+// ya es true (calcularProyeccionRPM.js nunca llega a `estado: 'calculado'` si no lo es,
+// ver su propio gate de vigencia) — las dos únicas condiciones (fuera de una entrada
+// malformada, imposible aquí porque smlv/desgloseTasa/referenciasNormativas los construye
+// el propio calcularProyeccionRPM.js) que impedirían que ajustarMesadaLegalRPM.js llegue a
+// su rama de piso/techo. Por eso, en el uso real de este archivo, `ajusteLegal.estado` es
+// siempre 'evaluado' para toda proyección con `estado: 'calculado'`.
+//
+// Exportada (revisión Atlas, E3-C2d) exclusivamente para poder probar en aislamiento la
+// defensa contra el fallback silencioso — el propio flujo de generarCaminosRPM() nunca
+// permite fabricar externamente una proyección con ajusteLegal no evaluable (la
+// elegibilidad y la vigencia del SMLV ya están garantizadas antes de llegar aquí), así que
+// esta es la única forma de ejercitar esa rama sin mockear módulos completos ni debilitar
+// las garantías de entrada del resto de la función. No forma parte del contrato público de
+// generarCaminosRPM.js — es un detalle interno expuesto solo para pruebas.
+export function mesadaGobernante(proyeccion) {
+  const ajuste = proyeccion.ajusteLegal
+  if (ajuste?.estado === 'evaluado' && Number.isFinite(ajuste.resultadoFinalAjustado)) {
+    return ajuste.resultadoFinalAjustado
+  }
+  return null
+}
+
 function construirEsfuerzo(ibcActual, ibcPropuesto, tasaCotizacion) {
   const aporteMensualPensionActual = ibcActual * tasaCotizacion
   const aporteMensualPensionPropuesto = ibcPropuesto * tasaCotizacion
@@ -165,15 +199,65 @@ function construirEsfuerzo(ibcActual, ibcPropuesto, tasaCotizacion) {
   }
 }
 
-function construirCamino({ id, tipo, decision, proyeccion, edadJubilacionDeseada, ibcActual, tasaCotizacion, objetivoValorMensual }) {
-  const delta = objetivoValorMensual - proyeccion.pensionMensualProyectada
+// Exportada (revisión Atlas, E3-C2d), mismo motivo que mesadaGobernante: probar en
+// aislamiento que un ajusteLegal no evaluable produce un camino "descartado" con la razón
+// exacta disponible (o AJUSTE_LEGAL_NO_EVALUABLE si no hay ninguna) — nunca un camino
+// "viable" gobernado en silencio por pensionMensualProyectada. No forma parte del contrato
+// público de generarCaminosRPM.js.
+export function construirCamino({ id, tipo, decision, proyeccion, edadJubilacionDeseada, ibcActual, tasaCotizacion, objetivoValorMensual }) {
+  const valorGobernante = mesadaGobernante(proyeccion)
+
+  // Defensa en profundidad (E3-C2d) — nunca alcanzable desde el flujo normal de este
+  // archivo (ver invariantes documentadas en mesadaGobernante), pero si algún día lo fuera,
+  // el camino debe quedar explícitamente no evaluable, nunca gobernado en silencio por
+  // pensionMensualProyectada. Reutiliza la forma ya establecida de "descartado" (Principio
+  // 11 — no inventa un tercer estado nuevo). Revisión Atlas: se conserva la razón EXACTA ya
+  // disponible en proyeccion.ajusteLegal.razon (ej. ELEGIBILIDAD_NO_EVALUABLE,
+  // NO_CUMPLE_REQUISITOS_EN_FECHA_OBJETIVO, ENTRADA_INVALIDA) — 'AJUSTE_LEGAL_NO_EVALUABLE'
+  // es solo el último recurso, cuando ni siquiera esa razón específica existe.
+  if (valorGobernante === null) {
+    return caminoDescartado(
+      id,
+      decision,
+      {
+        codigo: proyeccion.ajusteLegal?.razon?.codigo ?? 'AJUSTE_LEGAL_NO_EVALUABLE',
+        mensaje:
+          proyeccion.ajusteLegal?.razon?.mensaje ??
+          'El ajuste legal (piso/techo de pensión) no pudo evaluarse para este escenario — no se usa el resultado matemático crudo como sustituto.',
+        reglaAplicada: 'ajuste-legal-rpm',
+      },
+      tipo
+    )
+  }
+
+  const delta = objetivoValorMensual - valorGobernante
+  const pisoAplico = proyeccion.ajusteLegal.pisoEvaluado?.aplica === true
+  // objetivoAlcanzadoPorPisoLegal (E3-C2d, decisión Carlos/Atlas): true únicamente cuando
+  // las TRES condiciones se cumplen a la vez — (1) la meta se alcanza con el valor final
+  // ajustado, (2) el piso efectivamente aplicó, (3) el resultado matemático crudo por sí
+  // solo NO alcanzaba la meta (si el crudo ya la alcanzaba, el piso no es la causa real,
+  // aunque técnicamente también esté "aplicando" por debajo del crudo — caso imposible en
+  // la práctica porque pisoAplica exige crudo<piso, pero se verifica explícitamente para no
+  // depender de esa implicación sin declararla). Nunca afirma "derecho reconocido" ni
+  // "pensión garantizada" — solo que, según esta proyección, la meta se alcanza por
+  // aplicación del piso legal.
+  const metaAlcanzadaSoloConCrudo = objetivoValorMensual - proyeccion.pensionMensualProyectada <= 0
+  const objetivoAlcanzadoPorPisoLegal = delta <= 0 && pisoAplico && !metaAlcanzadaSoloConCrudo
+
   return {
     id,
     tipo,
     estado: 'viable',
     decision,
     entradas: { escenarioIbcFuturo: proyeccion.escenarioIbcFuturo, edadJubilacionDeseada },
-    resultado: { valor: proyeccion.pensionMensualProyectada, moneda: 'COP', periodoReferencia: 'mensual' },
+    // E3-C2d: `resultado.valor` es ahora la mesada FINAL AJUSTADA (piso/techo) cuando es
+    // evaluable — nunca el crudo. El crudo se conserva íntegro y auditable en
+    // `valorMatematico`, nunca borrado ni redefinido (Decisión 1, E3-C2/E3-C2d). El
+    // resultado legal completo (piso/techo/supuestos/trazabilidad) viaja en `ajusteLegal`.
+    resultado: { valor: valorGobernante, moneda: 'COP', periodoReferencia: 'mensual' },
+    valorMatematico: proyeccion.pensionMensualProyectada,
+    ajusteLegal: proyeccion.ajusteLegal,
+    objetivoAlcanzadoPorPisoLegal,
     ibl: proyeccion.ibl,
     tasaReemplazo: proyeccion.tasaReemplazo,
     semanasCotizadas: proyeccion.semanasCotizadas,
@@ -186,14 +270,21 @@ function construirCamino({ id, tipo, decision, proyeccion, edadJubilacionDeseada
   }
 }
 
-function caminoDescartado(id, decision, razonDescartado) {
+// `tipo` (E3-C2d, aditivo con default 'alternativo'): permite reutilizar esta forma también
+// para un camino BASE que quedara no evaluable por ajuste (defensa en profundidad de
+// construirCamino) — ningún llamador existente antes de este checkpoint pasaba `tipo`, así
+// que su comportamiento no cambia (siempre generaba caminos 'alternativo').
+function caminoDescartado(id, decision, razonDescartado, tipo = 'alternativo') {
   return {
     id,
-    tipo: 'alternativo',
+    tipo,
     estado: 'descartado',
     decision,
     entradas: null,
     resultado: null,
+    valorMatematico: null,
+    ajusteLegal: null,
+    objetivoAlcanzadoPorPisoLegal: false,
     ibl: null,
     tasaReemplazo: null,
     semanasCotizadas: null,
@@ -241,7 +332,11 @@ function construirPuntoBarrido({ construirInput, ibcActual, tasaCotizacion, indi
     posicion,
     escenarioIbcFuturo: proyeccion.escenarioIbcFuturo,
     esfuerzo: construirEsfuerzo(ibcActual, proyeccion.escenarioIbcFuturo.valorAplicado, tasaCotizacion),
-    resultado: { valor: proyeccion.pensionMensualProyectada, moneda: 'COP', periodoReferencia: 'mensual' },
+    // E3-C2d: mismo criterio que construirCamino — el valor mostrado en la curva es la
+    // mesada final ajustada (nunca el crudo como sustituto silencioso); el crudo queda
+    // disponible aparte, en `valorMatematico`, para quien necesite auditarlo.
+    resultado: { valor: mesadaGobernante(proyeccion), moneda: 'COP', periodoReferencia: 'mensual' },
+    valorMatematico: proyeccion.pensionMensualProyectada,
   }
 }
 
@@ -376,7 +471,9 @@ function construirBarridoEsfuerzoResultado({
     objetivoValorMensual: objetivoReferenciaSuperior,
   })
   const ibcReferenciaSuperior = resultadoReferenciaSuperior.escenarioIbcFuturo.valorAplicado
-  const referenciaSuperiorAlcanzada = resultadoReferenciaSuperior.pensionMensualProyectada >= objetivoReferenciaSuperior
+  // E3-C2d: mismo valor gobernante que el resto de la búsqueda — nunca el crudo.
+  const valorReferenciaSuperior = mesadaGobernante(resultadoReferenciaSuperior)
+  const referenciaSuperiorAlcanzada = valorReferenciaSuperior !== null && valorReferenciaSuperior >= objetivoReferenciaSuperior
 
   // §8.5 (monotonicidad) garantiza ibcReferenciaSuperior >= ibcObjetivo del alternativo —
   // objetivoReferenciaSuperior > objetivoValorMensual, y ambas búsquedas comparten el mismo
@@ -419,8 +516,16 @@ function biseccionarEscenarioIbcFuturo({ construirInput, ibcActual, topeAplicado
   for (let i = 0; i < iteraciones; i++) {
     const medio = (limiteInferior + limiteSuperior) / 2
     const proyeccion = calcularProyeccionRPM(construirInput(medio))
+    // E3-C2d: la búsqueda ahora persigue la mesada FINAL AJUSTADA, no el resultado
+    // matemático crudo — el piso legal crea una meseta monotónica (constante mientras el
+    // crudo se mantenga por debajo del piso, luego coincide con el crudo) que esta misma
+    // bisección ya maneja correctamente sin cambios de algoritmo: sigue siendo una función
+    // no decreciente en el IBC candidato. `valorGobernante === null` (defensivo, nunca
+    // alcanzable aquí — ver mesadaGobernante) se trata como "no cumple", nunca como
+    // sustituto silencioso del crudo.
+    const valorGobernante = mesadaGobernante(proyeccion)
 
-    if (proyeccion.pensionMensualProyectada >= objetivoValorMensual) {
+    if (valorGobernante !== null && valorGobernante >= objetivoValorMensual) {
       limiteSuperior = medio
     } else {
       limiteInferior = medio
@@ -610,6 +715,14 @@ export function generarCaminosRPM({
     // el barrido y el esfuerzo personalizado, más abajo. Nunca una fuente distinta por
     // camino.
     semanasReferenciaDeclaradas,
+    // E3-C2d (sprint-4-correcciones-oscar-baldor): misma elegibilidad canónica ya
+    // confirmada CUMPLE arriba (todo NO_CUMPLE_*/NO_EVALUABLE ya hizo hard-stop antes de
+    // llegar aquí) — se propaga tal cual, vía este mismo spread, a TODAS las invocaciones
+    // de calcularProyeccionRPM.js de esta función (base, bisección del alternativo,
+    // referencia superior del barrido, cada punto del barrido, esfuerzo personalizado).
+    // Nunca se recalcula ni se reinterpreta — es exactamente el mismo objeto que
+    // ajustarMesadaLegalRPM.js recibirá en cada una de esas llamadas.
+    elegibilidad,
   }
 
   const resultadoBase = calcularProyeccionRPM(escenarioBaseInput)
@@ -637,6 +750,24 @@ export function generarCaminosRPM({
         'HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA',
         razon,
         { diasEfectivosAcumulados: diasEfectivos, diasVentanaRequeridos: DIAS_REFERENCIA_VENTANA_IBL },
+        elegibilidad,
+        disponibilidadCuantia
+      )
+    }
+    // E3-C2d (revisión Atlas): mismo criterio que el caso de arriba — cuando la causa
+    // específica es que el SMLV no es apto para calcular en esta fecha (vigencia jurídica:
+    // fundamento no verificado, suspensión, fuera de vigencia, fuente insuficiente), se
+    // conserva el código jurídico exacto como orientacion.codigo y la vigencia completa
+    // como detalle auditable — nunca se pierde detrás del mensaje genérico de
+    // SIN_CAMINOS_VIABLES. `resultadoBase.vigenciaSmlv` solo viene poblado cuando
+    // calcularProyeccionRPM.js se detuvo específicamente por esta razón (ver su propio
+    // `noEvaluable()`) — nunca para las demás causas de `estado: 'no_evaluable'`.
+    if (resultadoBase.vigenciaSmlv !== null && !resultadoBase.vigenciaSmlv.aptoParaCalculoEnFechaBase) {
+      return resultadoVacio(
+        resultadoBase.razonNoEvaluable,
+        resultadoBase.vigenciaSmlv.advertencia?.mensaje ??
+          `El salario mínimo vigente en la fecha de esta simulación no está apto para calcular (${resultadoBase.razonNoEvaluable}).`,
+        { vigenciaSmlv: resultadoBase.vigenciaSmlv },
         elegibilidad,
         disponibilidadCuantia
       )
@@ -727,8 +858,33 @@ export function generarCaminosRPM({
         ...escenarioBaseInput,
         escenarioIbcFuturo: { valor: topeAplicado, origen: 'busqueda_objetivo_rpm' },
       })
+      // E3-C2d: la alcanzabilidad se confirma con la mesada final ajustada — el tope legal
+      // de IBC (topeAplicado) y el techo de la mesada (25 SMLMV, dentro de ajusteLegal) son
+      // dos límites legales distintos; este chequeo ya usaba el primero para acotar el IBC
+      // candidato y ahora usa el segundo, correctamente, para decidir si el objetivo es
+      // alcanzable dentro de lo legal.
+      const valorGobernanteEnTope = mesadaGobernante(resultadoEnTope)
 
-      if (resultadoEnTope.pensionMensualProyectada < objetivoValorMensual) {
+      // Revisión Atlas (E3-C2d): "no se pudo evaluar el ajuste legal" (valorGobernanteEnTope
+      // === null) y "se evaluó y no alcanza ni en el tope" son afirmaciones DISTINTAS — la
+      // primera nunca debe clasificarse como OBJETIVO_NO_ALCANZABLE_NI_EN_TOPE (eso
+      // afirmaría una imposibilidad legal que en realidad no se pudo verificar). Por la
+      // invariante ya documentada en mesadaGobernante (elegibilidad CUMPLE y SMLV apto
+      // garantizados en este punto del flujo), este `null` es estructuralmente inalcanzable
+      // aquí — pero se defiende explícitamente de todas formas, nunca asumido.
+      if (valorGobernanteEnTope === null) {
+        escenarios.push(
+          caminoDescartado('aumentar-ibc-futuro', 'Aumentar tu IBC futuro para acercarte a tu objetivo.', {
+            codigo: resultadoEnTope.ajusteLegal?.razon?.codigo ?? 'AJUSTE_LEGAL_NO_EVALUABLE',
+            mensaje:
+              resultadoEnTope.ajusteLegal?.razon?.mensaje ??
+              'El ajuste legal (piso/techo de pensión) no pudo evaluarse para el escenario en el tope máximo de ' +
+                'IBC — no se usa el resultado matemático crudo como sustituto, ni se afirma que el objetivo sea ' +
+                'legalmente inalcanzable.',
+            reglaAplicada: 'ajuste-legal-rpm',
+          })
+        )
+      } else if (valorGobernanteEnTope < objetivoValorMensual) {
         escenarios.push(
           caminoDescartado('aumentar-ibc-futuro', 'Aumentar tu IBC futuro para acercarte a tu objetivo.', {
             codigo: 'OBJETIVO_NO_ALCANZABLE_NI_EN_TOPE',

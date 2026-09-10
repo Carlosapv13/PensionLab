@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { generarCaminosRPM } from './generarCaminosRPM.js'
+import { generarCaminosRPM, mesadaGobernante, construirCamino } from './generarCaminosRPM.js'
 import { calcularProyeccionRPM } from './calcularProyeccionRPM.js'
 import { obtenerTasaCotizacion } from '../../data/legal/index.js'
 
@@ -415,12 +415,17 @@ describe('generarCaminosRPM — camino personalizado (esfuerzoAdicionalMensualDe
     const objetivoValorMensual = objetivoNoAlcanzadoPorBase()
     const tasa = tasaCotizacionFraccion()
     const ibcEsperado = PERFIL_BASE.ibcAplicableSimulacion + 200000 / tasa
+    // E3-C2d: la verificación independiente ahora debe pasar la misma elegibilidad canónica
+    // que generarCaminosRPM.js propaga internamente, y comparar contra la mesada FINAL
+    // AJUSTADA (resultado.valor ya no es el crudo) — nunca pensionMensualProyectada, que
+    // sigue existiendo pero ya no gobierna el camino.
     const proyeccionEsperada = calcularProyeccionRPM({
       historiaCotizacion: PERFIL_BASE.historiaCotizacion,
       fechaNacimiento: PERFIL_BASE.fechaNacimiento,
       edadJubilacionDeseada: PERFIL_BASE.edadJubilacionDeseada,
       escenarioIbcFuturo: { valor: ibcEsperado, origen: 'esfuerzo_adicional_declarado' },
       fecha: FECHA_CALCULO,
+      elegibilidad: { estado: 'CUMPLE_REQUISITOS_EN_FECHA_OBJETIVO' },
     })
 
     const r = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual, esfuerzoAdicionalMensualDeseado: 200000 })
@@ -431,7 +436,9 @@ describe('generarCaminosRPM — camino personalizado (esfuerzoAdicionalMensualDe
     expect(personalizado.tipo).toBe('alternativo')
     expect(personalizado.entradas.escenarioIbcFuturo.origen).toBe('esfuerzo_adicional_declarado')
     expect(personalizado.entradas.escenarioIbcFuturo.valorAplicado).toBe(ibcEsperado)
-    expect(personalizado.resultado.valor).toBe(proyeccionEsperada.pensionMensualProyectada)
+    expect(personalizado.resultado.valor).toBe(proyeccionEsperada.ajusteLegal.resultadoFinalAjustado)
+    // El crudo se conserva íntegro y auditable, nunca borrado (Decisión 1, E3-C2/E3-C2d).
+    expect(personalizado.valorMatematico).toBe(proyeccionEsperada.pensionMensualProyectada)
   })
 
   it('2. costoPensionalAdicionalMensual del escenario coincide con el monto declarado cuando el tope legal no interviene', () => {
@@ -560,13 +567,18 @@ describe('generarCaminosRPM — diferenciaFrenteABase (decisión de producto, 20
     expect(base.diferenciaFrenteABase).toEqual({ delta: 0 })
   })
 
-  it('B. camino personalizado: delta === resultado.valor - base.resultado.valor exactamente (verificado independientemente)', () => {
+  it('B. camino personalizado: delta === resultado.valor - base.resultado.valor exactamente (verificado independientemente). E3-C2d: con PERFIL_BASE, tanto el base como este esfuerzo de $200.000 quedan dentro de la meseta del piso legal (ambos resultados matemáticos crudos siguen por debajo de 1 SMLMV) — el delta correctamente da 0: el esfuerzo adicional NO se traduce en ningún beneficio pensional final, aunque el resultado matemático crudo sí haya mejorado (caso R de la integración del ajuste legal). Antes de E3-C2d este mismo delta era positivo porque se comparaba el crudo, no la mesada legal final.', () => {
     const objetivoValorMensual = objetivoNoAlcanzadoPorBase()
     const r = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual, esfuerzoAdicionalMensualDeseado: 200000 })
     const base = r.escenarios.find((e) => e.id === 'base')
     const personalizado = r.escenarios.find((e) => e.id === 'esfuerzo-adicional-deseado')
     expect(personalizado.diferenciaFrenteABase.delta).toBe(personalizado.resultado.valor - base.resultado.valor)
-    expect(personalizado.diferenciaFrenteABase.delta).toBeGreaterThan(0) // más esfuerzo, más pensión — monotonicidad ya validada (§8.5)
+    // Precondición explícita (no asumida): ambos resultados matemáticos crudos siguen
+    // dentro de la meseta del piso — por eso el delta LEGAL da exactamente 0.
+    expect(base.valorMatematico).toBeLessThan(SMLV_2026)
+    expect(personalizado.valorMatematico).toBeLessThan(SMLV_2026)
+    expect(personalizado.valorMatematico).toBeGreaterThan(base.valorMatematico) // el crudo SÍ mejoró...
+    expect(personalizado.diferenciaFrenteABase.delta).toBe(0) // ...pero el resultado final no, por el piso
   })
 
   it('C. camino objetivo (alternativo): mismo criterio', () => {
@@ -577,15 +589,17 @@ describe('generarCaminosRPM — diferenciaFrenteABase (decisión de producto, 20
     expect(alternativo.diferenciaFrenteABase.delta).toBe(alternativo.resultado.valor - base.resultado.valor)
   })
 
-  it('D. la resta es directa, sin Math.abs ni clamping — un delta negativo (si existiera) se conservaría intacto. Nota arquitectónica: hoy generarCaminosRPM.js no puede producir legítimamente un camino viable con pensión menor que el base (el alternativo y el personalizado solo evalúan IBC >= ibcActual, y la monotonicidad de calcularProyeccionRPM ya está validada en §8.5) — por eso el signo negativo se prueba de forma exhaustiva a nivel de helper de presentación (ProyectaTuPensionRPM.helpers.test.js), que sí recibe deltas arbitrarios. Aquí solo se confirma que la resta del dominio nunca invierte ni recorta el signo de un delta positivo real.', () => {
+  it('D. la resta es directa, sin Math.abs ni clamping — un delta negativo (si existiera) se conservaría intacto. Nota arquitectónica: hoy generarCaminosRPM.js no puede producir legítimamente un camino viable con pensión menor que el base (el alternativo y el personalizado solo evalúan IBC >= ibcActual, y la monotonicidad de calcularProyeccionRPM ya está validada en §8.5) — por eso el signo negativo se prueba de forma exhaustiva a nivel de helper de presentación (ProyectaTuPensionRPM.helpers.test.js), que sí recibe deltas arbitrarios. Aquí solo se confirma que la resta del dominio nunca invierte ni recorta el signo de un delta positivo real. E3-C2d: el esfuerzo se eligió deliberadamente grande ($1.500.000) para que el resultado matemático crudo cruce el piso legal — un esfuerzo pequeño, como en el test B, cae dentro de la meseta y da delta=0 (correcto, ver test B), lo cual no sirve para demostrar el punto de ESTE test (que la resta nunca recorta un delta positivo real).', () => {
     const objetivoValorMensual = objetivoNoAlcanzadoPorBase()
-    const r = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual, esfuerzoAdicionalMensualDeseado: 50000 })
+    const r = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual, esfuerzoAdicionalMensualDeseado: 1500000 })
     const base = r.escenarios.find((e) => e.id === 'base')
     const personalizado = r.escenarios.find((e) => e.id === 'esfuerzo-adicional-deseado')
-    // Un esfuerzo pequeño produce un delta pequeño pero sigue siendo exactamente la resta —
-    // nunca 0 por redondeo, nunca forzado a un mínimo.
+    // Precondición explícita: este esfuerzo sí saca al resultado matemático crudo de la
+    // meseta del piso (a diferencia del test B) — por eso aquí el delta legal sí es real.
+    expect(personalizado.valorMatematico).toBeGreaterThan(SMLV_2026)
     expect(personalizado.diferenciaFrenteABase.delta).toBe(personalizado.resultado.valor - base.resultado.valor)
     expect(personalizado.diferenciaFrenteABase.delta).not.toBe(0)
+    expect(personalizado.diferenciaFrenteABase.delta).toBeGreaterThan(0)
   })
 
   it('escenario descartado (sin resultado) → diferenciaFrenteABase es null, nunca un delta inventado sobre un resultado inexistente', () => {
@@ -722,8 +736,14 @@ describe('generarCaminosRPM — barrido esfuerzo↔resultado (S4-005)', () => {
     })
 
     it('sin_margen — restricción de costo declarada en $0, distinguido con SIN_MARGEN_RESTRICCION_COSTO (no es el tope legal el que limita)', () => {
+      // E3-C2d: objetivoValorMensual explícito, por encima del piso legal (a diferencia del
+      // valor por defecto de PERFIL_BASE, $1.600.000, que el piso de $1.750.905 ya cubre por
+      // sí solo desde que el ajuste legal gobierna las decisiones) — de lo contrario el
+      // escenario base ya alcanzaría el objetivo vía el piso y este caso (que necesita un
+      // objetivo genuinamente no alcanzado) nunca se ejercitaría.
       const r = generarCaminosRPM({
         ...PERFIL_BASE,
+        objetivoValorMensual: 2500000,
         restriccionCostoPensionalAdicionalMaximoMensual: 0,
       })
       expect(r.barrido.estado).toBe('sin_margen')
@@ -797,11 +817,16 @@ describe('generarCaminosRPM — barrido esfuerzo↔resultado (S4-005)', () => {
     })
 
     it("una restricción de costo permite alcanzar el objetivo pero corta antes del margen del 125% → extremo 'limite_restriccion', objetivo igual alcanzado y marcado", () => {
-      // Calibrado numéricamente: objetivo alcanzable con IBC ≈ $4.213.375; su ×1.25
-      // necesitaría IBC ≈ $6.611.197. La restricción elegida (a mitad de camino entre
-      // ambos IBC) deja alcanzar el objetivo pero no el margen del 125%.
-      const objetivoValorMensual = 1534606
-      const restriccion = 545966
+      // Recalibrado (E3-C2d): con el ajuste legal gobernando las decisiones, un objetivo
+      // igual o por debajo del piso ($1.750.905) ya lo cubre el escenario base por sí solo
+      // (sin necesitar bisección ni restricción) — la calibración original ($1.534.606) caía
+      // en ese caso y ya no ejercita esta rama. Recalibrado numéricamente sobre la mesada
+      // FINAL AJUSTADA (no sobre el crudo): objetivo alcanzable con IBC ≈ $13.372.088; su
+      // ×1.25 ($3.750.000) necesitaría IBC ≈ $18.059.588. La restricción elegida (a mitad de
+      // camino entre ambos IBC, en pesos de aporte adicional) deja alcanzar el objetivo pero
+      // no el margen del 125%.
+      const objetivoValorMensual = 3000000
+      const restriccion = 2194534
 
       const r = generarCaminosRPM({
         ...PERFIL_BASE,
@@ -919,7 +944,11 @@ describe('generarCaminosRPM — horizonte (§14 punto 9 del Entregable 2)', () =
   })
 
   it('horizonte también cubre el rango del barrido — mismo fecha/fechaNacimiento/edadJubilacionDeseada en cada punto', () => {
-    const r = generarCaminosRPM(PERFIL_BASE)
+    // E3-C2d: objetivoValorMensual explícito, por encima del piso legal — con el valor por
+    // defecto de PERFIL_BASE ($1.600.000, por debajo del piso de $1.750.905) el escenario
+    // base ya alcanzaría el objetivo vía el piso y el barrido devolvería
+    // 'objetivo_ya_alcanzado' sin puntos, en vez de 'calculado'.
+    const r = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual: 2500000 })
     expect(r.barrido.estado).toBe('calculado')
     const primerPunto = calcularProyeccionRPM({
       historiaCotizacion: PERFIL_BASE.historiaCotizacion,
@@ -1355,5 +1384,393 @@ describe('generarCaminosRPM — E2 corrección: historia con períodos posterior
     expect(r.orientacion.codigo).toBe('DATOS_INCOMPLETOS')
     expect(r.elegibilidad.razones[0].codigo).toBe('HISTORIA_CON_PERIODO_DE_FECHAS_INVERTIDAS')
     expect(r.escenarios).toEqual([])
+  })
+})
+
+// E3-C2d (sprint-4-correcciones-oscar-baldor): integración del ajuste legal (piso/techo)
+// como gobierno de las decisiones de los caminos — comparación contra objetivo,
+// distanciaObjetivo, orientación, búsqueda del esfuerzo mínimo y selección entre
+// alternativas usan ahora resultadoFinalAjustado (proyeccion.ajusteLegal.resultadoFinalAjustado),
+// nunca pensionMensualProyectada como sustituto silencioso. pensionMensualProyectada se
+// conserva íntegro y auditable en cada camino como `valorMatematico`.
+//
+// Fixture propio (SEXO/FECHA_NACIMIENTO/EDAD_JUBILACION C2D), deliberadamente distinto de
+// PERFIL_BASE: fechaNacimiento 1976-01-01 + edadJubilacionDeseada 62 produce un horizonte
+// (~12 años) que por sí solo excede los 3.650 días de la ventana del IBL — verificado
+// empíricamente antes de escribir estas pruebas (misma técnica ya usada en la suite E3-C2c
+// de calcularProyeccionRPM.test.js) — así que la ventana del IBL cae ENTERAMENTE dentro del
+// período futuro sintético, y el IBL aplicable es exactamente `ibcAplicableSimulacion`, sin
+// que la historia (usada aquí solo para sustentar las semanas mínimas) la contamine con
+// indexación IPC. historiaLargaCompleta() (1990-2025, ya definida en este archivo, ~1878
+// semanas) sustenta semanas de sobra sin afectar el IBL por esta razón.
+describe('generarCaminosRPM — E3-C2d: el ajuste legal gobierna las decisiones de los caminos', () => {
+  const SEXO_C2D = 'Hombre'
+  const FECHA_NACIMIENTO_C2D = '1976-01-01'
+  const EDAD_JUBILACION_C2D = 62
+  const TOPE_IBC_2026_C2D = 25 * SMLV_2026
+
+  function perfilBajoElPiso(overrides = {}) {
+    return {
+      regimenActual: 'RPM',
+      sexo: SEXO_C2D,
+      historiaCotizacion: historiaLargaCompleta(),
+      fechaNacimiento: FECHA_NACIMIENTO_C2D,
+      edadJubilacionDeseada: EDAD_JUBILACION_C2D,
+      // IBC = exactamente 1 SMLMV — jurídicamente válido (es la base de cotización mínima
+      // legal, nunca inferior) y, aun así, matemáticamente insuficiente frente al piso: con
+      // semanas de sobra la tasa llega al máximo legal (80%), y 0,80 × 1 SMLMV < 1 SMLMV
+      // por construcción (mismo criterio ya usado y verificado en calcularProyeccionRPM.test.js).
+      ibcAplicableSimulacion: SMLV_2026,
+      objetivoValorMensual: SMLV_2026,
+      fecha: FECHA_CALCULO,
+      ...overrides,
+    }
+  }
+
+  it('A — elegible, matemático inferior al piso, meta inferior al piso: el escenario base alcanza la meta por el piso, sin proponer ningún aumento', () => {
+    const r = generarCaminosRPM(perfilBajoElPiso({ objetivoValorMensual: 1500000 }))
+
+    expect(r.elegibilidad.estado).toBe('CUMPLE_REQUISITOS_EN_FECHA_OBJETIVO')
+    expect(r.escenarios).toHaveLength(1) // sin alternativo — no hace falta ningún aumento
+    const base = r.escenarios[0]
+    // Precondiciones explícitas (no asumidas): matemático<piso Y matemático<meta<piso.
+    expect(base.valorMatematico).toBeLessThan(1500000)
+    expect(base.valorMatematico).toBeLessThan(SMLV_2026)
+    expect(1500000).toBeLessThan(SMLV_2026)
+
+    expect(base.resultado.valor).toBe(SMLV_2026)
+    expect(base.distanciaObjetivo.cumple).toBe(true)
+    expect(base.esfuerzo.aumentoIBC).toBe(0)
+    expect(base.esfuerzo.costoPensionalAdicionalMensual).toBe(0)
+    expect(base.objetivoAlcanzadoPorPisoLegal).toBe(true)
+    expect(r.orientacion.codigo).toBe('UNICO_CUMPLE')
+    expect(r.barrido.estado).toBe('objetivo_ya_alcanzado')
+    expect(r.barrido.puntos).toEqual([])
+  })
+
+  it('B — meta exactamente igual al piso: se alcanza sin incremento porque el ajuste aplica', () => {
+    const r = generarCaminosRPM(perfilBajoElPiso({ objetivoValorMensual: SMLV_2026 }))
+    const base = r.escenarios[0]
+
+    expect(r.escenarios).toHaveLength(1)
+    expect(base.resultado.valor).toBe(SMLV_2026)
+    expect(base.distanciaObjetivo.delta).toBe(0)
+    expect(base.distanciaObjetivo.cumple).toBe(true)
+    expect(base.objetivoAlcanzadoPorPisoLegal).toBe(true) // el crudo por sí solo no llegaba
+  })
+
+  it('C — meta apenas superior al piso: la búsqueda sale de la meseta y encuentra el IBC mínimo que la supera', () => {
+    const objetivoValorMensual = SMLV_2026 + 1000
+    const r = generarCaminosRPM(perfilBajoElPiso({ objetivoValorMensual }))
+
+    expect(r.escenarios).toHaveLength(2)
+    const base = r.escenarios[0]
+    const alternativo = r.escenarios[1]
+    expect(base.distanciaObjetivo.cumple).toBe(false) // el piso solo no basta para esta meta
+    expect(alternativo.estado).toBe('viable')
+    expect(alternativo.distanciaObjetivo.cumple).toBe(true)
+    expect(alternativo.resultado.valor).toBeGreaterThanOrEqual(objetivoValorMensual)
+
+    // Monotonicidad conservada pese a la meseta: un peso menos en el IBC encontrado ya no
+    // alcanza la meta — misma verificación de "mínimo real", ahora sobre el valor ajustado.
+    const ibcEncontrado = alternativo.entradas.escenarioIbcFuturo.valorAplicado
+    expect(Number.isInteger(ibcEncontrado)).toBe(true)
+    const unPesoMenos = calcularProyeccionRPM({
+      historiaCotizacion: perfilBajoElPiso().historiaCotizacion,
+      fechaNacimiento: perfilBajoElPiso().fechaNacimiento,
+      edadJubilacionDeseada: perfilBajoElPiso().edadJubilacionDeseada,
+      escenarioIbcFuturo: { valor: ibcEncontrado - 1, origen: 'busqueda_objetivo_rpm' },
+      fecha: FECHA_CALCULO,
+      elegibilidad: { estado: 'CUMPLE_REQUISITOS_EN_FECHA_OBJETIVO' },
+    })
+    expect(unPesoMenos.ajusteLegal.resultadoFinalAjustado).toBeLessThan(objetivoValorMensual)
+  })
+
+  it('D — matemático superior al piso: el final ajustado es igual al matemático, comportamiento ordinario sin regresión', () => {
+    const r = generarCaminosRPM(perfilBajoElPiso({ ibcAplicableSimulacion: 8000000, objetivoValorMensual: 3000000 }))
+    const base = r.escenarios[0]
+
+    expect(base.valorMatematico).toBeGreaterThan(SMLV_2026) // precondición: fuera de la meseta
+    expect(base.resultado.valor).toBe(base.valorMatematico) // ni piso ni techo aplican
+    expect(base.ajusteLegal.pisoEvaluado.aplica).toBe(false)
+    expect(base.objetivoAlcanzadoPorPisoLegal).toBe(false)
+    expect(base.distanciaObjetivo.cumple).toBe(true)
+  })
+
+  it('E — NO_CUMPLE_EDAD: mismo hard stop y código de siempre, sin construir ningún camino ni exponer ajuste alguno', () => {
+    const r = generarCaminosRPM(perfilBajoElPiso({ fechaNacimiento: '2010-01-01', edadJubilacionDeseada: 30 }))
+    expect(r.elegibilidad.estado).toBe('NO_CUMPLE_EDAD_EN_FECHA_OBJETIVO')
+    expect(r.orientacion.codigo).toBe('EDAD_JUBILACION_INFERIOR_A_EDAD_MINIMA_LEGAL')
+    expect(r.escenarios).toEqual([])
+  })
+
+  it('F — NO_CUMPLE_SEMANAS: mismo hard stop y código de siempre, precedencia E2 intacta', () => {
+    const r = generarCaminosRPM(perfilBajoElPiso({ historiaCotizacion: historiaDiezAniosCompleta() }))
+    expect(r.elegibilidad.estado).toBe('NO_CUMPLE_SEMANAS_EN_FECHA_OBJETIVO')
+    expect(r.orientacion.codigo).toBe('SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM')
+    expect(r.escenarios).toEqual([])
+  })
+
+  it('G — NO_CUMPLE_EDAD_NI_SEMANAS: mismo hard stop y código de siempre', () => {
+    // historiaDiezAniosCompleta() (~522 semanas, ya definida en este archivo) aporta
+    // EVIDENCIA de semanas insuficientes — con historiaCotizacion=[] (sin evidencia alguna)
+    // la causa sería NO_CUMPLE_EDAD a secas (edad decide primero cuando semanas es
+    // ambiguo, no insuficiente confirmado) — ver evaluarElegibilidadProyectadaRPM.js.
+    const r = generarCaminosRPM(
+      perfilBajoElPiso({
+        fechaNacimiento: '2010-01-01',
+        edadJubilacionDeseada: 20,
+        historiaCotizacion: historiaDiezAniosCompleta(),
+      })
+    )
+    expect(r.elegibilidad.estado).toBe('NO_CUMPLE_EDAD_NI_SEMANAS_EN_FECHA_OBJETIVO')
+    expect(r.orientacion.codigo).toBe('EDAD_Y_SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM')
+    expect(r.escenarios).toEqual([])
+  })
+
+  it('H — elegibilidad NO_EVALUABLE (semanas sin evidencia): nunca se usa la cifra matemática como sustituto, mismo corte de siempre (verificación diferida de E2, intacta)', () => {
+    // Mismo fechaNacimiento/edadJubilacionDeseada que el caso ya verificado más arriba en
+    // este archivo ("historiaCotizacion=[] con horizonte que sí llena la ventana del IBL
+    // pero no las 1.300 semanas mínimas", línea ~197) — con la fechaNacimiento propia de
+    // perfilBajoElPiso (1976) un horizonte de 75 años sí alcanza a cubrir las 1.300 semanas
+    // por sí solo (25 años ≈ 1.300 semanas), así que no sirve para este caso — se necesita
+    // el horizonte más corto que ya está calibrado y verificado (1964 + 75 años ≈ 13 años).
+    const r = generarCaminosRPM(
+      perfilBajoElPiso({
+        fechaNacimiento: '1964-01-01',
+        historiaCotizacion: [],
+        semanasReferenciaDeclaradas: null,
+        edadJubilacionDeseada: 75,
+      })
+    )
+    // Revisión Atlas: aserción explícita sobre el ESTADO real de elegibilidad — distingue
+    // NO_EVALUABLE (evidencia insuficiente, este caso: sin historia ni declaración) de
+    // NO_CUMPLE_SEMANAS (incumplimiento CONFIRMADO, con evidencia). orientacion.codigo por
+    // sí solo no basta para demostrarlo: E2 usa el MISMO código
+    // (SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM) para ambos casos — la diferencia real
+    // vive en elegibilidad.estado/razones, verificada aquí explícitamente.
+    expect(r.elegibilidad.estado).toBe('NO_EVALUABLE_DATOS_INSUFICIENTES')
+    expect(r.elegibilidad.razones[0].codigo).toBe('SEMANAS_ACTUALES_SIN_EVIDENCIA')
+    expect(r.orientacion.codigo).toBe('SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM')
+    expect(r.escenarios).toEqual([])
+    // Ninguna cifra pensional (ajustada o cruda) se filtra en ningún lugar del resultado.
+    expect(r.barrido).toBeNull()
+    expect(r.semanas).toBeNull()
+  })
+
+  it('I — SMLMV no apto: camino no evaluable, propaga la razón jurídica exacta (FUNDAMENTO_NORMATIVO_NO_VERIFICADO), sin cifras inventadas', () => {
+    const r = generarCaminosRPM(perfilBajoElPiso({ fecha: '2026-02-12' })) // FUNDAMENTO_NORMATIVO_NO_VERIFICADO
+    // Revisión Atlas: la orientación ya NO colapsa al mensaje genérico SIN_CAMINOS_VIABLES
+    // para esta causa específica — orientacion.codigo ES el código jurídico exacto,
+    // auditable, mismo patrón ya usado para HISTORIA_INSUFICIENTE_PARA_VENTANA_IBL_EFECTIVA.
+    expect(r.orientacion.codigo).toBe('FUNDAMENTO_NORMATIVO_NO_VERIFICADO')
+    expect(r.orientacion.codigo).not.toBe('SIN_CAMINOS_VIABLES')
+    expect(r.detalleElegibilidad.vigenciaSmlv.tipoVigencia).toBe('fundamento_no_verificado')
+    expect(r.detalleElegibilidad.vigenciaSmlv.aptoParaCalculoEnFechaBase).toBe(false)
+    expect(r.escenarios).toEqual([])
+  })
+
+  it('J — fecha base inválida: conserva la precedencia de error existente (DATOS_INCOMPLETOS, antes de cualquier cálculo)', () => {
+    const r = generarCaminosRPM(perfilBajoElPiso({ fecha: 'no-es-fecha' }))
+    expect(r.orientacion.codigo).toBe('DATOS_INCOMPLETOS')
+    expect(r.escenarios).toEqual([])
+  })
+
+  it('K — meta superior al máximo alcanzable: descarta el alternativo con OBJETIVO_NO_ALCANZABLE_NI_EN_TOPE evaluado sobre el valor ajustado, sin falsos positivos', () => {
+    const r = generarCaminosRPM(perfilBajoElPiso({ ibcAplicableSimulacion: 8000000, objetivoValorMensual: 900000000 }))
+    const alternativo = r.escenarios.find((e) => e.id === 'aumentar-ibc-futuro')
+    expect(alternativo.estado).toBe('descartado')
+    expect(alternativo.razonDescartado.codigo).toBe('OBJETIVO_NO_ALCANZABLE_NI_EN_TOPE')
+    expect(r.orientacion.objetivoLegalmenteInalcanzable).toBe(true)
+  })
+
+  it('L — techo legal: estructuralmente inalcanzable mediante la fórmula RPM normal (máximo matemático 20 SMLMV < techo de 25 SMLMV) — se documenta aquí, sin fabricar un caso engañoso; el techo real se prueba en ajustarMesadaLegalRPM.test.js', () => {
+    // Incluso en el IBC futuro más alto legalmente posible (25 SMLMV, el tope de IBC), el
+    // resultado matemático máximo es 20 SMLMV — el techo (25 SMLMV) nunca se activa en RPM
+    // puro. Se verifica aquí como propiedad del sistema completo, no se inventa un mock.
+    const r = generarCaminosRPM(perfilBajoElPiso({ ibcAplicableSimulacion: TOPE_IBC_2026_C2D, objetivoValorMensual: 1000000 }))
+    const base = r.escenarios[0]
+    expect(base.ajusteLegal.techoEvaluado.evaluable).toBe(true)
+    expect(base.ajusteLegal.techoEvaluado.aplica).toBe(false)
+    expect(base.valorMatematico).toBeLessThan(TOPE_IBC_2026_C2D) // muy por debajo del techo de 25 SMLMV
+  })
+
+  it('M — el IBC actual ya alcanza la meta usando el valor ajustado: incremento adicional cero, sin alternativa innecesaria', () => {
+    const r = generarCaminosRPM(perfilBajoElPiso({ objetivoValorMensual: 1200000 }))
+    expect(r.escenarios).toHaveLength(1)
+    expect(r.escenarios[0].esfuerzo.aumentoIBC).toBe(0)
+    expect(r.escenarios[0].esfuerzo.costoPensionalAdicionalMensual).toBe(0)
+  })
+
+  it('N — varios IBC producen el mismo resultado final por la meseta del piso: se selecciona el mínimo esfuerzo (el actual), nunca se recomienda aumentar sin beneficio', () => {
+    const conIbcBajo = generarCaminosRPM(perfilBajoElPiso({ ibcAplicableSimulacion: SMLV_2026, objetivoValorMensual: 1000000 }))
+    const conIbcMayor = generarCaminosRPM(
+      perfilBajoElPiso({ ibcAplicableSimulacion: SMLV_2026 * 1.2, objetivoValorMensual: 1000000 })
+    )
+    // Ambos IBC (distintos) producen el MISMO resultado final (piso) — confirmado como
+    // precondición de la meseta.
+    expect(conIbcBajo.escenarios[0].resultado.valor).toBe(SMLV_2026)
+    expect(conIbcMayor.escenarios[0].resultado.valor).toBe(SMLV_2026)
+    expect(conIbcMayor.escenarios[0].valorMatematico).toBeGreaterThan(conIbcBajo.escenarios[0].valorMatematico)
+    // En ninguno de los dos casos se recomienda ningún aumento — el IBC actual ya basta.
+    expect(conIbcBajo.escenarios).toHaveLength(1)
+    expect(conIbcMayor.escenarios).toHaveLength(1)
+  })
+
+  it('O — toda la región relevante permanece en la meseta (objetivo ya alcanzado por el piso): no se ejecuta ni se recomienda ningún incremento, el barrido no explora puntos inútiles', () => {
+    const r = generarCaminosRPM(perfilBajoElPiso({ objetivoValorMensual: 1000000 }))
+    expect(r.barrido.estado).toBe('objetivo_ya_alcanzado')
+    expect(r.barrido.puntos).toEqual([])
+    expect(r.barrido.razon).toContain('no hace falta explorar')
+  })
+
+  it('P — borde exacto de salida de la meseta: la búsqueda sigue siendo monotónica y encuentra el mínimo (mismo caso que C, verificado desde el ángulo del borde)', () => {
+    // Reutiliza el mismo mecanismo que C — aquí se enfatiza específicamente que el objetivo
+    // elegido cae EXACTAMENTE un peso por encima del piso, el borde más ajustado posible.
+    const objetivoValorMensual = SMLV_2026 + 1
+    const r = generarCaminosRPM(perfilBajoElPiso({ objetivoValorMensual }))
+    const alternativo = r.escenarios.find((e) => e.id === 'aumentar-ibc-futuro')
+    expect(alternativo.distanciaObjetivo.cumple).toBe(true)
+    expect(alternativo.resultado.valor).toBeGreaterThanOrEqual(objetivoValorMensual)
+  })
+
+  it('Q — caso Óscar (integración representativa): elegible, matemático por debajo del piso, meta igual o menor al piso → el valor rector es exactamente el SMLMV aplicable, sin recomendar ningún aumento innecesario. El caso exacto ($1.243.210 matemático / $1.750.905 SMLMV) ya está cubierto bit a bit en ajustarMesadaLegalRPM.test.js (función pura, sin depender de historia/IBL real) — reproducirlo aquí exigiría afinar una historia real hasta acertar esa cifra exacta, frágil ante cualquier cambio futuro de constantes legales, sin aportar cobertura nueva sobre ESTA integración (el objetivo de este checkpoint). Esta prueba cubre la misma situación estructural con una historia real.', () => {
+    const r = generarCaminosRPM(perfilBajoElPiso({ objetivoValorMensual: SMLV_2026 }))
+    const base = r.escenarios[0]
+    expect(base.valorMatematico).toBeLessThan(SMLV_2026)
+    expect(base.resultado.valor).toBe(SMLV_2026)
+    expect(r.escenarios).toHaveLength(1) // ningún aumento recomendado
+    expect(base.esfuerzo.aumentoIBC).toBe(0)
+  })
+
+  it('R — el resultado matemático mejora dentro de la meseta, pero el resultado final sigue siendo el mismo piso: no se presenta como beneficio pensional ni se recomienda esfuerzo adicional por ello', () => {
+    // objetivoValorMensual calibrado a $1.700.000 — deliberadamente por ENCIMA de ambos
+    // resultados matemáticos crudos (verificados por separado: $1.400.724 y $1.680.868,8)
+    // pero por DEBAJO del piso ($1.750.905): así ninguno de los dos alcanza la meta por su
+    // propio crudo (objetivoAlcanzadoPorPisoLegal exige exactamente eso), y ambos la
+    // alcanzan solo gracias al piso — precondición verificada explícitamente abajo.
+    const objetivoValorMensual = 1700000
+    const conIbcBajo = generarCaminosRPM(perfilBajoElPiso({ ibcAplicableSimulacion: SMLV_2026, objetivoValorMensual }))
+    const conIbcMayor = generarCaminosRPM(
+      perfilBajoElPiso({ ibcAplicableSimulacion: SMLV_2026 * 1.2, objetivoValorMensual })
+    )
+    expect(conIbcMayor.escenarios[0].valorMatematico).toBeGreaterThan(conIbcBajo.escenarios[0].valorMatematico) // el crudo mejoró...
+    expect(conIbcMayor.escenarios[0].valorMatematico).toBeLessThan(objetivoValorMensual) // ...pero ninguno alcanza la meta por sí solo...
+    expect(conIbcBajo.escenarios[0].valorMatematico).toBeLessThan(objetivoValorMensual)
+    expect(conIbcMayor.escenarios[0].resultado.valor).toBe(conIbcBajo.escenarios[0].resultado.valor) // ...y el legal final no cambia
+    expect(conIbcMayor.escenarios[0].objetivoAlcanzadoPorPisoLegal).toBe(true)
+    expect(conIbcBajo.escenarios[0].objetivoAlcanzadoPorPisoLegal).toBe(true)
+  })
+})
+
+// E3-C2d (revisión Atlas): pruebas directas de la defensa contra el fallback silencioso —
+// mesadaGobernante() y construirCamino() se exportan exclusivamente para esto (ver su propia
+// justificación en generarCaminosRPM.js). El flujo público de generarCaminosRPM() nunca
+// permite fabricar externamente un ajusteLegal no evaluable en este punto (elegibilidad y
+// vigencia del SMLV ya están garantizadas antes de construir cualquier camino) — por eso
+// esta es la única forma de ejercitar la defensa sin mockear módulos completos.
+describe('generarCaminosRPM — E3-C2d: defensa contra el fallback silencioso (mesadaGobernante/construirCamino)', () => {
+  // Proyección base bien formada, reutilizada como plantilla — cada test solo sobreescribe
+  // `ajusteLegal` y/o `pensionMensualProyectada`, nunca reconstruye la forma completa.
+  function proyeccionBase(overrides = {}) {
+    return {
+      estado: 'calculado',
+      pensionMensualProyectada: 900000,
+      escenarioIbcFuturo: { valorDeclarado: 2000000, valorAplicado: 2000000, origen: 'continuidad_ibc_actual', topeAplicado: 43772625 },
+      ibl: { ordinario: { valor: 2000000, detalle: [] }, vidaLaboral: null, aplicable: 2000000, esOpcionLegal: false, razonVidaLaboralNoEvaluada: null },
+      tasaReemplazo: 65,
+      semanasCotizadas: { observadas: 1500, futuras: 100, sustentadasPorHistoria: 1600, declaradas: null, certeza: null, total: 1600, fuente: 'historia_estructurada' },
+      composicionVentanaOrdinaria: { diasObservados: 3000, diasFuturos: 650, fraccionFutura: 0.178 },
+      trazabilidadVentana: {},
+      limitaciones: [],
+      ajusteLegal: { estado: 'evaluado', resultadoFinalAjustado: 1750905, pisoEvaluado: { evaluable: true, aplica: true }, techoEvaluado: { evaluable: true, aplica: false }, razon: null },
+      ...overrides,
+    }
+  }
+
+  describe('mesadaGobernante — detección aislada', () => {
+    it('devuelve resultadoFinalAjustado cuando el ajuste está evaluado y es un número finito', () => {
+      expect(mesadaGobernante(proyeccionBase())).toBe(1750905)
+    })
+
+    it('devuelve null cuando ajusteLegal.estado es no_evaluable — nunca el crudo', () => {
+      const proyeccion = proyeccionBase({
+        ajusteLegal: { estado: 'no_evaluable', resultadoFinalAjustado: null, razon: { codigo: 'ELEGIBILIDAD_NO_EVALUABLE', mensaje: 'x' } },
+      })
+      expect(mesadaGobernante(proyeccion)).toBeNull()
+    })
+
+    it('devuelve null cuando ajusteLegal.estado es no_solicitado', () => {
+      const proyeccion = proyeccionBase({
+        ajusteLegal: { estado: 'no_solicitado', resultadoFinalAjustado: null, razon: { codigo: 'AJUSTE_LEGAL_NO_SOLICITADO', mensaje: 'x' } },
+      })
+      expect(mesadaGobernante(proyeccion)).toBeNull()
+    })
+
+    it('devuelve null cuando ajusteLegal es null', () => {
+      expect(mesadaGobernante(proyeccionBase({ ajusteLegal: null }))).toBeNull()
+    })
+
+    it('devuelve null cuando resultadoFinalAjustado no es finito, incluso si estado dice "evaluado" (entrada malformada)', () => {
+      expect(mesadaGobernante(proyeccionBase({ ajusteLegal: { estado: 'evaluado', resultadoFinalAjustado: NaN } }))).toBeNull()
+      expect(mesadaGobernante(proyeccionBase({ ajusteLegal: { estado: 'evaluado', resultadoFinalAjustado: null } }))).toBeNull()
+      expect(mesadaGobernante(proyeccionBase({ ajusteLegal: { estado: 'evaluado', resultadoFinalAjustado: undefined } }))).toBeNull()
+    })
+  })
+
+  describe('construirCamino — nunca usa pensionMensualProyectada como sustituto silencioso', () => {
+    const paramsComunes = {
+      id: 'base',
+      tipo: 'base',
+      decision: 'x',
+      edadJubilacionDeseada: 62,
+      ibcActual: 2000000,
+      tasaCotizacion: 0.16,
+      objetivoValorMensual: 1000000,
+    }
+
+    it('ajusteLegal.estado="evaluado": camino viable, resultado.valor = ajustado, valorMatematico = crudo, ambos conservados', () => {
+      const camino = construirCamino({ ...paramsComunes, proyeccion: proyeccionBase() })
+      expect(camino.estado).toBe('viable')
+      expect(camino.resultado.valor).toBe(1750905)
+      expect(camino.valorMatematico).toBe(900000)
+      expect(camino.ajusteLegal.estado).toBe('evaluado')
+    })
+
+    it('ajusteLegal.estado="no_evaluable" con razón propia: camino DESCARTADO, conserva la razón exacta disponible, nunca gobernado por el crudo', () => {
+      const proyeccion = proyeccionBase({
+        pensionMensualProyectada: 5000000, // deliberadamente alto — si hubiera fallback, "cumpliría" el objetivo
+        ajusteLegal: {
+          estado: 'no_evaluable',
+          resultadoFinalAjustado: null,
+          razon: { codigo: 'ELEGIBILIDAD_NO_EVALUABLE', mensaje: 'No hay evidencia suficiente para confirmar el requisito.' },
+        },
+      })
+      const camino = construirCamino({ ...paramsComunes, proyeccion })
+
+      expect(camino.estado).toBe('descartado')
+      expect(camino.resultado).toBeNull()
+      // Nunca se afirma alcanzabilidad ni inalcanzabilidad legal — es un código distinto,
+      // nunca OBJETIVO_NO_ALCANZABLE_NI_EN_TOPE ni YA_EN_TOPE_LEGAL.
+      expect(camino.razonDescartado.codigo).toBe('ELEGIBILIDAD_NO_EVALUABLE')
+      expect(camino.razonDescartado.codigo).not.toBe('OBJETIVO_NO_ALCANZABLE_NI_EN_TOPE')
+      expect(camino.razonDescartado.mensaje).toBe('No hay evidencia suficiente para confirmar el requisito.')
+      // El crudo nunca gobierna: ni siquiera se expone como "resultado" a pesar de ser, por
+      // construcción de este test, un valor que superaría cualquier objetivo razonable.
+      expect(camino.valorMatematico).toBeNull()
+      expect(camino.distanciaObjetivo).toBeNull()
+    })
+
+    it('ajusteLegal sin razón específica disponible (null/malformado): usa exactamente AJUSTE_LEGAL_NO_EVALUABLE, nunca un código inventado ni silencio', () => {
+      const camino = construirCamino({ ...paramsComunes, proyeccion: proyeccionBase({ ajusteLegal: null }) })
+      expect(camino.estado).toBe('descartado')
+      expect(camino.razonDescartado.codigo).toBe('AJUSTE_LEGAL_NO_EVALUABLE')
+      expect(camino.razonDescartado.mensaje).toMatch(/ajuste legal/i)
+    })
+
+    it('tipo se preserva en el camino descartado (base o alternativo), nunca forzado a "alternativo" para un camino base', () => {
+      const caminoBase = construirCamino({ ...paramsComunes, tipo: 'base', proyeccion: proyeccionBase({ ajusteLegal: null }) })
+      expect(caminoBase.tipo).toBe('base')
+    })
   })
 })

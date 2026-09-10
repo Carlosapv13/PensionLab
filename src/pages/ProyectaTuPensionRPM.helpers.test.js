@@ -13,6 +13,7 @@ import {
   textoEsfuerzoAdicional,
   textoAjusteIBC,
   textoDistancia,
+  textoResultadoMatematicoPrevioAjuste,
   textoPorcentajeObjetivo,
   textoDiferenciaFrenteABase,
   textoOrientacion,
@@ -24,6 +25,15 @@ import {
   validarEsfuerzoAdicionalMensualDeseado,
   ordenarCaminosParaPresentacion,
   construirSemanasReferenciaDeclaradas,
+  objetivoInferiorAlPisoLegal,
+  textoObjetivoInferiorAlPisoLegal,
+  textoResumenSemanasDeclaradas,
+  textoResumenBaseCotizacion,
+  textoResumenTraslado,
+  textoAccionUsarPisoLegalComoObjetivo,
+  textoResumenHistoriaCotizacion,
+  textoResumenLimiteEsfuerzo,
+  debeMostrarBotonGeneralEdicionObjetivo,
 } from './ProyectaTuPensionRPM.helpers.js'
 
 describe('debeOcultarRestriccion — EVIDENCIA: solo se oculta cuando el resultado es semanas insuficientes (precisión de producto S4-006)', () => {
@@ -104,21 +114,79 @@ describe('textoAjusteIBC — ajuste UX/semántico 2026-08-26: el IBC como acció
 })
 
 describe('textoDistancia', () => {
-  it('cumple el objetivo: mensaje fijo, ignora el valor de delta (no debería usarse cuando cumple=true)', () => {
-    const escenario = { distanciaObjetivo: { cumple: true, delta: -999999 } }
+  it('cumple el objetivo, sin piso legal aplicado: mensaje fijo, ignora el valor de delta (no debería usarse cuando cumple=true)', () => {
+    const escenario = { distanciaObjetivo: { cumple: true, delta: -999999 }, objetivoAlcanzadoPorPisoLegal: false }
     expect(textoDistancia(escenario)).toBe('Alcanza tu objetivo.')
   })
 
   it('no cumple el objetivo: muestra exactamente el delta recibido, formateado, ningún otro número', () => {
-    const escenario = { distanciaObjetivo: { cumple: false, delta: 150000 } }
+    const escenario = { distanciaObjetivo: { cumple: false, delta: 150000 }, objetivoAlcanzadoPorPisoLegal: false }
     expect(textoDistancia(escenario)).toBe('No alcanza tu objetivo — le faltarían $150.000 al mes.')
   })
 
   it('dos escenarios con deltas distintos producen mensajes que reflejan cada uno su propio delta', () => {
-    const a = { distanciaObjetivo: { cumple: false, delta: 50000 } }
-    const b = { distanciaObjetivo: { cumple: false, delta: 999000 } }
+    const a = { distanciaObjetivo: { cumple: false, delta: 50000 }, objetivoAlcanzadoPorPisoLegal: false }
+    const b = { distanciaObjetivo: { cumple: false, delta: 999000 }, objetivoAlcanzadoPorPisoLegal: false }
     expect(textoDistancia(a)).toBe('No alcanza tu objetivo — le faltarían $50.000 al mes.')
     expect(textoDistancia(b)).toBe('No alcanza tu objetivo — le faltarían $999.000 al mes.')
+  })
+
+  describe('checkpoint E4-C1, Decisión 3 — objetivo alcanzado por aplicación del piso legal', () => {
+    it('cumple === true y objetivoAlcanzadoPorPisoLegal === true: comunica expresamente el piso legal, nunca "Alcanza tu objetivo." a secas', () => {
+      const escenario = { distanciaObjetivo: { cumple: true, delta: -50000 }, objetivoAlcanzadoPorPisoLegal: true }
+      expect(textoDistancia(escenario)).toBe('Alcanza tu objetivo por aplicación del piso legal.')
+    })
+
+    it('objetivoAlcanzadoPorPisoLegal ausente (undefined, defensivo) se trata como false', () => {
+      const escenario = { distanciaObjetivo: { cumple: true, delta: -50000 } }
+      expect(textoDistancia(escenario)).toBe('Alcanza tu objetivo.')
+    })
+
+    it('no cumple, aunque objetivoAlcanzadoPorPisoLegal fuera true (caso imposible por construcción, pero defendido): el mensaje de no-cumple manda', () => {
+      const escenario = { distanciaObjetivo: { cumple: false, delta: 10000 }, objetivoAlcanzadoPorPisoLegal: true }
+      expect(textoDistancia(escenario)).toBe('No alcanza tu objetivo — le faltarían $10.000 al mes.')
+    })
+  })
+})
+
+describe('textoResultadoMatematicoPrevioAjuste — checkpoint E4-C1, Decisión 3 (revelación progresiva del valor crudo)', () => {
+  it('valorMatematico difiere del ajustado por aplicación del piso: menciona "el piso legal" y la cifra cruda exacta', () => {
+    const escenario = {
+      estado: 'viable',
+      valorMatematico: 1200000,
+      ajusteLegal: { estado: 'evaluado', resultadoFinalAjustado: 1750905, pisoEvaluado: { aplica: true }, techoEvaluado: { aplica: false } },
+    }
+    expect(textoResultadoMatematicoPrevioAjuste(escenario)).toBe(
+      'Antes de aplicar el piso legal, el resultado matemático de la fórmula era $1.200.000 al mes — no se usa ' +
+        'como tu pensión proyectada, se conserva únicamente para trazabilidad.'
+    )
+  })
+
+  it('valorMatematico difiere por aplicación del techo: menciona "el techo legal"', () => {
+    const escenario = {
+      estado: 'viable',
+      valorMatematico: 50000000,
+      ajusteLegal: { estado: 'evaluado', resultadoFinalAjustado: 43772625, pisoEvaluado: { aplica: false }, techoEvaluado: { aplica: true } },
+    }
+    expect(textoResultadoMatematicoPrevioAjuste(escenario)).toContain('el techo legal')
+  })
+
+  it('valorMatematico === resultadoFinalAjustado (sin ajuste aplicado): null, nada que revelar', () => {
+    const escenario = {
+      estado: 'viable',
+      valorMatematico: 3000000,
+      ajusteLegal: { estado: 'evaluado', resultadoFinalAjustado: 3000000, pisoEvaluado: { aplica: false }, techoEvaluado: { aplica: false } },
+    }
+    expect(textoResultadoMatematicoPrevioAjuste(escenario)).toBeNull()
+  })
+
+  it('escenario descartado: null, nunca lanza', () => {
+    expect(textoResultadoMatematicoPrevioAjuste({ estado: 'descartado', valorMatematico: null, ajusteLegal: null })).toBeNull()
+  })
+
+  it('ajusteLegal no evaluable (defensivo): null, nunca sustituye por el crudo', () => {
+    const escenario = { estado: 'viable', valorMatematico: 1200000, ajusteLegal: { estado: 'no_evaluable', resultadoFinalAjustado: null } }
+    expect(textoResultadoMatematicoPrevioAjuste(escenario)).toBeNull()
   })
 })
 
@@ -486,5 +554,252 @@ describe('construirSemanasReferenciaDeclaradas — contrato GO-B (2026-08-25)', 
     expect(construirSemanasReferenciaDeclaradas('conocido', '')).toBeNull()
     expect(construirSemanasReferenciaDeclaradas('aproximado', 'no-es-un-numero')).toBeNull()
     expect(construirSemanasReferenciaDeclaradas('conocido', '-5')).toBeNull()
+  })
+})
+
+describe('objetivoInferiorAlPisoLegal — checkpoint E4-C1, Decisión 2', () => {
+  it('objetivo por debajo del piso → true', () => {
+    expect(objetivoInferiorAlPisoLegal(1000000, 1750905)).toBe(true)
+  })
+
+  it('objetivo igual al piso → false (el piso mismo es un objetivo válido, nunca bloqueado)', () => {
+    expect(objetivoInferiorAlPisoLegal(1750905, 1750905)).toBe(false)
+  })
+
+  it('objetivo superior al piso → false', () => {
+    expect(objetivoInferiorAlPisoLegal(3000000, 1750905)).toBe(false)
+  })
+
+  it('piso no resuelto (null) → nunca bloquea — no se inventa una certeza legal que no existe', () => {
+    expect(objetivoInferiorAlPisoLegal(500000, null)).toBe(false)
+  })
+
+  it('objetivo null/0/negativo/no numérico → false, nunca lanza (ese caso lo cubre otra validación, no esta)', () => {
+    expect(objetivoInferiorAlPisoLegal(null, 1750905)).toBe(false)
+    expect(objetivoInferiorAlPisoLegal(0, 1750905)).toBe(false)
+    expect(objetivoInferiorAlPisoLegal(-100, 1750905)).toBe(false)
+    expect(objetivoInferiorAlPisoLegal(NaN, 1750905)).toBe(false)
+  })
+
+  it('piso 0/negativo/no numérico (defensivo) → false, nunca bloquea con un piso inválido', () => {
+    expect(objetivoInferiorAlPisoLegal(500000, 0)).toBe(false)
+    expect(objetivoInferiorAlPisoLegal(500000, -1)).toBe(false)
+    expect(objetivoInferiorAlPisoLegal(500000, NaN)).toBe(false)
+  })
+})
+
+describe('textoObjetivoInferiorAlPisoLegal — checkpoint E4-C1, Decisión 2', () => {
+  it('incluye el valor exacto del piso recibido, nunca un valor hardcodeado', () => {
+    const texto = textoObjetivoInferiorAlPisoLegal(1750905)
+    expect(texto).toContain('$1.750.905')
+  })
+
+  it('con un piso distinto, el texto refleja ESE valor — nunca $1.750.905 fijo', () => {
+    const texto = textoObjetivoInferiorAlPisoLegal(2000000)
+    expect(texto).toContain('$2.000.000')
+    expect(texto).not.toContain('1.750.905')
+  })
+
+  it('aclara que PensionLab no predice incrementos futuros del salario mínimo', () => {
+    expect(textoObjetivoInferiorAlPisoLegal(1750905).toLowerCase()).toContain('no predice')
+  })
+})
+
+describe('textoResumenSemanasDeclaradas — checkpoint E4-C1, Decisión 5', () => {
+  it('conocido: cifra exacta, sin prefijo "aproximadamente", documenta ausencia de fecha de referencia', () => {
+    expect(textoResumenSemanasDeclaradas('conocido', '1400')).toBe(
+      '1400 semanas — sin una fecha de referencia registrada todavía.'
+    )
+  })
+
+  it('aproximado: prefijo "aproximadamente"', () => {
+    expect(textoResumenSemanasDeclaradas('aproximado', '1100')).toBe(
+      'aproximadamente 1100 semanas — sin una fecha de referencia registrada todavía.'
+    )
+  })
+
+  it('desconocido: mensaje distinto, nunca "0 semanas"', () => {
+    expect(textoResumenSemanasDeclaradas('desconocido', '')).toBe('No declaraste cuántas semanas tienes cotizadas.')
+  })
+
+  it('sin respuesta todavía (null): mensaje neutro, nunca lanza', () => {
+    expect(textoResumenSemanasDeclaradas(null, '')).toBe('Todavía no respondiste esta pregunta.')
+  })
+})
+
+describe('textoResumenBaseCotizacion — checkpoint E4-C1, Decisión 5 (revisión correctiva punto 4: lenguaje natural, nunca el enum crudo)', () => {
+  it('IBC aplicable presente, certeza conocido: "Valor exacto declarado por ti", nunca "certeza: conocido"', () => {
+    const baseCotizacion = { ibcAplicableSimulacion: 2900000, certezaValorDeclarado: 'conocido', origenDatoIbc: 'declarado_por_usuario' }
+    expect(textoResumenBaseCotizacion(baseCotizacion, 'conocido')).toBe('$2.900.000 al mes — Valor exacto declarado por ti.')
+  })
+
+  it('certeza aproximado: "Valor aproximado declarado por ti", nunca "certeza: aproximado"', () => {
+    const baseCotizacion = { ibcAplicableSimulacion: 2900000, certezaValorDeclarado: 'aproximado', origenDatoIbc: 'declarado_por_usuario' }
+    expect(textoResumenBaseCotizacion(baseCotizacion, 'aproximado')).toBe(
+      '$2.900.000 al mes — Valor aproximado declarado por ti.'
+    )
+  })
+
+  it('estimado desde salario: "Estimado a partir del salario que declaraste"', () => {
+    const baseCotizacion = { ibcAplicableSimulacion: 1500000, certezaValorDeclarado: 'desconocido', origenDatoIbc: 'calculado_desde_dato_declarado' }
+    expect(textoResumenBaseCotizacion(baseCotizacion, 'desconocido')).toBe(
+      '$1.500.000 al mes — Estimado a partir del salario que declaraste.'
+    )
+  })
+
+  it('sin IBC aplicable, certeza desconocido: "No conocemos todavía tu IBC actual"', () => {
+    const baseCotizacion = { ibcAplicableSimulacion: null, certezaValorDeclarado: null, origenDatoIbc: null }
+    expect(textoResumenBaseCotizacion(baseCotizacion, 'desconocido')).toBe('No conocemos todavía tu IBC actual.')
+  })
+
+  it('sin certeza todavía: mensaje neutro', () => {
+    expect(textoResumenBaseCotizacion({ ibcAplicableSimulacion: null }, null)).toBe('Todavía no respondiste esta pregunta.')
+  })
+
+  it('ningún texto expone el nombre técnico del enum como etiqueta ("certeza: X") — "aproximado"/"desconocido" solo aparecen como adjetivo natural dentro de una frase completa, nunca como token suelto', () => {
+    const casos = [
+      textoResumenBaseCotizacion({ ibcAplicableSimulacion: 2900000, certezaValorDeclarado: 'conocido', origenDatoIbc: 'declarado_por_usuario' }, 'conocido'),
+      textoResumenBaseCotizacion({ ibcAplicableSimulacion: 2900000, certezaValorDeclarado: 'aproximado', origenDatoIbc: 'declarado_por_usuario' }, 'aproximado'),
+      textoResumenBaseCotizacion({ ibcAplicableSimulacion: 1500000, certezaValorDeclarado: 'desconocido', origenDatoIbc: 'calculado_desde_dato_declarado' }, 'desconocido'),
+      textoResumenBaseCotizacion({ ibcAplicableSimulacion: null, certezaValorDeclarado: null, origenDatoIbc: null }, 'desconocido'),
+    ]
+    for (const texto of casos) {
+      // El defecto real reportado era la ETIQUETA técnica "certeza: X" — nunca aparece.
+      expect(texto).not.toMatch(/certeza\s*:/i)
+      // Y ninguna frase termina en el token crudo pegado tras un guion (ej. "— conocido."),
+      // que sería la forma en que un enum se filtraría sin traducir.
+      expect(texto).not.toMatch(/—\s*(conocido|aproximado|desconocido)\.?$/i)
+    }
+  })
+})
+
+describe('textoResumenTraslado — checkpoint E4-C1, Decisión 5 (revisión correctiva punto 4: sin códigos internos crudos)', () => {
+  it('sin traslado declarado: null (el llamador no muestra la fila, "cuando exista")', () => {
+    expect(textoResumenTraslado({ trasladoRegimen: null, detalleTraslado: null, certezaFechaTraslado: null, fechaTrasladoRegimen: '' })).toBeNull()
+    expect(textoResumenTraslado({ trasladoRegimen: 'no', detalleTraslado: null, certezaFechaTraslado: null, fechaTrasladoRegimen: '' })).toBeNull()
+  })
+
+  it('con traslado, detalle y fecha conocida: detalle en lenguaje natural (nunca "rpm_a_rais" crudo), incluye la fecha, y aclara que no modifica ningún cálculo', () => {
+    const texto = textoResumenTraslado({
+      trasladoRegimen: 'si',
+      detalleTraslado: 'rpm_a_rais',
+      certezaFechaTraslado: 'conocido',
+      fechaTrasladoRegimen: '2015-03-01',
+    })
+    expect(texto).toContain('de Colpensiones a un fondo privado')
+    expect(texto).not.toContain('rpm_a_rais')
+    expect(texto).not.toContain('rpm a rais')
+    expect(texto).toContain('2015-03-01')
+    expect(texto).toContain('no modifica ningún cálculo')
+  })
+
+  it('los 4 códigos de detalleTraslado tienen redacción natural mapeada, ninguno crudo', () => {
+    for (const codigo of ['rpm_a_rais', 'rais_a_rpm', 'multiple', 'no_estoy_seguro']) {
+      const texto = textoResumenTraslado({
+        trasladoRegimen: 'si',
+        detalleTraslado: codigo,
+        certezaFechaTraslado: 'desconocido',
+        fechaTrasladoRegimen: '',
+      })
+      expect(texto).not.toContain(codigo)
+      expect(texto).not.toContain('_')
+    }
+  })
+
+  it('con traslado pero sin fecha declarada: lo dice explícitamente, sin inventar una fecha', () => {
+    const texto = textoResumenTraslado({ trasladoRegimen: 'si', detalleTraslado: null, certezaFechaTraslado: 'desconocido', fechaTrasladoRegimen: '' })
+    expect(texto).toContain('sin fecha declarada')
+  })
+})
+
+describe('textoAccionUsarPisoLegalComoObjetivo — corrección puntual E4-C1 (hallazgo 1: acción primaria + consecuencia explícita)', () => {
+  it('incluye la cifra exacta recibida, formateada, nunca un valor hardcodeado', () => {
+    expect(textoAccionUsarPisoLegalComoObjetivo(1750905)).toBe('Cambiar mi objetivo al mínimo legal de $1.750.905')
+  })
+
+  it('con un piso distinto, el texto refleja ESE valor — nunca $1.750.905 fijo', () => {
+    const texto = textoAccionUsarPisoLegalComoObjetivo(2000000)
+    expect(texto).toBe('Cambiar mi objetivo al mínimo legal de $2.000.000')
+    expect(texto).not.toContain('1.750.905')
+  })
+
+  it('dos llamadas con valores distintos nunca se mezclan', () => {
+    expect(textoAccionUsarPisoLegalComoObjetivo(1500000)).toContain('$1.500.000')
+    expect(textoAccionUsarPisoLegalComoObjetivo(1750905)).toContain('$1.750.905')
+  })
+})
+
+describe('textoResumenHistoriaCotizacion — corrección puntual E4-C1 (hallazgo 3: gramática natural, nunca "período(s)"/"agregado(s)")', () => {
+  it('cero: oración distinta, sin la cifra "0" ni "(s)"', () => {
+    expect(textoResumenHistoriaCotizacion(0)).toBe('No has agregado períodos de cotización.')
+  })
+
+  it('uno: singular exacto, sin "(s)"', () => {
+    expect(textoResumenHistoriaCotizacion(1)).toBe('Historia de cotización estructurada: 1 período agregado.')
+  })
+
+  it('dos: plural exacto', () => {
+    expect(textoResumenHistoriaCotizacion(2)).toBe('Historia de cotización estructurada: 2 períodos agregados.')
+  })
+
+  it('varios (caso general de "dos o más"): plural exacto con la cifra correcta', () => {
+    expect(textoResumenHistoriaCotizacion(7)).toBe('Historia de cotización estructurada: 7 períodos agregados.')
+  })
+
+  it('ningún resultado contiene el patrón "(s)"', () => {
+    for (const cantidad of [0, 1, 2, 5, 10]) {
+      expect(textoResumenHistoriaCotizacion(cantidad)).not.toMatch(/\(s\)/)
+    }
+  })
+})
+
+describe('textoResumenLimiteEsfuerzo — corrección puntual E4-C1 (hallazgo 4: no informado ≠ cero explícito ≠ valor positivo)', () => {
+  it('null (no informado): texto exacto, nunca una cifra de $0', () => {
+    expect(textoResumenLimiteEsfuerzo(null)).toBe('Límite de esfuerzo mensual: no informado.')
+  })
+
+  it('0 (cero explícito): SÍ muestra $0, pero con una aclaración que lo distingue de "no informado" — un dato distinto, no una ausencia', () => {
+    const texto = textoResumenLimiteEsfuerzo(0)
+    expect(texto).toContain('$0')
+    expect(texto).toContain('declaraste explícitamente')
+    expect(texto).not.toBe('Límite de esfuerzo mensual: no informado.')
+  })
+
+  it('valor positivo: cifra exacta, sin la aclaración de "cero explícito"', () => {
+    const texto = textoResumenLimiteEsfuerzo(400000)
+    expect(texto).toBe('Límite de esfuerzo mensual: $400.000 adicionales al mes.')
+    expect(texto).not.toContain('declaraste explícitamente')
+  })
+
+  it('los tres resultados son mutuamente distintos entre sí (ausencia, cero explícito, positivo nunca se confunden)', () => {
+    const noInformado = textoResumenLimiteEsfuerzo(null)
+    const ceroExplicito = textoResumenLimiteEsfuerzo(0)
+    const positivo = textoResumenLimiteEsfuerzo(500000)
+    expect(new Set([noInformado, ceroExplicito, positivo]).size).toBe(3)
+  })
+
+  // Evidencia de que "0" es un dato VÁLIDO y distinto en este formulario (no una entrada
+  // rechazada): validarMontoNoNegativo('0') en ProyectaTuPensionRPM.jsx devuelve el número 0
+  // (no null) — el mismo camino que produce este 0 explícito es alcanzable escribiendo "0" en
+  // el campo opcional de límite de esfuerzo. Por eso esta función SÍ distingue los tres casos
+  // en vez de documentar que "cero explícito no es válido" (si no lo fuera, restriccionCostoPensional
+  // nunca podría valer 0 y esta rama sería inalcanzable — no es el caso).
+  it('EVIDENCIA: cero explícito es alcanzable desde el formulario — no es un caso inalcanzable ni rechazado', () => {
+    expect(textoResumenLimiteEsfuerzo(0)).not.toBeNull()
+  })
+})
+
+describe('debeMostrarBotonGeneralEdicionObjetivo — corrección puntual E4-C1 (hallazgo 6: sin acción duplicada)', () => {
+  it('resumen cerrado, formulario colapsado: visible (es la única vía rápida de editar)', () => {
+    expect(debeMostrarBotonGeneralEdicionObjetivo({ mostrarFormulario: false, resumenAbierto: false })).toBe(true)
+  })
+
+  it('resumen abierto, formulario colapsado: oculto — los botones individuales del resumen ya cubren la misma acción', () => {
+    expect(debeMostrarBotonGeneralEdicionObjetivo({ mostrarFormulario: false, resumenAbierto: true })).toBe(false)
+  })
+
+  it('formulario ya abierto (mostrarFormulario true): oculto sin importar el resumen — no hay nada que "editar", ya se está editando', () => {
+    expect(debeMostrarBotonGeneralEdicionObjetivo({ mostrarFormulario: true, resumenAbierto: false })).toBe(false)
+    expect(debeMostrarBotonGeneralEdicionObjetivo({ mostrarFormulario: true, resumenAbierto: true })).toBe(false)
   })
 })

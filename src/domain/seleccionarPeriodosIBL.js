@@ -63,7 +63,13 @@ function diaAnterior(fechaISO) {
   return sumarDias(fechaISO, -1)
 }
 
-function seSuperponen(a, b) {
+// Exportada (revisión correctiva E4-C1, 2026-09-10) exclusivamente para que
+// HistoriaCotizacionRPM.helpers.js pueda validar solapamiento ANTES de agregar/editar un
+// período, con la MISMA regla que ya usa seleccionarPeriodosIBL — nunca una reimplementación
+// paralela que pudiera divergir. Firma sin cambios: espera `{fechaDesde, fechaHastaResuelta}`
+// en ambos argumentos (el llamador resuelve `fechaHastaResuelta` igual que aquí abajo, línea
+// ~236, cuando fechaHasta es null).
+export function seSuperponen(a, b) {
   return a.fechaDesde <= b.fechaHastaResuelta && b.fechaDesde <= a.fechaHastaResuelta
 }
 

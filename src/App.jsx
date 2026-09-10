@@ -18,7 +18,7 @@ import ExploraTuProyeccionRPM from './pages/ExploraTuProyeccionRPM.jsx'
 import ProyectaTuPensionRPM from './pages/ProyectaTuPensionRPM.jsx'
 import DeclaracionLibre from './pages/DeclaracionLibre.jsx'
 import { tienePrimeraLecturaValor } from './domain/tienePrimeraLecturaValor.js'
-import { siguienteVistaTrasBaseCotizacion } from './navegacionRPM.js'
+import { siguienteVistaTrasBaseCotizacion, destinoTrasEdicionDesdeResumenRPM } from './navegacionRPM.js'
 
 // Import estático, pero solo se monta bajo import.meta.env.DEV (ver el
 // return más abajo) — Vite sustituye ese flag por el literal `false` en
@@ -100,6 +100,70 @@ function App() {
   // distintas que antes quedaban acopladas por error. No es un returnTo genérico: un solo
   // booleano, exclusivamente para este par de pantallas.
   const [regresarAProyeccionTrasHistoria, setRegresarAProyeccionTrasHistoria] = useState(false)
+
+  // Revisión correctiva E4-C1 (2026-09-10) — "Retorno controlado desde el resumen": mismo
+  // patrón exacto que regresarAProyeccionTrasHistoria (arriba), generalizado a los cuatro
+  // datos que SÍ necesitan un atajo (semanas, traslado, fecha de nacimiento, régimen actual —
+  // IBC actual y historia ya no lo necesitan, ver comentarios junto a onVolver/
+  // onProfundizarHistoria más abajo). Contexto de navegación PURAMENTE transitorio: no es un
+  // dato del expediente pensional, nunca se persiste más allá de esta sesión de edición, no
+  // interviene en ningún cálculo (ni generarCaminosRPM ni ninguna otra función de dominio lo
+  // reciben), y se limpia SIEMPRE al salir de la pantalla propietaria del dato — ya sea
+  // completando (continuarTrasEdicionDesdeResumenRPM) o cancelando
+  // (volverCancelandoEdicionDesdeResumenRPM), nunca queda "colgado" para una navegación
+  // posterior no relacionada. Distingue navegación normal del onboarding (false — el
+  // comportamiento de cada onContinuar/onVolver es exactamente el de antes de este
+  // checkpoint) de una edición iniciada desde "Revisar la información que estamos usando
+  // para esta proyección" (true).
+  const [regresarAProyeccionTrasEdicionResumen, setRegresarAProyeccionTrasEdicionResumen] = useState(false)
+
+  // Única función que decide el destino de "Continuar" en las cuatro pantallas editables
+  // desde el resumen (datosIniciales, situacionPensional, informacionPensional,
+  // indiciosTransicion) — centraliza la decisión en un solo lugar en vez de repetir el mismo
+  // condicional cuatro veces (piden explícitamente evitar condicionales dispersos).
+  //
+  // Regla, igual para las cuatro pantallas (cubre los 6 datos del checkpoint: las 4 que
+  // pasan por aquí, más IBC actual y historia, que ya regresaban directo por su cuenta): si
+  // el contexto de edición desde el resumen está activo Y el expediente sigue siendo
+  // compatible con una proyección RPM (regimenActual === 'RPM' en el momento de continuar —
+  // la única condición estructural que puede volverse incompatible; ver
+  // actualizarRegimenActual, sin cambios, para la única invalidación real que existe),
+  // regresa directo a 'proyectaTuPensionRPM'. Si regimenActual dejó de ser 'RPM' (única
+  // pantalla donde eso puede ocurrir: situacionPensional), NUNCA regresa ahí — cae a
+  // `destinoNormal`, que para esa pantalla ya es 'historialLaboral' (el flujo RAIS
+  // correspondiente, sin ninguna regla de invalidación nueva).
+  //
+  // Fecha de nacimiento (caso especial documentado en el checkpoint): esta función NO
+  // verifica por separado "existen todos los datos imprescindibles" — ese chequeo ya existe,
+  // en el único lugar donde tiene sentido: ProyectaTuPensionRPM.jsx recalcula edadActual
+  // (calcularEdadCumplida) en cada render y ya reabre su propio formulario con su propio
+  // mensaje de error específico (validarEdadJubilacionDeseada) si la nueva fecha de
+  // nacimiento deja edadJubilacionDeseada inválida — ese campo no se captura en ninguna otra
+  // pantalla, así que ProyectaTuPensionRPM.jsx YA ES "la primera pantalla realmente
+  // necesaria" para ese caso. No se duplica esa validación aquí.
+  //
+  // `destinoNormal` es siempre el mismo `setVista('literal')` que esa pantalla ya usaba antes
+  // de este checkpoint — la navegación normal del onboarding (contexto false) es bit-idéntica
+  // a como era antes, nunca afectada por esta función.
+  function continuarTrasEdicionDesdeResumenRPM(destinoNormal) {
+    const destino = destinoTrasEdicionDesdeResumenRPM({
+      regresarAProyeccionTrasEdicionResumen,
+      regimenActual,
+      destinoNormal,
+    })
+    setRegresarAProyeccionTrasEdicionResumen(false)
+    setVista(destino)
+  }
+
+  // "Volver" desde cualquiera de esas mismas cuatro pantallas cancela la edición en curso —
+  // nunca deja el contexto activo para una navegación posterior no relacionada (ej. abandonar
+  // la edición, retroceder más en el onboarding, y luego volver a avanzar sin haber pasado de
+  // nuevo por el resumen). No altera ningún dato: solo limpia el contexto transitorio y sigue
+  // el destino normal de "Volver" de esa pantalla, exactamente como antes de este checkpoint.
+  function volverCancelandoEdicionDesdeResumenRPM(destinoNormal) {
+    setRegresarAProyeccionTrasEdicionResumen(false)
+    setVista(destinoNormal)
+  }
 
   function actualizarRegimenActual(valor) {
     // trasladoRegimen depende semánticamente de regimenActual (S3-009): la
@@ -366,8 +430,8 @@ function App() {
           onCambiarSexo={setSexo}
           lugarResidencia={lugarResidencia}
           onCambiarLugarResidencia={setLugarResidencia}
-          onContinuar={() => setVista('situacionPensional')}
-          onVolver={() => setVista('bienvenida')}
+          onContinuar={() => continuarTrasEdicionDesdeResumenRPM('situacionPensional')}
+          onVolver={() => volverCancelandoEdicionDesdeResumenRPM('bienvenida')}
         />
       )}
 
@@ -375,8 +439,8 @@ function App() {
         <SituacionPensional
           regimenActual={regimenActual}
           onCambiarRegimenActual={actualizarRegimenActual}
-          onContinuar={() => setVista('historialLaboral')}
-          onVolver={() => setVista('datosIniciales')}
+          onContinuar={() => continuarTrasEdicionDesdeResumenRPM('historialLaboral')}
+          onVolver={() => volverCancelandoEdicionDesdeResumenRPM('datosIniciales')}
         />
       )}
 
@@ -419,10 +483,10 @@ function App() {
           onCambiarSemanasCotizadas={actualizarSemanasCotizadas}
           semanasConfirmadasPara={semanasConfirmadasPara}
           onConfirmarSemanasExtraordinarias={confirmarSemanasExtraordinarias}
-          onVolver={() => setVista('completarExpediente')}
+          onVolver={() => volverCancelandoEdicionDesdeResumenRPM('completarExpediente')}
           onContinuar={() => {
             setInfoEsencialCompletada(true)
-            setVista('historiaPensional')
+            continuarTrasEdicionDesdeResumenRPM('historiaPensional')
           }}
         />
       )}
@@ -463,8 +527,10 @@ function App() {
           onCambiarCertezaFechaTraslado={actualizarCertezaFechaTraslado}
           fechaTrasladoRegimen={fechaTrasladoRegimen}
           onCambiarFechaTrasladoRegimen={setFechaTrasladoRegimen}
-          onVolver={() => setVista(vistaSegunValorDePrimeraLectura('primeraLectura', 'historiaPensional'))}
-          onContinuar={() => setVista('baseCotizacion')}
+          onVolver={() =>
+            volverCancelandoEdicionDesdeResumenRPM(vistaSegunValorDePrimeraLectura('primeraLectura', 'historiaPensional'))
+          }
+          onContinuar={() => continuarTrasEdicionDesdeResumenRPM('baseCotizacion')}
         />
       )}
 
@@ -576,6 +642,47 @@ function App() {
           // se conectan aquí para la proyección preliminar, sin volver a preguntarlas.
           nivelConocimientoSemanas={nivelConocimientoSemanas}
           semanasCotizadas={semanasCotizadas}
+          // checkpoint E4-C1, Decisión 5 (2026-09-10): solo para el resumen revisable —
+          // nunca se usan en ningún cálculo aquí tampoco (mismo criterio ya establecido en
+          // IndiciosRegimenTransicion.jsx).
+          trasladoRegimen={trasladoRegimen}
+          detalleTraslado={detalleTraslado}
+          certezaFechaTraslado={certezaFechaTraslado}
+          fechaTrasladoRegimen={fechaTrasladoRegimen}
+          // Revisión correctiva E4-C1 (2026-09-10, segunda ronda — "Retorno controlado desde
+          // el resumen"): la primera versión de esta corrección asumía que la cadena normal
+          // de onContinuar ya bastaba para volver a 'proyectaTuPensionRPM' — cierto en
+          // términos de destino final, pero obligaba a recorrer TODAS las pantallas
+          // intermedias de nuevo (informacionPensional → historiaPensional → [primeraLectura?]
+          // → indiciosTransicion → baseCotizacion), lo que Atlas/Carlos señalaron
+          // correctamente que NO es un retorno controlado. Las cuatro navegaciones de abajo
+          // ahora activan `regresarAProyeccionTrasEdicionResumen` — contexto puramente
+          // transitorio (ver su declaración, arriba) — para que el `onContinuar` de la
+          // pantalla propietaria del dato regrese DIRECTO a 'proyectaTuPensionRPM' (vía
+          // continuarTrasEdicionDesdeResumenRPM), sin atravesar ninguna pantalla intermedia
+          // no relacionada.
+          //
+          // IBC actual y historia de cotización NO se tocan aquí — ya regresan directo por
+          // construcción propia, sin necesitar este contexto: baseCotizacion.onContinuar ya
+          // era incondicionalmente 'proyectaTuPensionRPM' para RPM (siguienteVistaTrasBaseCotizacion,
+          // sin cambios), y la historia ya usa su propio mecanismo equivalente
+          // (regresarAProyeccionTrasHistoria, sin cambios) vía onProfundizarHistoria más abajo.
+          onEditarFechaNacimiento={() => {
+            setRegresarAProyeccionTrasEdicionResumen(true)
+            setVista('datosIniciales')
+          }}
+          onEditarRegimenActual={() => {
+            setRegresarAProyeccionTrasEdicionResumen(true)
+            setVista('situacionPensional')
+          }}
+          onEditarSemanasDeclaradas={() => {
+            setRegresarAProyeccionTrasEdicionResumen(true)
+            setVista('informacionPensional')
+          }}
+          onEditarTraslado={() => {
+            setRegresarAProyeccionTrasEdicionResumen(true)
+            setVista('indiciosTransicion')
+          }}
           // Profundización opcional (2026-08-26): reutiliza HistoriaCotizacionRPM.jsx /
           // ExploraTuProyeccionRPM.jsx tal cual, sin ningún estado de navegación nuevo —
           // mismo `vista` de siempre. onVolver de historiaCotizacionRPM (arriba) regresa

@@ -27,14 +27,21 @@
 // escritura numérica del mes). fechaDesde/fechaHasta del borrador ya son cadenas ISO — la
 // construcción día/mes/año vive exclusivamente dentro de ese componente.
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRestaurarFocoAlMontar } from '../hooks/useRestaurarFocoAlMontar.js'
 import { useCampoMonetario } from '../hooks/useCampoMonetario.js'
 import CampoMonetario from '../components/CampoMonetario.jsx'
 import CampoFechaDiaMesAnio from '../components/CampoFechaDiaMesAnio.jsx'
 import { formatearPesos } from '../format/formatearDinero.js'
 import { evaluarIndicioVidaLaboral } from '../domain/evidenciaIndicioVidaLaboral.js'
-import { borradorVacio, evaluarNuevoPeriodo, construirPeriodoCotizacion } from './HistoriaCotizacionRPM.helpers.js'
+import {
+  borradorVacio,
+  construirPeriodoCotizacion,
+  periodoAFormularioBorrador,
+  evaluarPeriodoParaHistoria,
+  reemplazarPeriodoEnPosicion,
+  quitarPeriodoEnPosicion,
+} from './HistoriaCotizacionRPM.helpers.js'
 
 function textoRangoPeriodo(periodo) {
   const hasta = periodo.fechaHasta ?? 'actualidad'
@@ -127,12 +134,47 @@ function HistoriaCotizacionRPM({
   const indicioVidaLaboral = evaluarIndicioVidaLaboral({ regimenActual, nivelConocimientoSemanas, semanasCotizadas })
   const [borrador, setBorrador] = useState(borradorVacio())
   const [intentoAgregar, setIntentoAgregar] = useState(false)
-  // Confirmación accesible tras agregar/quitar un período (feedback de usuaria real,
+  // Confirmación accesible tras agregar/quitar/editar un período (feedback de usuaria real,
   // 2026-09-02) — estado local simple, sin arquitectura nueva; se limpia al quitar un
   // período para no dejar un mensaje de "agregaste X" sobre una lista que ya cambió.
   const [mensajeConfirmacion, setMensajeConfirmacion] = useState(null)
+  // Revisión correctiva E4-C1 (2026-09-10) — "Edición real de periodos históricos": null =
+  // modo "Agregar" (comportamiento sin cambios); un número = modo "Editar" — la POSICIÓN
+  // TRANSITORIA, dentro de esta única sesión de edición, del período de `historiaCotizacion`
+  // que se está reemplazando. Precisión deliberada (revisión correctiva 2026-09-10): esto NO
+  // es un identificador estable — es válido únicamente mientras el array no se reordena ni
+  // se elimina nada antes de esa posición. En este componente eso está garantizado: agregar
+  // siempre añade al final (nunca desplaza índices anteriores) y `manejarConfirmarQuitarPeriodo`
+  // ya cancela la edición en curso ANTES de eliminar (ver más abajo), así que `indiceEnEdicion`
+  // nunca sobrevive a un cambio de longitud del array. Ningún otro punto de este archivo
+  // reordena `historiaCotizacion`. Si en el futuro se agregara reordenamiento, filtrado o
+  // eliminación fuera de `manejarQuitarPeriodo`, la posición dejaría de ser segura y este
+  // campo debería reemplazarse por un identificador persistente — no se introduce uno ahora
+  // porque no hay evidencia de que haga falta. Estado puramente transitorio de esta pantalla:
+  // nunca se persiste en App.jsx ni forma parte de PeriodoCotizacion.
+  const [indiceEnEdicion, setIndiceEnEdicion] = useState(null)
+  const enModoEdicion = indiceEnEdicion !== null
 
-  const evaluacion = evaluarNuevoPeriodo(borrador)
+  // Revisión correctiva E4-C1 (2026-09-10), hallazgo 5: "Quitar" ya no elimina de inmediato —
+  // el primer clic solo abre una confirmación asociada a ESE período (nunca un
+  // window.confirm nativo, para seguir el estilo visual de la app). null = ningún período en
+  // confirmación; un número = la posición del período cuya confirmación está abierta. Mismo
+  // criterio de "posición transitoria, no identificador persistente" que indiceEnEdicion
+  // (ver su comentario, arriba) — misma garantía de seguridad: agregar solo añade al final, y
+  // la eliminación real (manejarConfirmarQuitarPeriodo) es el único punto que cambia la
+  // longitud del array, y limpia este estado en el mismo gesto.
+  const [indiceEnConfirmacionQuitar, setIndiceEnConfirmacionQuitar] = useState(null)
+  // Foco visible tras abrir la confirmación (requisito explícito: "debe funcionar con
+  // teclado, tener foco visible") — el botón "Quitar" que se pulsó desaparece del DOM al
+  // renderizarse la confirmación, así que el navegador lo perdería por completo sin este
+  // efecto. Se mueve a "Cancelar" (la acción no destructiva) por defecto, nunca a la acción
+  // destructiva — mismo criterio de seguridad que cualquier diálogo de confirmación.
+  const cancelarQuitarRef = useRef(null)
+  useEffect(() => {
+    if (indiceEnConfirmacionQuitar !== null) cancelarQuitarRef.current?.focus()
+  }, [indiceEnConfirmacionQuitar])
+
+  const evaluacion = evaluarPeriodoParaHistoria({ historiaCotizacion, borrador, indiceExcluido: indiceEnEdicion })
 
   function actualizarBorrador(campos) {
     setBorrador((actual) => ({ ...actual, ...campos }))
@@ -158,19 +200,80 @@ function HistoriaCotizacionRPM({
     setIntentoAgregar(false)
   }
 
-  // Enter dentro de un campo de fecha del borrador agrega el período en vez de
-  // enviar el formulario completo (que dispararía "Continuar") — mismo espíritu que
-  // el estándar ya adoptado de navegación por Enter, adaptado a que esta pantalla
-  // tiene dos acciones (Agregar período / Continuar) en un único <form>.
+  // Revisión correctiva E4-C1: carga el período seleccionado en el mismo formulario de
+  // arriba (nunca un formulario paralelo) y cambia el modo a "Editar" — nunca borra ni
+  // modifica el período hasta que se pulse "Guardar cambios" explícitamente.
+  function manejarEmpezarEdicion(indice) {
+    setBorrador(periodoAFormularioBorrador(historiaCotizacion[indice]))
+    setIndiceEnEdicion(indice)
+    setIntentoAgregar(false)
+    setMensajeConfirmacion(null)
+    // Defensivo: cierra cualquier confirmación de "Quitar" pendiente en otro período — evita
+    // dos diálogos de acción distintos abiertos a la vez en la misma lista.
+    setIndiceEnConfirmacionQuitar(null)
+  }
+
+  // Cancelar deja el período original intacto — nunca escribe en historiaCotizacion.
+  function manejarCancelarEdicion() {
+    setBorrador(borradorVacio())
+    setIndiceEnEdicion(null)
+    setIntentoAgregar(false)
+  }
+
+  // Reemplaza en la MISMA posición (indiceEnEdicion) — nunca agrega un elemento nuevo, así
+  // que nunca duplica; los demás períodos del array se conservan intactos, sin tocarlos.
+  function manejarGuardarEdicion() {
+    if (!evaluacion.puedeAgregar) {
+      setIntentoAgregar(true)
+      return
+    }
+    const periodoActualizado = construirPeriodoCotizacion(evaluacion)
+    onCambiarHistoriaCotizacion(reemplazarPeriodoEnPosicion(historiaCotizacion, indiceEnEdicion, periodoActualizado))
+    setMensajeConfirmacion(`Guardaste los cambios del período ${textoRangoPeriodo(periodoActualizado)}.`)
+    setBorrador(borradorVacio())
+    setIndiceEnEdicion(null)
+    setIntentoAgregar(false)
+  }
+
+  // Enter dentro de un campo de fecha del borrador confirma la acción principal vigente
+  // (agregar o guardar, según el modo) en vez de enviar el formulario completo (que
+  // dispararía "Continuar") — mismo espíritu que el estándar ya adoptado de navegación por
+  // Enter, adaptado a que esta pantalla tiene más de una acción en un único <form>.
   function manejarEnterEnBorrador(e) {
     if (e.key !== 'Enter') return
     e.preventDefault()
-    manejarAgregarPeriodo()
+    if (enModoEdicion) {
+      manejarGuardarEdicion()
+    } else {
+      manejarAgregarPeriodo()
+    }
   }
 
-  function manejarQuitarPeriodo(indice) {
-    onCambiarHistoriaCotizacion(historiaCotizacion.filter((_, i) => i !== indice))
+  // Revisión correctiva E4-C1, hallazgo 5: primer clic en "Quitar" — solo abre la
+  // confirmación, nunca elimina todavía. No toca historiaCotizacion ni ningún otro estado.
+  function manejarPedirConfirmacionQuitar(indice) {
+    setIndiceEnConfirmacionQuitar(indice)
+  }
+
+  // "Cancelar" — conserva el período sin modificaciones, solo cierra la confirmación.
+  function manejarCancelarConfirmacionQuitar() {
+    setIndiceEnConfirmacionQuitar(null)
+  }
+
+  // "Sí, quitar período" — única acción que efectivamente elimina. `filter` por índice
+  // garantiza por construcción que solo se elimina la posición confirmada y que los demás
+  // períodos se conservan intactos y en su mismo orden relativo (ni se duplican ni se
+  // alteran).
+  function manejarConfirmarQuitarPeriodo(indice) {
+    onCambiarHistoriaCotizacion(quitarPeriodoEnPosicion(historiaCotizacion, indice))
     setMensajeConfirmacion(null)
+    setIndiceEnConfirmacionQuitar(null)
+    // Defensivo: si se quita el período que se estaba editando (o cualquier otro, para
+    // evitar que `indiceEnEdicion` quede apuntando a una posición desplazada por el
+    // splice), la edición en curso se cancela — nunca deja el formulario mostrando datos de
+    // un período que ya no existe en esa posición. Eliminar es siempre una acción distinta
+    // y explícita: esto nunca elimina un SEGUNDO período, solo cierra la edición transitoria.
+    if (enModoEdicion) manejarCancelarEdicion()
   }
 
   const campoIbc = useCampoMonetario(borrador.ibc, (valor) => actualizarBorrador({ ibc: valor }))
@@ -213,11 +316,60 @@ function HistoriaCotizacionRPM({
       ) : (
         <ul className="checklist">
           {historiaCotizacion.map((periodo, indice) => (
-            <li className="checklist__item" key={`${periodo.fechaDesde}-${indice}`}>
-              <span>{textoRangoPeriodo(periodo)}</span>
-              <button type="button" className="btn btn-secondary" onClick={() => manejarQuitarPeriodo(indice)}>
-                Quitar
-              </button>
+            <li
+              className={`checklist__item${indice === indiceEnEdicion ? ' checklist__item--siguiente' : ''}`}
+              key={`${periodo.fechaDesde}-${indice}`}
+            >
+              <span>
+                {textoRangoPeriodo(periodo)}
+                {indice === indiceEnEdicion && ' — editando'}
+              </span>
+              {/* Revisión correctiva E4-C1 (2026-09-10), hallazgo 5: confirmación dentro de la
+                  interfaz (nunca window.confirm), asociada visualmente a este período —
+                  reutiliza field__warning (mismo estilo ya usado para avisos) y btn-primary/
+                  btn-secondary existentes, sin CSS nuevo. */}
+              {indice === indiceEnConfirmacionQuitar ? (
+                <div className="field__warning">
+                  <p>¿Quieres quitar este período de tu historia de cotización?</p>
+                  <div className="screen__actions">
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      ref={cancelarQuitarRef}
+                      onClick={manejarCancelarConfirmacionQuitar}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      aria-label={`Confirmar: quitar el período ${textoRangoPeriodo(periodo)}`}
+                      onClick={() => manejarConfirmarQuitarPeriodo(indice)}
+                    >
+                      Sí, quitar período
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="screen__actions">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    aria-label={`Editar el período ${textoRangoPeriodo(periodo)}`}
+                    onClick={() => manejarEmpezarEdicion(indice)}
+                  >
+                    Editar
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    aria-label={`Quitar el período ${textoRangoPeriodo(periodo)}`}
+                    onClick={() => manejarPedirConfirmacionQuitar(indice)}
+                  >
+                    Quitar
+                  </button>
+                </div>
+              )}
             </li>
           ))}
         </ul>
@@ -230,10 +382,14 @@ function HistoriaCotizacionRPM({
       )}
 
       <fieldset className="field-group" onKeyDown={manejarEnterEnBorrador}>
-        <legend className="field__label">Agregar un período</legend>
+        <legend className="field__label">{enModoEdicion ? 'Editar período' : 'Agregar un período'}</legend>
 
+        {/* La key incluye indiceEnEdicion (además de historiaCotizacion.length, ya usado
+            para el reinicio tras agregar) porque CampoFechaDiaMesAnio es semi-controlado:
+            solo lee `valor` al montarse — cambiar de "Agregar" a "Editar" (o entre dos
+            períodos distintos) debe forzar un remontaje para mostrar la fecha cargada. */}
         <CampoFechaDiaMesAnio
-          key={`desde-${historiaCotizacion.length}`}
+          key={`desde-${historiaCotizacion.length}-${indiceEnEdicion ?? 'nuevo'}`}
           valor={borrador.fechaDesde}
           onCambiar={(fecha) => actualizarBorrador({ fechaDesde: fecha })}
           etiquetaDia="Día desde"
@@ -252,7 +408,7 @@ function HistoriaCotizacionRPM({
 
         {!borrador.sigueAbierto && (
           <CampoFechaDiaMesAnio
-            key={`hasta-${historiaCotizacion.length}`}
+            key={`hasta-${historiaCotizacion.length}-${indiceEnEdicion ?? 'nuevo'}`}
             valor={borrador.fechaHasta}
             onCambiar={(fecha) => actualizarBorrador({ fechaHasta: fecha })}
             etiquetaDia="Día hasta"
@@ -274,9 +430,20 @@ function HistoriaCotizacionRPM({
           </div>
         )}
 
-        <button type="button" className="btn btn-secondary" onClick={manejarAgregarPeriodo}>
-          Agregar período
-        </button>
+        {enModoEdicion ? (
+          <div className="screen__actions">
+            <button type="button" className="btn btn-primary" onClick={manejarGuardarEdicion}>
+              Guardar cambios
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={manejarCancelarEdicion}>
+              Cancelar edición
+            </button>
+          </div>
+        ) : (
+          <button type="button" className="btn btn-secondary" onClick={manejarAgregarPeriodo}>
+            Agregar período
+          </button>
+        )}
       </fieldset>
 
       <div className="screen__actions">

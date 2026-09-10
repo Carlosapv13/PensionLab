@@ -52,13 +52,48 @@ export function textoAjusteIBC(escenario) {
 }
 
 /**
+ * checkpoint E4-C1, Decisión 3 (2026-09-10): cuando la meta solo se alcanza porque el piso
+ * legal (1 SMLMV) elevó el resultado matemático crudo, la interfaz no puede decir lo mismo
+ * que cuando la meta ya se alcanzaba sin ningún ajuste — son hechos distintos para la
+ * persona. `escenario.objetivoAlcanzadoPorPisoLegal` ya viene resuelto por
+ * generarCaminosRPM.js (E3-C2d): esta función nunca recalcula el piso, solo decide cómo
+ * decirlo.
  * @param {Object} escenario
  * @returns {string}
  */
 export function textoDistancia(escenario) {
   const { cumple, delta } = escenario.distanciaObjetivo
-  if (cumple) return 'Alcanza tu objetivo.'
+  if (cumple) {
+    return escenario.objetivoAlcanzadoPorPisoLegal
+      ? 'Alcanza tu objetivo por aplicación del piso legal.'
+      : 'Alcanza tu objetivo.'
+  }
   return `No alcanza tu objetivo — le faltarían ${formatearPesos(delta)} al mes.`
+}
+
+// checkpoint E4-C1, Decisión 3: revelación progresiva del resultado matemático crudo
+// (`valorMatematico`) cuando difiere del resultado final ajustado — nunca compite
+// visualmente con la cifra principal (`escenario.resultado.valor`), solo queda disponible
+// para quien quiera auditar el ajuste. Distingue piso/techo con la misma fuente que ya
+// decide `objetivoAlcanzadoPorPisoLegal` (ajusteLegal.pisoEvaluado/techoEvaluado.aplica) —
+// nunca infiere la causa del texto de distancia, que responde una pregunta distinta (si se
+// alcanzó el objetivo, no si el ajuste se aplicó).
+/**
+ * @param {Object} escenario
+ * @returns {string|null} null cuando no hay nada que revelar (descartado, sin ajusteLegal,
+ *   o el resultado final ajustado coincide con el matemático crudo)
+ */
+export function textoResultadoMatematicoPrevioAjuste(escenario) {
+  if (escenario.estado !== 'viable') return null
+  const ajuste = escenario.ajusteLegal
+  if (!ajuste || ajuste.estado !== 'evaluado' || !Number.isFinite(ajuste.resultadoFinalAjustado)) return null
+  if (escenario.valorMatematico === ajuste.resultadoFinalAjustado) return null
+
+  const causa = ajuste.pisoEvaluado?.aplica ? 'el piso legal' : ajuste.techoEvaluado?.aplica ? 'el techo legal' : 'un ajuste legal'
+  return (
+    `Antes de aplicar ${causa}, el resultado matemático de la fórmula era ${formatearPesos(escenario.valorMatematico)} ` +
+    'al mes — no se usa como tu pensión proyectada, se conserva únicamente para trazabilidad.'
+  )
 }
 
 // Ajuste UX/producto (2026-08-27, tras revisión crítica de diseño — descartada la idea
@@ -298,4 +333,202 @@ export function construirSemanasReferenciaDeclaradas(nivelConocimientoSemanas, s
   const cantidad = validarSemanas(semanasCotizadas)
   if (cantidad === null) return null
   return { cantidad, certeza: nivelConocimientoSemanas }
+}
+
+// checkpoint E4-C1, Decisión 2 (2026-09-10): PensionLab no puede aceptar en silencio un
+// objetivo de pensión RPM por debajo del piso legal (1 SMLMV) — ni generar caminos para
+// alcanzarlo, ni mostrar "Alcanza tu objetivo" como si fuera un objetivo ordinario. Esta
+// función es exclusivamente el PREDICADO de bloqueo — nunca decide el valor del piso (lo
+// resuelve resolverSmlvVigenteRPM.js, ya consumido por ProyectaTuPensionRPM.jsx antes de
+// llamar aquí) y nunca normaliza el objetivo por su cuenta: eso solo ocurre tras la acción
+// explícita "Usar 1 SMLV como objetivo mínimo".
+//
+// `pisoLegalPensionMensual` puede ser null cuando el SMLV vigente no pudo resolverse para la
+// fecha de cálculo (resolverSmlvVigenteRPM.js, aptoParaCalculoEnFechaBase === false) — en ese
+// caso esta función nunca bloquea: afirmar un piso que no se pudo verificar sería inventar
+// una certeza legal que no existe (mismo criterio de "no bloquear sin evidencia" ya usado en
+// el resto del dominio).
+/**
+ * @param {number|null} objetivoValorMensual
+ * @param {number|null} pisoLegalPensionMensual
+ * @returns {boolean}
+ */
+export function objetivoInferiorAlPisoLegal(objetivoValorMensual, pisoLegalPensionMensual) {
+  if (!Number.isFinite(objetivoValorMensual) || objetivoValorMensual <= 0) return false
+  if (!Number.isFinite(pisoLegalPensionMensual) || pisoLegalPensionMensual <= 0) return false
+  return objetivoValorMensual < pisoLegalPensionMensual
+}
+
+/**
+ * @param {number} pisoLegalPensionMensual - ya resuelto, en pesos de hoy
+ * @returns {string}
+ */
+export function textoObjetivoInferiorAlPisoLegal(pisoLegalPensionMensual) {
+  return (
+    `El objetivo que escribiste está por debajo del salario mínimo legal vigente (${formatearPesos(pisoLegalPensionMensual)} ` +
+    'al mes, en pesos de hoy). Si cumples los requisitos para una pensión de vejez en el Régimen de Prima Media, la mesada ' +
+    'reconocida no puede quedar por debajo del piso legal evaluado — por eso no construimos caminos para un objetivo menor. ' +
+    'PensionLab no predice futuros incrementos del salario mínimo: esta cifra es la vigente hoy.'
+  )
+}
+
+// Revisión correctiva E4-C1 (2026-09-10), hallazgo 1 de la validación manual de Carlos: el
+// texto del botón debe dejar la CONSECUENCIA totalmente explícita ("a qué cifra exacta
+// cambiaría mi objetivo"), no solo nombrar la unidad legal ("1 SMLV"). La cifra siempre
+// proviene de `pisoLegalPensionMensual` (resolverSmlvVigenteRPM.js, vía
+// ProyectaTuPensionRPM.jsx) — esta función nunca hardcodea $1.750.905 ni ningún otro valor;
+// si el piso cambia (otro año, otra fecha de cálculo), el texto cambia con él.
+/**
+ * @param {number} pisoLegalPensionMensual - ya resuelto, en pesos de hoy
+ * @returns {string}
+ */
+export function textoAccionUsarPisoLegalComoObjetivo(pisoLegalPensionMensual) {
+  return `Cambiar mi objetivo al mínimo legal de ${formatearPesos(pisoLegalPensionMensual)}`
+}
+
+// Revisión correctiva E4-C1 (2026-09-10), hallazgo 3: gramática natural según cantidad —
+// nunca "período(s)"/"agregado(s)". El caso cero usa una oración completamente distinta
+// (no es una variación de "0 períodos agregados": "No has agregado períodos de cotización."
+// es la forma en que una persona real lo diría) — el caso singular/plural sí comparte
+// estructura, solo cambia la palabra.
+/**
+ * @param {number} cantidadPeriodos - historiaCotizacion.length
+ * @returns {string}
+ */
+export function textoResumenHistoriaCotizacion(cantidadPeriodos) {
+  if (cantidadPeriodos === 0) return 'No has agregado períodos de cotización.'
+  const palabra = cantidadPeriodos === 1 ? 'período' : 'períodos'
+  const participio = cantidadPeriodos === 1 ? 'agregado' : 'agregados'
+  return `Historia de cotización estructurada: ${cantidadPeriodos} ${palabra} ${participio}.`
+}
+
+// Revisión correctiva E4-C1 (2026-09-10), hallazgo 4: distingue explícitamente TRES estados
+// — nunca convierte en silencio "campo vacío" en "límite de $0". `restriccionCostoPensional`
+// ya llega parseado por validarMontoNoNegativo.js (ProyectaTuPensionRPM.jsx): `null` significa
+// "el campo está vacío, la persona no respondió esta pregunta todavía" (nunca "cero"); `0` es
+// un valor numérico válido y semánticamente distinto — la persona SÍ escribió "0", una
+// declaración real de "no tengo margen para aportar más" que generarCaminosRPM.js ya
+// interpreta de forma distinta a la ausencia (limiteIBCPorRestriccion se vuelve exactamente
+// ibcAplicableSimulacion, sin margen — ver generarCaminosRPM.js). Por eso el cero explícito
+// SÍ es un dato válido en este formulario, y esta función lo redacta de forma reconocible en
+// vez de mostrarlo idéntico a la ausencia o a un valor positivo cualquiera.
+/**
+ * @param {number|null} restriccionCostoPensional - ya parseado (validarMontoNoNegativo);
+ *   `null` = campo vacío/no informado, `0` = cero explícito, `> 0` = valor informado.
+ * @returns {string}
+ */
+export function textoResumenLimiteEsfuerzo(restriccionCostoPensional) {
+  if (restriccionCostoPensional === null) return 'Límite de esfuerzo mensual: no informado.'
+  if (restriccionCostoPensional === 0) {
+    return 'Límite de esfuerzo mensual: $0 adicionales al mes — declaraste explícitamente que no puedes destinar nada adicional.'
+  }
+  return `Límite de esfuerzo mensual: ${formatearPesos(restriccionCostoPensional)} adicionales al mes.`
+}
+
+// checkpoint E4-C1, Decisión 5 (2026-09-10) — resumen revisable de la información ingresada.
+// Exclusivamente formato: cada función decide cómo mostrar un dato ya capturado en otra
+// pantalla, nunca calcula ni reinterpreta ese dato. La ausencia de una fecha de referencia
+// para las semanas declaradas se documenta explícitamente aquí (nunca se inventa una) — ver
+// InformacionPensionalEsencial.jsx, que hoy no captura ese dato.
+/**
+ * @param {('conocido'|'aproximado'|'desconocido'|null)} nivelConocimientoSemanas
+ * @param {string} semanasCotizadas
+ * @returns {string}
+ */
+export function textoResumenSemanasDeclaradas(nivelConocimientoSemanas, semanasCotizadas) {
+  if (nivelConocimientoSemanas === 'desconocido') return 'No declaraste cuántas semanas tienes cotizadas.'
+  if (nivelConocimientoSemanas !== 'conocido' && nivelConocimientoSemanas !== 'aproximado') {
+    return 'Todavía no respondiste esta pregunta.'
+  }
+  const prefijo = nivelConocimientoSemanas === 'aproximado' ? 'aproximadamente ' : ''
+  // Ausencia documentada a propósito (checkpoint E4-C1, Decisión 5): no existe hoy un dato
+  // de "fecha de referencia" para esta cifra — no se inventa ni se implementa aquí.
+  return `${prefijo}${semanasCotizadas} semanas — sin una fecha de referencia registrada todavía.`
+}
+
+// Revisión correctiva E4-C1 (2026-09-10), punto 4: el resumen NUNCA muestra el nombre
+// técnico del enum de certeza ("certeza: conocido", "certeza: aproximado") — siempre
+// lenguaje natural. Los cuatro textos exactos exigidos viven aquí, como única fuente de esa
+// redacción (el valor técnico `certezaValorDeclarado`/`certezaBaseCotizacion` se sigue
+// usando internamente para decidir CUÁL de los cuatro aplica, nunca se imprime tal cual).
+const TEXTO_CERTEZA_IBC = {
+  exacto: 'Valor exacto declarado por ti',
+  aproximado: 'Valor aproximado declarado por ti',
+  estimadoDesdeSalario: 'Estimado a partir del salario que declaraste',
+  desconocido: 'No conocemos todavía tu IBC actual',
+}
+
+/**
+ * @param {Object} baseCotizacion - salida de determinarBaseCotizacion.js
+ * @param {('conocido'|'aproximado'|'desconocido'|null)} certezaBaseCotizacion
+ * @returns {string}
+ */
+export function textoResumenBaseCotizacion(baseCotizacion, certezaBaseCotizacion) {
+  if (!certezaBaseCotizacion) return 'Todavía no respondiste esta pregunta.'
+  if (baseCotizacion.ibcAplicableSimulacion === null) {
+    return certezaBaseCotizacion === 'desconocido'
+      ? `${TEXTO_CERTEZA_IBC.desconocido}.`
+      : 'El valor que declaraste no es apto para simulación todavía (ver detalle en esa pantalla).'
+  }
+  if (baseCotizacion.origenDatoIbc === 'calculado_desde_dato_declarado') {
+    return `${formatearPesos(baseCotizacion.ibcAplicableSimulacion)} al mes — ${TEXTO_CERTEZA_IBC.estimadoDesdeSalario}.`
+  }
+  const descripcionCerteza =
+    baseCotizacion.certezaValorDeclarado === 'aproximado' ? TEXTO_CERTEZA_IBC.aproximado : TEXTO_CERTEZA_IBC.exacto
+  return `${formatearPesos(baseCotizacion.ibcAplicableSimulacion)} al mes — ${descripcionCerteza}.`
+}
+
+// Revisión correctiva E4-C1, punto 4/6: mismo criterio que TEXTO_CERTEZA_IBC — nunca se
+// imprime el código interno de detalleTraslado tal cual (ej. "rpm_a_rais"), siempre su
+// redacción en lenguaje natural. Vocabulario más breve que OPCIONES_DETALLE_TRASLADO de
+// IndiciosRegimenTransicion.jsx (esa pantalla necesita frases completas para un radio button;
+// aquí es una cláusula dentro de una sola línea de resumen) — mismos cuatro códigos, nunca
+// un quinto inventado.
+const TEXTO_DETALLE_TRASLADO = {
+  rpm_a_rais: 'de Colpensiones a un fondo privado',
+  rais_a_rpm: 'de un fondo privado a Colpensiones',
+  multiple: 'más de un traslado',
+  no_estoy_seguro: 'dirección no confirmada',
+}
+
+/**
+ * @param {Object} params
+ * @param {string|null} params.trasladoRegimen
+ * @param {string|null} params.detalleTraslado
+ * @param {('conocido'|'aproximado'|'desconocido'|null)} params.certezaFechaTraslado
+ * @param {string} params.fechaTrasladoRegimen
+ * @returns {string|null} null cuando no hubo traslado declarado — el llamador decide no
+ *   mostrar esta fila en absoluto ("cuando exista", per checkpoint E4-C1)
+ */
+export function textoResumenTraslado({ trasladoRegimen, detalleTraslado, certezaFechaTraslado, fechaTrasladoRegimen }) {
+  if (trasladoRegimen !== 'si') return null
+  const partes = ['Te trasladaste de régimen alguna vez']
+  const detalleLegible = TEXTO_DETALLE_TRASLADO[detalleTraslado] ?? null
+  if (detalleLegible) partes.push(`(${detalleLegible})`)
+  if (certezaFechaTraslado === 'conocido' || certezaFechaTraslado === 'aproximado') {
+    partes.push(`— fecha ${certezaFechaTraslado === 'aproximado' ? 'aproximada' : ''} ${fechaTrasladoRegimen}`.trim())
+  } else {
+    partes.push('— sin fecha declarada')
+  }
+  // Recordatorio deliberado (mismo criterio de honestidad que IndiciosRegimenTransicion.jsx):
+  // esta fecha nunca modifica ningún cálculo.
+  return `${partes.join(' ')}. Esta fecha no modifica ningún cálculo.`
+}
+
+// Revisión correctiva E4-C1 (2026-09-10), hallazgo 6: predicado puro extraído para poder
+// probar la regla de visibilidad sin montar el componente (no hay React Testing Library en
+// este repositorio — ver decisión registrada en el checkpoint anterior). El botón general
+// "Editar tu objetivo o la edad que quieres explorar" solo tiene sentido cuando (a) el
+// formulario inline no está ya abierto (mostrarFormulario) — ahí no hay nada que "editar", ya
+// se está editando — y (b) el resumen revisable no está expandido — si lo está, sus botones
+// individuales "Editar" de objetivo/edad objetivo ya cubren exactamente la misma acción, y
+// mostrar ambos sería la duplicación reportada.
+/**
+ * @param {Object} params
+ * @param {boolean} params.mostrarFormulario
+ * @param {boolean} params.resumenAbierto
+ * @returns {boolean}
+ */
+export function debeMostrarBotonGeneralEdicionObjetivo({ mostrarFormulario, resumenAbierto }) {
+  return !mostrarFormulario && !resumenAbierto
 }

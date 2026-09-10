@@ -20,7 +20,7 @@
 // este archivo ya no conoce día/mes/año por separado, solo valida y usa el resultado.
 
 import { esFechaDiaMesAnioReal } from '../format/fechaDiaMesAnio.js'
-import { diasCalendarioEnRango } from '../domain/seleccionarPeriodosIBL.js'
+import { diasCalendarioEnRango, seSuperponen } from '../domain/seleccionarPeriodosIBL.js'
 
 function hoyISO() {
   return new Date().toISOString().slice(0, 10)
@@ -122,4 +122,105 @@ export function construirPeriodoCotizacion({ fechaDesdeISO, fechaHastaISO, ibcNu
     ibc: ibcNumero,
     diasCotizados: diasCalendarioEnRango(fechaDesdeISO, fechaHastaResuelta),
   }
+}
+
+// Revisión correctiva E4-C1 (2026-09-10) — "Edición real de periodos históricos": un período
+// ya guardado se convierte de vuelta al mismo BorradorPeriodo que produce el formulario, para
+// poder cargarlo y editarlo con exactamente los mismos campos/validaciones que agregar uno
+// nuevo. Nunca inventa un campo nuevo en el contrato PeriodoCotizacion — solo transforma ida
+// y vuelta entre las dos formas ya existentes (borrador de UI vs. período guardado).
+/**
+ * @param {{fechaDesde: string, fechaHasta: (string|null), ibc: number, diasCotizados: number}} periodo
+ * @returns {BorradorPeriodo}
+ */
+export function periodoAFormularioBorrador(periodo) {
+  return {
+    fechaDesde: periodo.fechaDesde,
+    fechaHasta: periodo.fechaHasta ?? '',
+    sigueAbierto: periodo.fechaHasta === null,
+    ibc: String(periodo.ibc),
+  }
+}
+
+// Revisión correctiva E4-C1 (2026-09-10): valida un borrador para agregarlo O para
+// reemplazar un período ya existente, con las MISMAS reglas en ambos casos — fechas/IBC (via
+// evaluarNuevoPeriodo, sin cambios) más solapamiento contra el resto de la historia (via
+// seSuperponen, la MISMA función que ya usa seleccionarPeriodosIBL.js — nunca reimplementada
+// aquí, para no crear una segunda fuente de verdad sobre qué cuenta como solapamiento).
+//
+// `indiceExcluido` es la posición del período que se está editando (se excluye de la
+// comparación contra sí mismo) — `null` en modo "agregar", donde no hay ningún índice que
+// excluir. Esta es la única función que decide si un borrador puede COMMITTEARSE a la
+// historia, tanto para agregar como para editar — evita que ambos flujos verifiquen reglas
+// distintas o diverjan con el tiempo.
+/**
+ * @param {Object} params
+ * @param {Array<{fechaDesde: string, fechaHasta: (string|null), ibc: number, diasCotizados: number}>} params.historiaCotizacion
+ * @param {BorradorPeriodo} params.borrador
+ * @param {number|null} [params.indiceExcluido]
+ * @param {string} [params.fecha]
+ * @returns {{fechaDesdeISO: string|null, fechaHastaISO: string|null, ibcNumero: number|null, puedeAgregar: boolean, errores: string[]}}
+ */
+export function evaluarPeriodoParaHistoria({ historiaCotizacion, borrador, indiceExcluido = null, fecha = hoyISO() }) {
+  const evaluacionBase = evaluarNuevoPeriodo(borrador, fecha)
+  if (!evaluacionBase.puedeAgregar) return evaluacionBase
+
+  const candidato = {
+    fechaDesde: evaluacionBase.fechaDesdeISO,
+    fechaHastaResuelta: evaluacionBase.fechaHastaISO ?? fecha,
+  }
+
+  const solapaConOtroPeriodo = historiaCotizacion.some((periodo, indice) => {
+    if (indice === indiceExcluido) return false
+    const otro = { fechaDesde: periodo.fechaDesde, fechaHastaResuelta: periodo.fechaHasta ?? fecha }
+    return seSuperponen(candidato, otro)
+  })
+
+  if (!solapaConOtroPeriodo) return evaluacionBase
+
+  return {
+    ...evaluacionBase,
+    puedeAgregar: false,
+    errores: [
+      ...evaluacionBase.errores,
+      'Este período se superpone en fechas con otro que ya agregaste — ajusta las fechas para que no coincidan.',
+    ],
+  }
+}
+
+// Revisión correctiva E4-C1 (2026-09-10): extraída como función pura y testeada aparte —
+// la misma lógica que antes vivía inline en el manejador de "Guardar cambios" de
+// HistoriaCotizacionRPM.jsx — para poder demostrar por prueba, sin montar el componente, que
+// guardar una edición (a) reemplaza EXACTAMENTE en `indice` (la posición TRANSITORIA del
+// período durante esta edición — ver la nota junto a `indiceEnEdicion` en
+// HistoriaCotizacionRPM.jsx sobre por qué no es un identificador persistente), (b) nunca
+// cambia la longitud del array (no duplica, no elimina), y (c) nunca toca ningún otro
+// elemento. `Array.prototype.map` ya garantiza esto por construcción — esta función solo le
+// da un nombre y un lugar donde probarlo explícitamente.
+/**
+ * @param {Array<Object>} historiaCotizacion
+ * @param {number} indice
+ * @param {Object} periodoActualizado
+ * @returns {Array<Object>} un array nuevo (nunca muta el recibido), misma longitud, con el
+ *   elemento en `indice` reemplazado y todos los demás intactos (misma referencia)
+ */
+export function reemplazarPeriodoEnPosicion(historiaCotizacion, indice, periodoActualizado) {
+  return historiaCotizacion.map((periodo, i) => (i === indice ? periodoActualizado : periodo))
+}
+
+// Revisión correctiva E4-C1 (2026-09-10), hallazgo 5 — "Eliminación inmediata sin
+// confirmación": extraída, mismo criterio que reemplazarPeriodoEnPosicion, para poder probar
+// por separado de la confirmación en sí (que es flujo de UI — abrir/cancelar/confirmar — y
+// vive como estado de React en HistoriaCotizacionRPM.jsx, no aquí). Esta función es el único
+// punto que efectivamente cambia la longitud del array al eliminar: solo se invoca desde
+// `manejarConfirmarQuitarPeriodo`, nunca desde el primer clic en "Quitar" (que solo abre la
+// confirmación) ni desde "Cancelar" (que no toca historiaCotizacion en absoluto).
+/**
+ * @param {Array<Object>} historiaCotizacion
+ * @param {number} indice
+ * @returns {Array<Object>} un array nuevo (nunca muta el recibido), con el elemento en
+ *   `indice` eliminado y todos los demás conservados, en el mismo orden relativo
+ */
+export function quitarPeriodoEnPosicion(historiaCotizacion, indice) {
+  return historiaCotizacion.filter((_, i) => i !== indice)
 }

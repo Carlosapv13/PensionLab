@@ -106,6 +106,8 @@ import { calcularEdadCumplida } from '../domain/calcularEdadCumplida.js'
 import { determinarCamposFaltantesObjetivoRPM } from '../domain/determinarCamposFaltantesObjetivoRPM.js'
 import { determinarOrientacionExploracion } from '../domain/determinarOrientacionExploracion.js'
 import { EDAD_MAXIMA_FUNCIONAL } from '../domain/pensionEngine/requisitosDatosImprescindiblesRPM.js'
+import { resolverSmlvVigenteRPM } from '../domain/pensionEngine/resolverSmlvVigenteRPM.js'
+import { formatearDiasFaltantesParaVentanaIBL } from '../format/aproximarDiasEnSemanasYMeses.js'
 import { explicarCaminos } from '../ia/explicarCaminos.js'
 import { construirTodosLosHechos } from '../ia/construirHechosEscenario.js'
 import { construirTextoExplicacion } from '../ia/construirTextoExplicacion.js'
@@ -119,6 +121,7 @@ import {
   textoEsfuerzoAdicional,
   textoAjusteIBC,
   textoDistancia,
+  textoResultadoMatematicoPrevioAjuste,
   textoPorcentajeObjetivo,
   textoDiferenciaFrenteABase,
   textoOrientacion,
@@ -130,6 +133,15 @@ import {
   validarEsfuerzoAdicionalMensualDeseado,
   ordenarCaminosParaPresentacion,
   construirSemanasReferenciaDeclaradas,
+  objetivoInferiorAlPisoLegal,
+  textoObjetivoInferiorAlPisoLegal,
+  textoAccionUsarPisoLegalComoObjetivo,
+  textoResumenSemanasDeclaradas,
+  textoResumenBaseCotizacion,
+  textoResumenTraslado,
+  textoResumenHistoriaCotizacion,
+  textoResumenLimiteEsfuerzo,
+  debeMostrarBotonGeneralEdicionObjetivo,
 } from './ProyectaTuPensionRPM.helpers.js'
 
 // Una sola instancia del adaptador de producción — mismo criterio ya usado en
@@ -164,6 +176,15 @@ function hoyISO() {
 const TEXTO_INTRO =
   'Proyecta tu pensión RPM hacia una edad futura que elijas, combinando tu situación actual ' +
   'con un escenario de ingreso futuro — nunca inventa inflación futura ni asume que la ley cambiará.'
+
+// checkpoint E4-C1, Decisión 1 (2026-09-10): aclara que los días faltantes son solo el tramo
+// que ESTA proyección concreta usa para su ventana de IBL — nunca da a entender que falta
+// toda la historia laboral. Historia adicional sigue siendo útil (verificar datos, evaluar
+// otras alternativas legales), pero no obligatoria si el tramo faltante es menor.
+const TEXTO_ALCANCE_HISTORIA_FALTANTE =
+  'Esto no significa que te falte toda tu historia laboral — es la parte que esta proyección usa para completar ' +
+  'su ventana de cálculo. Agregar el resto de tu historia puede servir para verificar tus datos o evaluar otras ' +
+  'alternativas legales, pero no es obligatorio si esta proyección concreta solo necesita este tramo.'
 
 // Mismo criterio de validación mínima que ExploraTuProyeccion.jsx (RAIS) — duplicado a
 // propósito, no extraído todavía a un módulo compartido (Principio 9: sin abstracción sin
@@ -231,6 +252,20 @@ function TextoExplicacionCamino({ texto }) {
  *   ya declarado en InformacionPensionalEsencial.jsx (contrato GO-B, 2026-08-25) — nunca
  *   se le vuelve a preguntar aquí.
  * @param {string} props.semanasCotizadas - idem, mismo origen.
+ * @param {string|null} [props.trasladoRegimen] - checkpoint E4-C1, Decisión 5: ya declarado
+ *   en IndiciosRegimenTransicion.jsx, solo para mostrarlo en el resumen revisable — nunca
+ *   se usa en ningún cálculo aquí tampoco (mismo criterio de esa pantalla).
+ * @param {string|null} [props.detalleTraslado]
+ * @param {('conocido'|'aproximado'|'desconocido'|null)} [props.certezaFechaTraslado]
+ * @param {string} [props.fechaTrasladoRegimen]
+ * @param {() => void} [props.onEditarFechaNacimiento] - revisión correctiva E4-C1 (punto 2):
+ *   navega a DatosIniciales.jsx. Editar este dato exige recorrer de nuevo toda la cadena de
+ *   onboarding (documentado en App.jsx) — no existe un atajo, y esta pantalla no construye
+ *   ninguno.
+ * @param {() => void} [props.onEditarRegimenActual] - idem, navega a SituacionPensional.jsx.
+ * @param {() => void} [props.onEditarSemanasDeclaradas] - checkpoint E4-C1, Decisión 5:
+ *   navega a InformacionPensionalEsencial.jsx desde el resumen revisable.
+ * @param {() => void} [props.onEditarTraslado] - idem, navega a IndiciosRegimenTransicion.jsx.
  * @param {() => void} [props.onProfundizarHistoria] - profundización opcional (2026-08-26):
  *   navega a HistoriaCotizacionRPM.jsx/ExploraTuProyeccionRPM.jsx para registrar historia
  *   real y volver aquí con la proyección ya recalculada. Solo se ofrece cuando
@@ -264,6 +299,14 @@ function ProyectaTuPensionRPM({
   salarioParaEstimarBase,
   nivelConocimientoSemanas,
   semanasCotizadas,
+  trasladoRegimen = null,
+  detalleTraslado = null,
+  certezaFechaTraslado = null,
+  fechaTrasladoRegimen = '',
+  onEditarFechaNacimiento,
+  onEditarRegimenActual,
+  onEditarSemanasDeclaradas,
+  onEditarTraslado,
   onProfundizarHistoria,
   edadJubilacionDeseada,
   onCambiarEdadJubilacionDeseada,
@@ -292,6 +335,17 @@ function ProyectaTuPensionRPM({
   const objetivoValorMensual = validarMontoNoNegativo(objetivoPensionMensual)
   const restriccionCostoPensional = validarMontoNoNegativo(restriccionCostoPensionalAdicionalMaximoMensual)
 
+  // checkpoint E4-C1, Decisión 2 (2026-09-10): resuelto ANTES de llamar a generarCaminosRPM
+  // — el bloqueo debe impedir por completo la generación de caminos para un objetivo por
+  // debajo del piso legal, no solo advertir después de calcular. Nunca hardcodea el valor
+  // del SMLV: lo resuelve resolverSmlvVigenteRPM.js, la misma fuente que usa el dominio para
+  // el ajuste legal (ajustarMesadaLegalRPM.js). Cuando el SMLV no está apto para calcular en
+  // esta fecha (litigio/suspensión/fuente insuficiente), pisoLegalPensionMensual queda en
+  // null y objetivoInferiorAlPisoLegal nunca bloquea con una certeza que no existe.
+  const smlvVigente = resolverSmlvVigenteRPM(fecha)
+  const pisoLegalPensionMensual = smlvVigente.aptoParaCalculoEnFechaBase ? smlvVigente.valor : null
+  const objetivoBloqueadoPorPisoLegal = objetivoInferiorAlPisoLegal(objetivoValorMensual, pisoLegalPensionMensual)
+
   // Se evalúa una sola vez, al montar (lazy initializer de useState — React nunca vuelve a
   // invocar esta función en renders posteriores): si en ese momento ya no falta ningún dato
   // imprescindible, el formulario arranca colapsado. Reutiliza el mismo criterio compartido
@@ -315,6 +369,15 @@ function ProyectaTuPensionRPM({
     () => restriccionCostoPensionalAdicionalMaximoMensual !== ''
   )
 
+  // Revisión correctiva E4-C1 (2026-09-10), hallazgo 6: el resumen revisable (<details>) se
+  // controla ahora desde React — antes era un <details> nativo sin estado propio, así que
+  // esta pantalla no tenía forma de saber si estaba abierto para poder ocultar el botón
+  // general redundante mientras los controles individuales ya son visibles. `onToggle` es el
+  // evento estándar de <details> (se dispara al abrir Y al cerrar, por clic en <summary> o
+  // por teclado) — sincroniza este estado con el elemento nativo sin reimplementar su
+  // comportamiento de expansión/colapso.
+  const [resumenAbierto, setResumenAbierto] = useState(false)
+
   // Camino personalizado (decisión de producto 2026-08-23) — estado LOCAL de esta pantalla,
   // deliberadamente NUNCA persistido en App.jsx/el expediente (diagnóstico previo: es una
   // exploración momentánea, no un hecho declarado que otra pantalla necesite reutilizar).
@@ -336,8 +399,11 @@ function ProyectaTuPensionRPM({
   // antes de este contrato — nunca se interpreta como "0 semanas".
   const semanasReferenciaDeclaradas = construirSemanasReferenciaDeclaradas(nivelConocimientoSemanas, semanasCotizadas)
 
+  // checkpoint E4-C1, Decisión 2: con el objetivo bloqueado por piso legal, generarCaminosRPM
+  // NUNCA se llama — no se generan caminos para un objetivo inválido, y por tanto tampoco
+  // puede aparecer "Alcanza tu objetivo" como si fuera un objetivo ordinario.
   const resultado =
-    edadValida !== null && baseCotizacion.ibcAplicableSimulacion !== null
+    edadValida !== null && baseCotizacion.ibcAplicableSimulacion !== null && !objetivoBloqueadoPorPisoLegal
       ? generarCaminosRPM({
           regimenActual,
           sexo,
@@ -427,6 +493,15 @@ function ProyectaTuPensionRPM({
     setEstadoExplicacion('lista')
   }
 
+  // checkpoint E4-C1, Decisión 2: única forma de que el objetivo cambie por causa del piso
+  // legal — nunca ocurre automáticamente, solo tras este clic explícito. Redondea a peso
+  // entero (pisoLegalPensionMensual siempre lo es en la práctica, pero se defiende igual):
+  // el campo de objetivo, como cualquier CampoMonetario, guarda solo dígitos.
+  function manejarUsarPisoLegalComoObjetivoMinimo() {
+    if (pisoLegalPensionMensual === null) return
+    onCambiarObjetivoPensionMensual(String(Math.round(pisoLegalPensionMensual)))
+  }
+
   const campoObjetivo = useCampoMonetario(objetivoPensionMensual, onCambiarObjetivoPensionMensual)
   const campoRestriccion = useCampoMonetario(
     restriccionCostoPensionalAdicionalMaximoMensual,
@@ -491,6 +566,159 @@ function ProyectaTuPensionRPM({
 
       <p className="screen__subtitle screen__subtitle--secundario">{TEXTO_INTRO}</p>
 
+      {/* checkpoint E4-C1, Decisión 5 (2026-09-10) — resumen revisable de la información
+          determinante, ANTES de presentar/confirmar la proyección. Solución deliberadamente
+          menos invasiva: lee datos ya calculados en esta misma pantalla (nunca los
+          recalcula, nunca es una fuente de verdad nueva) y cada fila navega a la pantalla
+          real donde ese dato se edita — nunca duplica su formulario aquí. Colapsado por
+          defecto (mismo patrón `legal-detail` ya usado en el resto de la app) para no
+          competir con el objetivo/resultado, que siguen siendo lo primero que se ve. */}
+      <details className="legal-detail" open={resumenAbierto} onToggle={(e) => setResumenAbierto(e.target.open)}>
+        <summary>Revisar la información que estamos usando para esta proyección</summary>
+
+        {/* revisión correctiva E4-C1 (2026-09-10), punto 2/3: editar fecha de nacimiento o
+            régimen actual recorre de nuevo toda la cadena de onboarding — son los dos datos
+            más estructurales del expediente y no existe un atajo que no sea construir un
+            router nuevo (fuera de alcance). Se avisa aquí mismo, antes del clic, para que la
+            persona sepa qué implica antes de decidirlo — nunca se le oculta. */}
+        <p className="screen__subtitle screen__subtitle--secundario">
+          Editar tu fecha de nacimiento o tu régimen actual te lleva de vuelta al inicio del recorrido — tendrás que
+          confirmar de nuevo cada paso hasta llegar otra vez aquí. El resto de los datos, abajo, se editan sin salir
+          de este tramo.
+        </p>
+
+        <ul className="checklist">
+          <li className="checklist__item">
+            <span>Edad actual: {edadActual} años (según tu fecha de nacimiento).</span>
+            {onEditarFechaNacimiento && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                aria-label="Editar tu fecha de nacimiento"
+                onClick={onEditarFechaNacimiento}
+              >
+                Editar
+              </button>
+            )}
+          </li>
+
+          <li className="checklist__item">
+            <span>Régimen actual: {regimenActual ?? 'sin declarar'}.</span>
+            {onEditarRegimenActual && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                aria-label="Editar tu régimen actual"
+                onClick={onEditarRegimenActual}
+              >
+                Editar
+              </button>
+            )}
+          </li>
+
+          <li className="checklist__item">
+            <span>Semanas declaradas: {textoResumenSemanasDeclaradas(nivelConocimientoSemanas, semanasCotizadas)}</span>
+            {onEditarSemanasDeclaradas && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                aria-label="Editar las semanas declaradas"
+                onClick={onEditarSemanasDeclaradas}
+              >
+                Editar
+              </button>
+            )}
+          </li>
+
+          <li className="checklist__item">
+            <span>{textoResumenHistoriaCotizacion(historiaCotizacion.length)}</span>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              aria-label={
+                historiaCotizacion.length === 0
+                  ? 'Agregar períodos a tu historia de cotización'
+                  : 'Revisar o editar tu historia de cotización'
+              }
+              onClick={onProfundizarHistoria}
+            >
+              {historiaCotizacion.length === 0 ? 'Agregar' : 'Revisar / editar'}
+            </button>
+          </li>
+
+          <li className="checklist__item">
+            <span>IBC actual: {textoResumenBaseCotizacion(baseCotizacion, certezaBaseCotizacion)}</span>
+            <button type="button" className="btn btn-secondary" aria-label="Editar tu IBC actual" onClick={onVolver}>
+              Editar
+            </button>
+          </li>
+
+          <li className="checklist__item">
+            <span>Objetivo pensional: {objetivoValorMensual !== null ? `${formatearPesos(objetivoValorMensual)} al mes` : 'sin declarar'}.</span>
+            {!mostrarFormulario && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                aria-label="Editar tu objetivo pensional"
+                onClick={() => setMostrarFormulario(true)}
+              >
+                Editar
+              </button>
+            )}
+          </li>
+
+          <li className="checklist__item">
+            <span>Edad objetivo: {edadValida !== null ? `${edadValida} años` : 'sin declarar'}.</span>
+            {!mostrarFormulario && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                aria-label="Editar tu edad objetivo"
+                onClick={() => setMostrarFormulario(true)}
+              >
+                Editar
+              </button>
+            )}
+          </li>
+
+          {/* Revisión correctiva E4-C1 (2026-09-10), hallazgo 4: la fila ahora SIEMPRE se
+              muestra (como el resto de filas del resumen) — antes desaparecía por completo
+              cuando restriccionCostoPensional era null, lo cual escondía el dato "no
+              informado" en vez de comunicarlo. textoResumenLimiteEsfuerzo distingue null
+              (no informado) de 0 (cero explícito, un dato válido y distinto) de un valor
+              positivo — nunca muestra "$0" para "no informado". */}
+          <li className="checklist__item">
+            <span>{textoResumenLimiteEsfuerzo(restriccionCostoPensional)}</span>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              aria-label="Editar tu límite de esfuerzo mensual"
+              onClick={() => setMostrarCampoRestriccion(true)}
+            >
+              Editar
+            </button>
+          </li>
+
+          {textoResumenTraslado({ trasladoRegimen, detalleTraslado, certezaFechaTraslado, fechaTrasladoRegimen }) && (
+            <li className="checklist__item">
+              <span>
+                Traslado de régimen: {textoResumenTraslado({ trasladoRegimen, detalleTraslado, certezaFechaTraslado, fechaTrasladoRegimen })}
+              </span>
+              {onEditarTraslado && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  aria-label="Editar tu información de traslado de régimen"
+                  onClick={onEditarTraslado}
+                >
+                  Editar
+                </button>
+              )}
+            </li>
+          )}
+        </ul>
+      </details>
+
       {mostrarFormulario ? (
         <>
           <p className="screen__subtitle">¿Hasta qué edad te gustaría explorar tu proyección?</p>
@@ -522,11 +750,20 @@ function ProyectaTuPensionRPM({
               {objetivoValorMensual !== null ? `, con tu objetivo de ${formatearPesos(objetivoValorMensual)} al mes.` : '.'}
             </p>
           )}
-          <div className="screen__actions">
-            <button type="button" className="btn btn-secondary" onClick={() => setMostrarFormulario(true)}>
-              Editar tu objetivo o la edad que quieres explorar
-            </button>
-          </div>
+          {/* Revisión correctiva E4-C1 (2026-09-10), hallazgo 6: este botón general duplicaba
+              los botones individuales "Editar" de objetivo/edad objetivo del resumen cuando
+              ambos estaban visibles a la vez. Sigue siendo necesario cuando el resumen está
+              colapsado (es la única vía rápida para editar sin abrirlo primero) — se oculta
+              únicamente mientras `resumenAbierto` es true, que es exactamente cuando los
+              controles individuales ya son visibles. No se elimina la capacidad de editar:
+              solo se evita mostrar dos acciones para lo mismo a la vez. */}
+          {debeMostrarBotonGeneralEdicionObjetivo({ mostrarFormulario, resumenAbierto }) && (
+            <div className="screen__actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setMostrarFormulario(true)}>
+                Editar tu objetivo o la edad que quieres explorar
+              </button>
+            </div>
+          )}
         </>
       )}
 
@@ -548,6 +785,29 @@ function ProyectaTuPensionRPM({
           </p>
           <CampoMonetario id="objetivo-pension-mensual" {...campoObjetivo} />
         </label>
+      )}
+
+      {/* checkpoint E4-C1, Decisión 2: bloqueo explícito, nunca silencioso — mientras el
+          objetivo declarado esté por debajo del piso legal, no se calcula ningún resultado
+          (ver el guard de `resultado`, arriba) y la única salida es esta acción explícita.
+          Deliberadamente NO depende de `mostrarFormulario`: un objetivo ya confirmado (por
+          eso el formulario arranca colapsado) puede estar igual por debajo del piso — este
+          aviso debe seguir visible aunque el campo esté colapsado, nunca desaparecer en
+          silencio. */}
+      {edadValida !== null && baseCotizacion.ibcAplicableSimulacion !== null && objetivoBloqueadoPorPisoLegal && (
+        <div className="field__warning">
+          <p>{textoObjetivoInferiorAlPisoLegal(pisoLegalPensionMensual)}</p>
+          {/* Revisión correctiva E4-C1 (2026-09-10), hallazgo 1: acción primaria inequívoca
+              (btn-primary, no btn-secondary) — Carlos no la reconoció como botón con el
+              estilo secundario de borde/fondo tenue. Texto explícito sobre la consecuencia
+              exacta (cifra, no solo "1 SMLV"); la cifra viene siempre de
+              pisoLegalPensionMensual, nunca hardcodeada (ver textoAccionUsarPisoLegalComoObjetivo). */}
+          <div className="screen__actions">
+            <button type="button" className="btn btn-primary" onClick={manejarUsarPisoLegalComoObjetivoMinimo}>
+              {textoAccionUsarPisoLegalComoObjetivo(pisoLegalPensionMensual)}
+            </button>
+          </div>
+        </div>
       )}
 
       {mostrarFormulario &&
@@ -602,7 +862,18 @@ function ProyectaTuPensionRPM({
           <>
             <div className="insight">
               <p className="insight__label">Todavía falta completar tu historia de cotización</p>
-              <p className="insight__message">{resultado.orientacion.razon}</p>
+              {/* checkpoint E4-C1, Decisión 1: la cifra exacta de días faltantes es la
+                  principal; semanas/meses son SIEMPRE una aproximación explícita, nunca una
+                  equivalencia legal exacta. Si detalleElegibilidad no trae los dos conteos
+                  (caso defensivo), se conserva el texto original del dominio, sin inventar
+                  ninguna cifra. */}
+              <p className="insight__message">
+                {formatearDiasFaltantesParaVentanaIBL({
+                  diasIdentificados: resultado.detalleElegibilidad?.diasEfectivosAcumulados,
+                  diasRequeridos: resultado.detalleElegibilidad?.diasVentanaRequeridos,
+                }) ?? resultado.orientacion.razon}
+              </p>
+              <p className="insight__message">{TEXTO_ALCANCE_HISTORIA_FALTANTE}</p>
             </div>
             <div className="screen__actions">
               <button type="button" className="btn btn-secondary" onClick={onProfundizarHistoria}>
@@ -646,6 +917,10 @@ function ProyectaTuPensionRPM({
               const notasEspecificas = limitacionesEspecificas(escenario, limitacionesComunes)
               const textoDiferencia = textoDiferenciaFrenteABase(escenario.diferenciaFrenteABase)
               const textoPorcentaje = escenario.estado === 'descartado' ? null : textoPorcentajeObjetivo(escenario)
+              // checkpoint E4-C1, Decisión 3: revelación progresiva del valor matemático
+              // crudo — null en el caso normal (sin ajuste, o ajuste que no cambió el
+              // resultado), así que no agrega ningún <details> vacío.
+              const textoValorCrudo = escenario.estado === 'descartado' ? null : textoResultadoMatematicoPrevioAjuste(escenario)
 
               return (
                 <div
@@ -679,6 +954,15 @@ function ProyectaTuPensionRPM({
                         </span>
                         {textoDiferencia && (
                           <span className="camino-celda__valor camino-celda__valor--secundario">{textoDiferencia}</span>
+                        )}
+                        {/* checkpoint E4-C1, Decisión 3: el valor matemático previo al ajuste
+                            legal nunca compite visualmente con la cifra final — solo
+                            disponible bajo revelación progresiva, para trazabilidad. */}
+                        {textoValorCrudo && (
+                          <details className="legal-detail">
+                            <summary>Ver resultado matemático antes del ajuste legal</summary>
+                            <p>{textoValorCrudo}</p>
+                          </details>
                         )}
                       </div>
                       <div className="camino-celda camino-celda--objetivo">
@@ -837,12 +1121,24 @@ function ProyectaTuPensionRPM({
               sigue siendo una exploración válida ahí. */}
           {orientacionExploracion?.codigo !== 'OBJETIVO_LEGALMENTE_INALCANZABLE' && (
             <div className="exploracion-esfuerzo">
+              {/* Revisión correctiva E4-C1 (2026-09-10), hallazgo 2: "Explorar otro esfuerzo
+                  mensual" sonaba contradictorio junto a HOY_YA_ALCANZA_OBJETIVO ("no hace
+                  falta explorar ningún aumento"). Nuevo texto neutro + hint explícito de que
+                  es una simulación opcional — nunca una recomendación de aportar más ni un
+                  paso necesario para el objetivo. Sin umbral de conveniencia, sin "vale la
+                  pena": la decisión sigue siendo exclusivamente de la persona. */}
               {!mostrarExploracionEsfuerzo && (
-                <button type="button" className="btn btn-secondary" onClick={manejarAbrirExploracionEsfuerzo}>
-                  {esfuerzoAdicionalMensualDeseadoConfirmado
-                    ? 'Editar el esfuerzo que quieres explorar'
-                    : 'Explorar otro esfuerzo mensual'}
-                </button>
+                <>
+                  <button type="button" className="btn btn-secondary" onClick={manejarAbrirExploracionEsfuerzo}>
+                    {esfuerzoAdicionalMensualDeseadoConfirmado
+                      ? 'Editar el esfuerzo que quieres explorar'
+                      : 'Ver qué ocurriría con otro esfuerzo'}
+                  </button>
+                  <p className="option__hint">
+                    Es una simulación opcional — no es necesaria para alcanzar tu objetivo ni una recomendación de
+                    aportar más.
+                  </p>
+                </>
               )}
 
               {mostrarExploracionEsfuerzo && (

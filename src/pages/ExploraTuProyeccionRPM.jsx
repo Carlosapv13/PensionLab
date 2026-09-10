@@ -23,6 +23,7 @@ import { calcularPensionRPM } from '../domain/pensionEngine/calcularPensionRPM.j
 import { evaluarIndicioVidaLaboral } from '../domain/evidenciaIndicioVidaLaboral.js'
 import { useRestaurarFocoAlMontar } from '../hooks/useRestaurarFocoAlMontar.js'
 import { formatearPesos } from '../format/formatearDinero.js'
+import { formatearDiasFaltantesParaVentanaIBL } from '../format/aproximarDiasEnSemanasYMeses.js'
 
 const TEXTO_SIN_HISTORIA =
   'Conocemos algunos datos generales de tu historia, pero esta lectura económica necesita ' +
@@ -34,16 +35,36 @@ const TEXTO_CIERRE_SIN_HISTORIA = 'Hasta aquí llega la lectura económica RPM e
 
 // Ventana del IBL ordinario — convención técnica provisional de PensionLab, no una
 // constante legal (ver src/data/legal/trazabilidad-normativa.md, sección "Convención
-// técnica provisional — 3.650 días efectivamente cotizados").
+// técnica provisional — 3.650 días efectivamente cotizados"). Duplicada a propósito de
+// generarCaminosRPM.js (mismo criterio de no acoplamiento ya documentado ahí).
+const DIAS_REFERENCIA_VENTANA_IBL = 3650
+
+// checkpoint E4-C1, Decisión 1 (2026-09-10): mismo defecto que en ProyectaTuPensionRPM.jsx
+// ("identificamos X de los Y días" sin decir cuántos faltan ni su equivalente aproximado) —
+// aplicado aquí también porque es exactamente el mismo mensaje en la práctica, solo que
+// para "esta lectura" en vez de "esta proyección". formatearDiasFaltantesParaVentanaIBL ya
+// centraliza el criterio de redondeo (aproximarDiasEnSemanasYMeses.js), nunca reimplementado
+// aquí.
 function textoHistoriaInsuficiente(resultado) {
   const dias = resultado?.trazabilidadVentana?.diasEfectivosAcumulados ?? null
-  const detalle = dias !== null ? ` Por ahora identificamos ${dias} de los 3.650 días que esta lectura necesita.` : ''
+  const detalleDiasFaltantes =
+    dias !== null
+      ? ` ${formatearDiasFaltantesParaVentanaIBL({ diasIdentificados: dias, diasRequeridos: DIAS_REFERENCIA_VENTANA_IBL })}`
+      : ''
   return (
     'Tu historia declarada, sumada, todavía no alcanza los años de cotización efectiva que ' +
     'esta lectura necesita para calcular tu IBL — no es un error, es información real que ' +
-    `todavía no tienes completa.${detalle}`
+    `todavía no tienes completa.${detalleDiasFaltantes} ${TEXTO_ALCANCE_HISTORIA_FALTANTE}`
   )
 }
+
+// Misma aclaración que ProyectaTuPensionRPM.jsx (checkpoint E4-C1, Decisión 1) — duplicada a
+// propósito, no extraída a un módulo compartido todavía (Principio 9: solo dos consumidores
+// reales, y cada pantalla puede necesitar ajustar su redacción de forma independiente).
+const TEXTO_ALCANCE_HISTORIA_FALTANTE =
+  'Esto no significa que te falte toda tu historia laboral — es la parte que esta lectura usa para completar ' +
+  'su ventana de cálculo. Agregar el resto de tu historia puede servir para verificar tus datos o evaluar otras ' +
+  'alternativas legales, pero no es obligatorio si esta lectura concreta solo necesita este tramo.'
 
 // Distinta de textoHistoriaInsuficiente a propósito: aquí la historia SÍ alcanza los 3.650
 // días — el problema es que PensionLab no tiene cargado el IPC real de alguno de los años

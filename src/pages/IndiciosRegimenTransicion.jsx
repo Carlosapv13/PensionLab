@@ -64,12 +64,22 @@ const OPCIONES_CERTEZA_FECHA_TRASLADO = [
   { valor: 'desconocido', texto: 'No la conozco' },
 ]
 
+// checkpoint E4-C1, Decisión 4 (2026-09-10, revisión de copy — el comportamiento de dominio
+// no cambia: fechaTrasladoRegimen nunca se pasa a generarCaminosRPM.js, ver
+// ProyectaTuPensionRPM.jsx). Reescrita para cubrir, sin ambigüedad, los cuatro puntos que la
+// persona debe entender: (1) esta fecha solo UBICA el cambio de régimen dentro de su
+// historia; (2) no determina por sí sola las semanas cotizadas; (3) no indica desde cuándo
+// cotiza sobre su IBC actual (una pregunta distinta que hoy no se hace); (4) cambiarla no
+// recalcula nada. La pregunta "¿Desde cuándo cotizas sobre este valor?" queda explícitamente
+// fuera de este checkpoint — reservada para un checkpoint posterior sobre períodos de IBC
+// declarados.
 const TEXTO_EXPLICACION_FECHA_TRASLADO =
-  'Esta fecha nos ayuda a ubicar correctamente tu cambio de régimen dentro de tu historia pensional.'
+  'Esta fecha nos ayuda a ubicar tu cambio de régimen dentro de tu historia pensional — nada más.'
 
 const TEXTO_HONESTIDAD_FECHA_TRASLADO =
-  'Por ahora PensionLab la guarda como parte de tu expediente, pero no la utiliza para modificar ningún ' +
-  'cálculo. Tampoco asumimos que sea exactamente la fecha en que comenzaste a cotizar en tu régimen actual.'
+  'Por ahora PensionLab la guarda en tu expediente, pero no la usa para ningún cálculo: no suma ni resta ' +
+  'semanas cotizadas, y cambiarla no vuelve a calcular nada. Tampoco indica desde cuándo cotizas sobre tu ' +
+  'base de cotización (IBC) actual — es un dato distinto que hoy no te preguntamos.'
 
 // Solo valida que la fecha sea real y no futura — un traslado no puede haber ocurrido
 // todavía. Ninguna otra regla de negocio (Principio 11: esta validación es de interfaz,

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { construirHechosEscenario, construirHechosGlobales, construirTodosLosHechos } from './construirHechosEscenario.js'
-import { explicarCaminos } from './explicarCaminos.js'
-import { crearAdaptadorSimulado } from './adaptadores/AdaptadorSimulado.js'
+import { explicarCaminos } from '../ia/explicarCaminos.js'
+import { crearAdaptadorSimulado } from '../ia/adaptadores/AdaptadorSimulado.js'
 import { generarCaminosRPM } from '../domain/pensionEngine/generarCaminosRPM.js'
 import { calcularProyeccionRPM } from '../domain/pensionEngine/calcularProyeccionRPM.js'
 

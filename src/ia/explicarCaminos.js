@@ -10,7 +10,7 @@
 // producto). Este filtro vive aquí, una sola vez, para que ningún consumidor tenga que
 // reimplementarlo.
 
-import { construirTodosLosHechos } from './construirHechosEscenario.js'
+import { construirTodosLosHechos } from '../transparency/construirHechosEscenario.js'
 import { esExplicacionConsistente } from './validarConsistenciaExplicacion.js'
 import { resultadoVacio, resultadoError } from './adaptadores/AdaptadorExplicacionIA.js'
 

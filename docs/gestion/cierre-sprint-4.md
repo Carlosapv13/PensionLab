@@ -1282,13 +1282,16 @@ introducida a mitad de este Slice y corregida antes del cierre.
   S4-006 (ahora cerrado) — sin bloqueos pendientes documentados para iniciarlo.
   **Actualización (ver "Checkpoint de continuidad" más abajo):** esta nota se escribió
   antes de la división E5.1/E5.2/E5.3/E5.4 de PL-260. S4-007 sigue **no iniciado** y
-  **no ha sido reemplazado ni absorbido por ninguna entrega E1-E10** — pero su
-  implementación queda **condicionada** por PL-260 §0.1.4: `construirHechosEscenario.js`
-  (`src/ia/`, consumido hoy por 6 módulos reales) debe extraerse primero a una capa
-  neutral para no seguir agregando consumidores exclusivos a `src/ia` que luego haya que
-  migrar — esa extracción es **E5.2**. En consecuencia, el único siguiente paso operativo
-  del plan vigente es **E5.2**, no S4-007; S4-007 podrá retomarse una vez E5.2 esté
-  cerrado y autorizado.
+  **no ha sido reemplazado ni absorbido por ninguna entrega E1-E10**. La condición
+  arquitectónica de PL-260 §0.1.4 que bloqueaba su implementación ya quedó **satisfecha
+  técnicamente**: `construirHechosEscenario.js` (consumido en realidad por 2 módulos de
+  producción — `explicarCaminos.js` y `ProyectaTuPensionRPM.jsx` — más su propio archivo
+  de pruebas, no por "6 módulos" como decía una versión anterior de este registro) ya se
+  extrajo a `src/transparency/` en **E5.2** (mecánico, sin cambio de comportamiento;
+  cierre registrado en este mismo cambio — ver PL-260 §8.6). Esto **no convierte a S4-007 en el siguiente
+  paso**: el siguiente checkpoint del plan vigente sigue siendo **E5.3**
+  (`construirEjercicioResueltoRPM.js`), que requiere autorización explícita propia,
+  separada del cierre de E5.2.
 
 ## Checkpoint de continuidad — E3, E4, E4-C1 cerrados; E5.1 aprobado como diseño
 
@@ -1313,6 +1316,9 @@ checkpoints E3-E5.1 documentados en detalle allí (§6-§8).
   completo (estructura de `EjercicioResueltoRPM`/`CaminoResuelto`/`PasoAuditable`,
   invariantes I1-I8, decisión de continuidad de cotización futura, frontera E5/E6,
   división E5.2/E5.3/E5.4) en PL-260 §8.
-- **Siguiente paso: E5.2** — extracción mecánica de `src/ia/construirHechosEscenario.js`
-  a una capa neutral, sin cambio de comportamiento, como preparación para E5.3.
-  Requiere autorización explícita propia antes de iniciarse.
+- **E5.2 — implementado; cierre registrado en este mismo cambio.** Movimiento mecánico de
+  `construirHechosEscenario.js` de `src/ia/` a `src/transparency/`, sin cambio de
+  comportamiento y sin reexport temporal — 72 archivos de prueba / 1465 pruebas en verde
+  (mismo conteo que antes del movimiento), lint y build correctos. Detalle completo en
+  PL-260 §8.6. **Siguiente paso: E5.3** (`construirEjercicioResueltoRPM.js`), que
+  requiere autorización explícita propia, separada de este cierre.

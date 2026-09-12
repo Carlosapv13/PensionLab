@@ -109,7 +109,7 @@ import { EDAD_MAXIMA_FUNCIONAL } from '../domain/pensionEngine/requisitosDatosIm
 import { resolverSmlvVigenteRPM } from '../domain/pensionEngine/resolverSmlvVigenteRPM.js'
 import { formatearDiasFaltantesParaVentanaIBL } from '../format/aproximarDiasEnSemanasYMeses.js'
 import { explicarCaminos } from '../ia/explicarCaminos.js'
-import { construirTodosLosHechos } from '../ia/construirHechosEscenario.js'
+import { construirTodosLosHechos } from '../transparency/construirHechosEscenario.js'
 import { construirTextoExplicacion } from '../ia/construirTextoExplicacion.js'
 import { crearAdaptadorExplicacionViaServidor } from '../ia/adaptadores/AdaptadorExplicacionViaServidor.js'
 import { useRestaurarFocoAlMontar } from '../hooks/useRestaurarFocoAlMontar.js'

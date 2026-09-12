@@ -79,6 +79,10 @@ del plan original, no lo sustituyen.
    explicación de IA — nunca duplicada entre ambas. No se ejecuta esa extracción en esta
    tarea (fuera de alcance explícito de la corrección de E2); queda registrada como
    decisión de diseño ya tomada para cuando se implemente E5.
+   **Actualización (E5.2, cerrado):** la extracción se realizó a `src/transparency/` —no
+   al candidato `src/domain/transparency/` mencionado arriba— porque el archivo depende
+   de `src/format/` para formatear cifras y `src/domain/` nunca importa de `src/format/`;
+   ver §8.6 para el detalle de la implementación.
 5. **La controversia del ancla de incrementos para mujeres NO se difiere fuera del próximo
    MVP.** A diferencia de lo que el plan original dejaba abierto indefinidamente, ahora está
    registrado explícitamente: puede bloquear entregas concretas (E3 para el rango de
@@ -174,8 +178,9 @@ E. ResultadoCamino          → §0.1.2: NO se formaliza como módulo propio —
                                `escenario` en generarCaminosRPM.js. E4 lo actualiza para leer
                                de D en vez de C directamente.
 F. EjercicioResueltoRPM     → E5, obligatorio antes de publicar (§0.1.6, no diferible). Debe
-                               reutilizar/extender construirHechosEscenario.js una vez
-                               extraído a una capa neutral (§0.1.4), no duplicar su mecanismo.
+                               reutilizar/extender construirHechosEscenario.js, ya extraído a
+                               una capa neutral (`src/transparency/`, E5.2 cerrado — §8.6), no
+                               duplicar su mecanismo.
 ```
 
 Cadena de dependencia entre etapas (verificable, no solo deseable):
@@ -310,7 +315,9 @@ Ronda de correcciones derivadas de la validación manual de Carlos en Preview so
 
 ## 8. E5.1 — Diseño del Contrato `EjercicioResueltoRPM` (F) — aprobado, sin implementación
 
-**Estado: diseño aprobado por Carlos y Atlas. Ningún código de E5 existe todavía — E5.2, E5.3 y E5.4 requieren autorización explícita, cada uno por separado, antes de implementarse.**
+**Estado: diseño aprobado por Carlos y Atlas. E5.2 (extracción mecánica) implementado;
+cierre registrado en este mismo cambio — ver §8.6. E5.3 y E5.4 siguen sin ningún código y
+requieren autorización explícita, cada uno por separado, antes de implementarse.**
 
 ### 8.1 Contratos A-E (reconstruidos desde el código, evidencia exacta)
 
@@ -426,7 +433,7 @@ E5 (F, dominio) decide el `codigo` del supuesto, `requiereConfirmacion`, y calcu
 
 | Checkpoint | Contenido |
 |---|---|
-| **E5.2** | Extracción mecánica de `src/ia/construirHechosEscenario.js` a una capa neutral (revisar antes el residuo de Sprint 1 en `src/domain/transparency/explainCalculation.js`, sin relación). Solo mueve/renombra imports en sus 6 consumidores actuales. Sin cambio de comportamiento. |
+| **E5.2** | **Implementado; cierre registrado en este mismo cambio.** Movimiento mecánico de `construirHechosEscenario.js` de `src/ia/` a `src/transparency/` (revisado antes el residuo de Sprint 1 en `src/domain/transparency/explainCalculation.js`, confirmado sin relación). Ubicación final `src/transparency/`, no `src/domain/transparency/` (evita que `domain/` dependa de `src/format/`). Corrección de evidencia: la cifra de "6 consumidores actuales" de una versión anterior de esta fila no coincidía con el código — el grep real muestra 2 consumidores de producción (`src/ia/explicarCaminos.js`, `src/pages/ProyectaTuPensionRPM.jsx`) más 1 archivo de pruebas propio que importa el módulo directamente; el resto de apariciones en el código son comentarios, no consumidores. Sin reexport temporal desde `src/ia/`. Sin cambio de comportamiento: 72 archivos de prueba / 1465 pruebas en verde (mismo conteo que el baseline previo al movimiento), lint y build correctos. |
 | **E5.3** | Implementación de `construirEjercicioResueltoRPM.js` con la estructura `caminos → pasos auditables`, recibiendo `politicasInvolucradas` como parámetro externo (nunca invoca `evaluarPoliticasEjercicioRPM.js`/`compararAnclaIncrementoRPM.js`). Cubre I1, I2, I3 (entrada sintética), I4, I5 (confirmación/edad), I6, I7, I8. Fixtures nuevos: confirmación válida/inválida/ausente; entrada sintética de política. **F permanece dormida, sin ningún consumidor real, hasta el cierre de E5.4** — de lo contrario un caso real de mujer en el rango divergente se marcaría incorrectamente `completo:true`. |
 | **E5.4** | `src/domain/pensionEngine/evaluarPoliticasEjercicioRPM.js` — invoca `compararAnclaIncrementoRPM.js` con los datos reales del ejercicio y produce `politicasInvolucradas`. Cierra I3/I5 (parte jurídica) con datos reales. Requiere un fixture nuevo de mujer en el rango divergente de semanas — **se creará en este checkpoint**, todavía no existe. |
 

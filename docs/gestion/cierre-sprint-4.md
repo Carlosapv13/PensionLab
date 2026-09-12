@@ -1287,11 +1287,11 @@ introducida a mitad de este Slice y corregida antes del cierre.
   técnicamente**: `construirHechosEscenario.js` (consumido en realidad por 2 módulos de
   producción — `explicarCaminos.js` y `ProyectaTuPensionRPM.jsx` — más su propio archivo
   de pruebas, no por "6 módulos" como decía una versión anterior de este registro) ya se
-  extrajo a `src/transparency/` en **E5.2** (mecánico, sin cambio de comportamiento;
-  cierre registrado en este mismo cambio — ver PL-260 §8.6). Esto **no convierte a S4-007 en el siguiente
-  paso**: el siguiente checkpoint del plan vigente sigue siendo **E5.3**
-  (`construirEjercicioResueltoRPM.js`), que requiere autorización explícita propia,
-  separada del cierre de E5.2.
+  extrajo a `src/transparency/` en **E5.2**, y el Contrato F (`construirEjercicioResueltoRPM.js`)
+  ya se implementó y cerró en **E5.3** (ambos mecánico/composición, sin cambio de
+  comportamiento del motor). Esto **no convierte a S4-007 en el siguiente paso**: el
+  siguiente checkpoint del plan vigente es **E5.4** (`evaluarPoliticasEjercicioRPM.js`),
+  que requiere autorización explícita propia, separada del cierre de E5.3.
 
 ## Checkpoint de continuidad — E3, E4, E4-C1 cerrados; E5.1 aprobado como diseño
 
@@ -1316,9 +1316,21 @@ checkpoints E3-E5.1 documentados en detalle allí (§6-§8).
   completo (estructura de `EjercicioResueltoRPM`/`CaminoResuelto`/`PasoAuditable`,
   invariantes I1-I8, decisión de continuidad de cotización futura, frontera E5/E6,
   división E5.2/E5.3/E5.4) en PL-260 §8.
-- **E5.2 — implementado; cierre registrado en este mismo cambio.** Movimiento mecánico de
+- **E5.2 — implementado y cerrado.** Movimiento mecánico de
   `construirHechosEscenario.js` de `src/ia/` a `src/transparency/`, sin cambio de
   comportamiento y sin reexport temporal — 72 archivos de prueba / 1465 pruebas en verde
   (mismo conteo que antes del movimiento), lint y build correctos. Detalle completo en
-  PL-260 §8.6. **Siguiente paso: E5.3** (`construirEjercicioResueltoRPM.js`), que
-  requiere autorización explícita propia, separada de este cierre.
+  PL-260 §8.6.
+- **E5.3 — implementado y cerrado en este mismo cambio.** Se creó
+  `src/domain/pensionEngine/construirEjercicioResueltoRPM.js` (Contrato F,
+  `EjercicioResueltoRPM`): compone y valida las salidas de A-E sin recalcular ninguna
+  cifra, implementa los 7 `PasoAuditable` (`DATOS_UTILIZADOS`, `IBL`, `TASA_REEMPLAZO`,
+  `RESULTADO_MATEMATICO`, `AJUSTE_LEGAL`, `RESULTADO_FINAL`, `COMPARACION_OBJETIVO`) y
+  cubre los invariantes I1-I8 (I3/I5 con entrada sintética de política/confirmación para
+  la parte jurídica, que E5.4 cerrará con datos reales). 30 pruebas nuevas
+  (`construirEjercicioResueltoRPM.test.js`); suite completa 73 archivos / 1495 pruebas en
+  verde; lint y build correctos. El contrato permanece dormido, sin ningún consumidor
+  real — no se integra con `App.jsx`, `pages/`, `src/ia/` ni `src/transparency/`, y no
+  invoca `compararAnclaIncrementoRPM.js`. Detalle completo en PL-260 §8.6.
+  **Siguiente paso: E5.4** (`evaluarPoliticasEjercicioRPM.js`), que requiere
+  autorización explícita propia, separada de este cierre.

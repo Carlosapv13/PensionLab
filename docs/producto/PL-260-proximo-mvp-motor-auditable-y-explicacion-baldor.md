@@ -239,10 +239,10 @@ lectura de la norma), no como algo que la ley ya autoriza.
 | | Alcance | Pruebas (creadas en la propia entrega) | Dependencia jurídica | Commit | Deploy |
 |---|---|---|---|---|---|
 | **E1** | Cierre jurídico y versionado: cotejo cruzado de C-197/2023 (resolutivos), C-264/2026, estado actual del Decreto 1469/2025, y carga de la entrada del piso de pensión mínima (Art. 35 + cláusula final del Art. 34) como borrador cotejado. | Tests de `resolverReglasVigentes`/`obtenerSemanasMinimas` sobre las entradas nuevas/actualizadas. | Total — bloquea todo lo demás salvo E2. | Permitido (solo `data/legal/`) | Prohibido |
-| **E2** | Separación elegibilidad/cuantía (Contratos A + parte de B). | Creadas en esta misma entrega — ver §5. | Ninguna (Carril 1). | **Pendiente de autorización de Carlos/Atlas tras este informe** | Prohibido |
-| **E3** | Piso de pensión mínima y Contrato D (ajustes legales). | Creadas en E3: piso mayor/igual/menor al resultado matemático; objetivo mayor/igual/menor al piso; ningún aporte cuando el base ajustado ya alcanza el objetivo. | **Bloqueado por Carril 2** (ancla de incremento mujer, si el caso cae en el rango divergente) y por el cierre de E1 (fuente del piso). | Prohibido hasta autorización | Prohibido |
-| **E4** | Caminos, búsqueda inversa, barrido — reconstruidos sobre D, no sobre C. Nueva demostración de monotonicidad con piso incluido. | Creadas en E4: curva plana durante el piso y creciente después; coherencia entre camino base/alternativo tras el piso. | Depende de E3. | Prohibido | Prohibido |
-| **E5** | Contrato `EjercicioResueltoRPM` (F) con invariantes I1-I8 como tests. | Creadas en E5: los 8 invariantes, ejecutados sobre los fixtures de E2-E4. | Ninguna adicional a las de E3/E4. | Prohibido | Prohibido |
+| **E2** | Separación elegibilidad/cuantía (Contratos A + parte de B). | Creadas en esta misma entrega — ver §5. | Ninguna (Carril 1). | **Cerrado** — commit `f88b05a9bfd27ec511c2438e2d3ef6f8f7260bce` | Prohibido |
+| **E3** | Piso de pensión mínima y Contrato D (ajustes legales). | Creadas en E3: piso mayor/igual/menor al resultado matemático; objetivo mayor/igual/menor al piso; ningún aporte cuando el base ajustado ya alcanza el objetivo. | **Bloqueado por Carril 2** (ancla de incremento mujer, si el caso cae en el rango divergente) y por el cierre de E1 (fuente del piso). | **Cerrado** — ver §6.1 para los 5 commits | Prohibido |
+| **E4** | Caminos, búsqueda inversa, barrido — reconstruidos sobre D, no sobre C. Nueva demostración de monotonicidad con piso incluido. | Creadas en E4: curva plana durante el piso y creciente después; coherencia entre camino base/alternativo tras el piso. | Depende de E3. | **Cerrado** — commit `aabf01d2ca8cf0bf900bcd8da5a1ac21ffadefce` (implementación) + `5a4e545d3f9e08f87f88cfb0b73643179d2c9c53` (corrección correctiva E4-C1, ver §7) | Prohibido |
+| **E5** | Contrato `EjercicioResueltoRPM` (F) con invariantes I1-I8 como tests. | Creadas en E5: los 8 invariantes, ejecutados sobre los fixtures de E2-E4. | Ninguna adicional a las de E3/E4. | **E5.1 (diseño) aprobado, sin ningún código** — ver §8. Implementación (E5.2-E5.4) sigue **prohibida hasta autorización explícita**. | Prohibido |
 | **E6** | Experiencia visual (Niveles 1-3, wireframes ya diseñados). **Depende obligatoriamente de E3, E4 y E5** — no empieza antes. | Creadas en E6: accesibilidad (teclado, lectores de pantalla), coherencia visual tarjeta/gráfica/Baldor. | Las mismas de E3-E5, heredadas. | Prohibido | Prohibido |
 | **E7** | Auditoría y ampliación adversarial — no el momento inicial de escribir pruebas. Combina casos de E2-E6, busca huecos, agrega pruebas de propiedades/límites/combinaciones no cubiertas individualmente. | Ampliación, no creación desde cero. | Ninguna adicional. | Prohibido | Prohibido |
 | **E8** | Preview y validación manual. **Depende del cierre de todas las reglas jurídicas necesarias para los casos que se muestren** — ningún caso con una política `NO_RESUELTA` involucrada se exhibe como resultado confiable en Preview. | Checklist manual firmado por Carlos. | Total, específica a cada caso mostrado. | Prohibido | Permitido solo a Preview, y solo para lo ya jurídicamente cerrado |
@@ -283,3 +283,155 @@ calculados pero no leídos por ninguna pantalla) necesitan una presentación ded
   consentimiento explícito del usuario.
 
 Ninguna de estas se resuelve aquí. Quedan como bloqueos explícitos de E3 en adelante.
+
+## 6. E3 y E4 — cerrados (implementación)
+
+### 6.1 E3 — Piso de pensión mínima y Contrato D
+
+**Cerrado.** Commits, en orden:
+
+- `f967c8c8e92c05e45ebf377e81d02be57e43bf90` — feat: aplicar piso y techo legal a la mesada RPM (E3-A, `ajustarMesadaLegalRPM.js`: piso de 1 SMLMV, techo de 25 SMLMV, conserva siempre resultado matemático y resultado ajustado por separado, nunca solo uno — principio de diseño §0.1.3 respetado).
+- `973152ebe3ae683e414a86f66d76daddf2ad184a` — feat: comparar anclas de incremento RPM para mujeres (E3-B, `compararAnclaIncrementoRPM.js`). **Dormida, sin consumidor real** — no integra con `calcularPensionRPM.js`, `calcularProyeccionRPM.js`, `generarCaminosRPM.js` ni UI (declarado explícitamente en el propio archivo). El comportamiento visible del producto no cambió por su existencia. `PoliticaAnclaIncrementoMujer` sigue `NO_RESUELTA` en el motor activo — este archivo es la base para que E5.4 la consuma en modo lectura, no una integración ya hecha.
+- `556b0ba802316b84821905f8b83e904a4471ca94` — refactor: unificar vigencia del SMLV en cálculos RPM (E3-C1, `resolverSmlvVigenteRPM.js`).
+- `ed7698ccd93ae122ec67818c1e1a1ab57d15c3d8` — refactor: preparar ajuste legal en proyección RPM (E3-C2a/b, plomería).
+- `0b474f51ab708946037fcf96c8784f893cb972cc` — feat: integrar ajuste legal en proyección RPM (E3-C2c, `calcularProyeccionRPM.js` expone `ajusteLegal` de forma aditiva, sin redefinir `pensionMensualProyectada`).
+
+### 6.2 E4 — Caminos reconstruidos sobre D
+
+**Cerrado.** Commit `aabf01d2ca8cf0bf900bcd8da5a1ac21ffadefce` — feat: integrar ajuste legal en caminos RPM. `generarCaminosRPM.js` gobierna sus decisiones (camino base, bisección del alternativo, barrido, orientación) por la mesada final ajustada (`mesadaGobernante()`), nunca por el resultado matemático crudo — `resultado.valor` es la cifra ajustada; `valorMatematico` conserva el crudo, siempre disponible para trazabilidad, nunca eliminado.
+
+Satisface el criterio de aceptación de la tabla §3 ("curva plana durante el piso y creciente después; coherencia entre camino base/alternativo tras el piso") mediante los casos B, C, D, N, O, P, R de `generarCaminosRPM.test.js` — cubren explícitamente la meseta del piso, su borde de salida, y que un esfuerzo adicional dentro de la meseta nunca se presenta como beneficio pensional aunque el resultado matemático crudo haya mejorado.
+
+## 7. E4-C1 — corrección correctiva de UX (cerrada)
+
+**Cerrado.** Commit `5a4e545d3f9e08f87f88cfb0b73643179d2c9c53` — fix: completa correcciones de claridad y validación RPM E4-C1.
+
+Ronda de correcciones derivadas de la validación manual de Carlos en Preview sobre el resultado de E4, sin tocar el motor pensional: jerarquía visual del botón para corregir un objetivo bajo el piso legal (con la cifra exacta del SMLV vigente, nunca hardcodeada); redacción del esfuerzo opcional para no contradecir "ya alcanzas tu objetivo"; gramática natural del resumen de períodos (nunca "período(s)"); distinción explícita "no informado" vs. "cero explícito" en el límite de esfuerzo mensual; confirmación explícita dentro de la interfaz antes de eliminar un período de historia (nunca inmediata, nunca `window.confirm`); eliminación de una acción de edición duplicada en el resumen; retorno controlado desde el resumen a la proyección tras editar semanas/IBC/traslado/fecha de nacimiento/régimen, sin recorrer de nuevo todo el onboarding salvo cuando el régimen deja de ser RPM (caso en el que correctamente continúa por el flujo RAIS, sin volver a una proyección RPM).
+
+## 8. E5.1 — Diseño del Contrato `EjercicioResueltoRPM` (F) — aprobado, sin implementación
+
+**Estado: diseño aprobado por Carlos y Atlas. Ningún código de E5 existe todavía — E5.2, E5.3 y E5.4 requieren autorización explícita, cada uno por separado, antes de implementarse.**
+
+### 8.1 Contratos A-E (reconstruidos desde el código, evidencia exacta)
+
+| Contrato | Archivo | Responsabilidad | F nunca recalcula |
+|---|---|---|---|
+| A — ElegibilidadProyectada | `src/domain/pensionEngine/evaluarElegibilidadProyectadaRPM.js` | ¿Cumplirías edad y semanas en la fecha objetivo? Nunca calcula IBL/tasa/fórmula. | `estado`, `edadMinimaAplicable`, `semanasMinimasAplicables`, `semanasActuales`, fechas de búsqueda monótona, `razones`, `supuestos` (incluido `ritmoCotizacionFutura`). |
+| B — ConstruccionIBL (disponibilidad de cuantía) | `src/domain/pensionEngine/evaluarDisponibilidadCuantiaRPM.js` | ¿Hay evidencia suficiente para el IBL? Interpreta la salida ya calculada, nunca la recalcula. | `estado`, `diasIBLCubiertos/Faltantes`, `razon`, `accionNecesaria`. |
+| C — FormulaMatematica | `src/domain/formulas/formulaRPM.js` (+ `formulaIBL.js`), orquestados en `calcularProyeccionRPM.js` | Aritmética pura del Art. 34 — nunca conoce elegibilidad ni aplica piso/techo. | `tasaReemplazo`, `pensionMensualProyectada`, el desglose completo de tasa. |
+| D — AjustesLegales | `src/domain/pensionEngine/ajustarMesadaLegalRPM.js` | Aplica piso (1 SMLMV)/techo (25 SMLMV) sobre C, solo si `elegibilidad.estado===CUMPLE`. | `pisoEvaluado`, `techoEvaluado`, `resultadoFinalAjustado`, `razon`, `supuestos`, `trazabilidadNormativa`. |
+| E — ResultadoCamino | `src/domain/pensionEngine/generarCaminosRPM.js` (`construirCamino`/`caminoDescartado`) | Construye/compara caminos; decide qué cifra gobierna (ajustada, nunca cruda). | `resultado.valor`, `valorMatematico`, `distanciaObjetivo`, `esfuerzo`, `orientacion`, `barrido`. |
+
+### 8.2 Estructura final de `EjercicioResueltoRPM`
+
+Nombres y ubicaciones aprobados:
+
+- `src/domain/pensionEngine/construirEjercicioResueltoRPM.js` — construye el Contrato F.
+- `src/domain/pensionEngine/evaluarPoliticasEjercicioRPM.js` — módulo separado (E5.4) que invoca `compararAnclaIncrementoRPM.js` y produce `politicasInvolucradas`; **`construirEjercicioResueltoRPM.js` nunca importa ni invoca `compararAnclaIncrementoRPM.js`** — recibe `politicasInvolucradas` ya evaluado como entrada externa.
+
+```
+construirEjercicioResueltoRPM({ resultadoGenerarCaminos, edadJubilacionDeseada, confirmacionesSupuestos, politicasInvolucradas })
+  → EJERCICIO_CONSTRUIDO | ENTRADA_INVALIDA
+
+// Caso válido
+{
+  estado: 'EJERCICIO_CONSTRUIDO',
+  fechaBaseMonetaria: string | null,
+  edadJubilacionDeseada: number,
+  elegibilidad: {...},                     // de A, tal cual
+  disponibilidadCuantia: {...} | null,     // de B, tal cual
+  caminos: Array<CaminoResuelto>,
+  supuestosEscenario: Array<SupuestoEscenario>,
+  completo: boolean,
+  razonesIncompleto: Array<{codigo, mensaje}>,
+  publicable: boolean,
+  razonesNoPublicable: Array<{codigo, mensaje}>,
+}
+
+// Caso de entrada inválida — el ejercicio NO se construye
+{
+  estado: 'ENTRADA_INVALIDA',
+  errores: Array<{ codigo, campo, mensaje }>,   // campo usa ruta precisa con índice, ej. 'confirmacionesSupuestos[0].codigo'
+}
+
+CaminoResuelto {
+  id, tipo, estado, decision,
+  distanciaObjetivo, esfuerzo, limitaciones, razonDescartado,
+  pasos: Array<PasoAuditable>,   // [] o ausente cuando estado==='descartado' — un camino descartado nunca calculó nada que narrar
+}
+
+PasoAuditable {
+  codigo: 'DATOS_UTILIZADOS' | 'IBL' | 'TASA_REEMPLAZO' | 'RESULTADO_MATEMATICO' | 'AJUSTE_LEGAL' | 'RESULTADO_FINAL' | 'COMPARACION_OBJETIVO',
+  datos: {...},   // ver tabla siguiente — siempre reexpuesto de A-E, nunca recalculado
+}
+
+SupuestoEscenario {
+  codigo: 'CONTINUIDAD_SIN_INTERRUPCIONES',   // único código soportado por ahora — no extendido a otras limitaciones
+  origen: 'supuesto_de_escenario',            // nunca 'hecho_declarado_por_usuario'
+  requiereConfirmacion: true,
+  confirmacion: { confirmado: true, textoAceptado: string, edadObjetivoConfirmada: number } | null,
+}
+
+PoliticaInvolucrada {
+  nombre: string,                     // ej. 'PoliticaAnclaIncrementoMujer'
+  estado: 'RESUELTA' | 'NO_RESUELTA',
+  aplicaAEsteEjercicio: boolean,
+  mensaje: string,
+}
+```
+
+**Contenido de cada `PasoAuditable.datos`** (decisiones finales sobre IBL y DATOS_UTILIZADOS):
+
+| `codigo` | Campos | Fuente exacta (A-E) | Notas |
+|---|---|---|---|
+| `DATOS_UTILIZADOS` | `ibcFuturoAplicado`, `semanasCotizadas`, y — **cuando existan en E** — `valorDeclarado`, `valorAplicado`, `topeAplicado`, razón del recorte | `escenario.entradas.escenarioIbcFuturo.*`, `escenario.semanasCotizadas.total` | Permite explicar si el IBC declarado fue recortado por el tope legal. F **nunca vuelve a aplicar el tope** — solo reexpone lo que E ya decidió. No copia el expediente completo ni repite las razones de elegibilidad (esas viven en `ejercicio.elegibilidad`). |
+| `IBL` | `valorAplicable`, `esOpcionLegal`, `razonVidaLaboralNoEvaluada`, y la composición/trazabilidad de la ventana **que ya exista** en la salida de E | `escenario.ibl.*`, `escenario.trazabilidadVentana` | F **no construye ni inventa un desglose anual nuevo**. Si el motor actual no expone un detalle específico, F lo marca como no disponible — nunca lo recalcula. |
+| `TASA_REEMPLAZO` | `tasaInicial`, `bloquesAdicionales`, `incrementoPorSemanas`, `tasaFinalAplicada`, `limiteOchentaPorciento` | `escenario.ajusteLegal.*` (único lugar donde el desglose de C sobrevive hoy) | |
+| `RESULTADO_MATEMATICO` | `valor` | `escenario.valorMatematico` | |
+| `AJUSTE_LEGAL` | `pisoEvaluado`, `techoEvaluado` (con `fundamento` normativo completo) | `escenario.ajusteLegal.pisoEvaluado`/`techoEvaluado` | |
+| `RESULTADO_FINAL` | `valor` | `escenario.resultado.valor` | |
+| `COMPARACION_OBJETIVO` | `valorObjetivo`, `delta`, `cumple` | `escenario.distanciaObjetivo` | |
+
+**Reglas de validación de entrada (decisiones finales)**:
+- Un `codigo` desconocido en `confirmacionesSupuestos` → `estado: 'ENTRADA_INVALIDA'`, el ejercicio no se construye.
+- `textoAceptado` vacío o solo espacios → **no** es `ENTRADA_INVALIDA`: se trata como confirmación ausente/inválida, el ejercicio sí se construye, `publicable:false`, `razonesNoPublicable` explica la falta de confirmación válida.
+- Una política `NO_RESUELTA` en `politicasInvolucradas` → **no** es `ENTRADA_INVALIDA`: el ejercicio sí se construye, `completo:false`, `publicable:false`, razones correspondientes.
+
+### 8.3 Invariantes I1-I8 (versión final)
+
+| # | Enunciado | Regla técnica | Checkpoint donde se prueba |
+|---|---|---|---|
+| I1 | El resultado matemático y el resultado ajustado siempre se derivan cada uno de su propia fuente (pasos `RESULTADO_MATEMATICO`/`RESULTADO_FINAL`) — nunca uno sustituye al otro, coincidan o no en valor. | Identidad de fuente contra `escenario.valorMatematico`/`escenario.resultado.valor`; nunca se exige que difieran. | E5.3 |
+| I2 | F nunca produce una cifra, confirmación o política que no haya recibido ya resuelta; un `codigo` desconocido en `confirmacionesSupuestos` siempre produce `ENTRADA_INVALIDA`, nunca se ignora en silencio. | Identidad de fuente + validación de `codigo` contra el único valor soportado. | E5.3 |
+| I3 | `completo` nunca es `true` si el ejercicio depende de una política `NO_RESUELTA` aplicable — exclusivamente sobre `completo`, nunca sobre `publicable`. | Evaluado a nivel de ejercicio (no por camino), a partir de `politicasInvolucradas` recibido como entrada externa. | E5.3 (con entrada sintética, documentada como tal) + E5.4 (con `evaluarPoliticasEjercicioRPM.js` real) |
+| I4 | La elegibilidad nunca se presenta como un derecho reconocido. | F nunca agrega texto libre nuevo sobre elegibilidad. | E5.3 |
+| I5 | `completo` y `publicable` son gates distintos, con causas distintas, nunca confundidos ni omitidos en silencio; `textoAceptado` vacío/solo-espacios cuenta como confirmación ausente para `publicable`, nunca como `ENTRADA_INVALIDA`. | `publicable===true ⟹ completo===true`; causas de `publicable:false` = `completo:false` o confirmación ausente/edad no coincidente. | E5.3 (confirmación/edad) + E5.4 (parte jurídica) |
+| I6 | F nunca reordena los caminos por relevancia propia. | `ejercicio.caminos.map(c=>c.id)` idéntico, en orden, a `resultado.escenarios.map(e=>e.id)`. | E5.3 |
+| I7 | Un camino descartado nunca tiene pasos ni cifra de pensión. | `estado==='descartado' ⟹ pasos===[] (o ausente) && razonDescartado!==null`. | E5.3 |
+| I8 | F no copia indiscriminadamente todos los campos de A-D, pero todo campo que sí incluye conserva su trazabilidad si la tenía. | Por cada campo incluido con `valueId`/`normaId`/`trazabilidadNormativa` de origen, ese identificador viaja con él. | E5.3 |
+
+### 8.4 Decisión — continuidad de cotización futura
+
+Aprobado por Carlos y Atlas: PensionLab puede calcular bajo continuidad de cotización solo si (1) se muestra de forma clara y visible ("Esta proyección supone que cotizas continuamente desde hoy hasta la edad elegida"), (2) la persona confirma explícitamente ("Entiendo y quiero explorar este escenario"), (3) esa confirmación **nunca** es una declaración ni promesa de que cotizará continuamente — es comprensión + deseo de explorar, (4) se registra como supuesto del **escenario**, nunca como hecho personal declarado, (5) sin confirmación, el ejercicio no se presenta como listo para publicación.
+
+El supuesto ya existía, sin mecanismo de confirmación, en Contrato A (`ritmoCotizacionFutura`/`CONTINUIDAD_SIN_INTERRUPCIONES`, `evaluarElegibilidadProyectadaRPM.js`) — E5 no lo inventa, le agrega la confirmación que A deliberadamente dejó pendiente desde S4-002. El mensaje técnico de A y el texto sencillo de E6 tienen funciones distintas y no tienen que ser idénticos — ambos expresan el mismo supuesto. F expone código y datos; **nunca redacta texto de interfaz**.
+
+La confirmación queda vinculada a `edadJubilacionDeseada`: cambiarla la invalida; cambios en objetivo económico, IBC, límite de esfuerzo o historia **no** la invalidan. Sin timestamp en el MVP — basta edad objetivo confirmada + texto exacto aceptado. El estado de la confirmación vive en `App.jsx` durante la sesión (nunca persistido fuera de ella) — **su implementación pertenece a E6, no a E5**.
+
+### 8.5 Frontera E5/E6
+
+E5 (F, dominio) decide el `codigo` del supuesto, `requiereConfirmacion`, y calcula `publicable` a partir de la confirmación ya recibida — nunca redacta texto, nunca captura el clic, nunca decide dónde vive el estado. E6 redacta el texto fijo y el del botón, captura el clic, decide dónde persiste el estado de confirmación durante la sesión y qué cambio de datos dispara una nueva llamada a F sin confirmación.
+
+### 8.6 División E5.2 / E5.3 / E5.4
+
+| Checkpoint | Contenido |
+|---|---|
+| **E5.2** | Extracción mecánica de `src/ia/construirHechosEscenario.js` a una capa neutral (revisar antes el residuo de Sprint 1 en `src/domain/transparency/explainCalculation.js`, sin relación). Solo mueve/renombra imports en sus 6 consumidores actuales. Sin cambio de comportamiento. |
+| **E5.3** | Implementación de `construirEjercicioResueltoRPM.js` con la estructura `caminos → pasos auditables`, recibiendo `politicasInvolucradas` como parámetro externo (nunca invoca `evaluarPoliticasEjercicioRPM.js`/`compararAnclaIncrementoRPM.js`). Cubre I1, I2, I3 (entrada sintética), I4, I5 (confirmación/edad), I6, I7, I8. Fixtures nuevos: confirmación válida/inválida/ausente; entrada sintética de política. **F permanece dormida, sin ningún consumidor real, hasta el cierre de E5.4** — de lo contrario un caso real de mujer en el rango divergente se marcaría incorrectamente `completo:true`. |
+| **E5.4** | `src/domain/pensionEngine/evaluarPoliticasEjercicioRPM.js` — invoca `compararAnclaIncrementoRPM.js` con los datos reales del ejercicio y produce `politicasInvolucradas`. Cierra I3/I5 (parte jurídica) con datos reales. Requiere un fixture nuevo de mujer en el rango divergente de semanas — **se creará en este checkpoint**, todavía no existe. |
+
+### 8.7 Pendientes de E5.1 (no bloqueantes para el diseño, a resolver durante la implementación)
+
+- Si el detalle año-a-año de indexación IPC va dentro del paso `IBL` o se omite.
+- Forma exacta de `errores[].campo` para otros casos de entrada malformada distintos del código desconocido.
+- Fixture de mujer en el rango divergente de `PoliticaAnclaIncrementoMujer` — asignado a E5.4, sigue sin existir.

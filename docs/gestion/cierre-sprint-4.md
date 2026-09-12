@@ -1280,3 +1280,39 @@ introducida a mitad de este Slice y corregida antes del cierre.
 - **S4-007** — Explicación IA de cada camino sobre datos ya producidos, la última
   capacidad del Entregable 2. Depende de S4-004/S4-005 (ya cerrados) y, idealmente, de
   S4-006 (ahora cerrado) — sin bloqueos pendientes documentados para iniciarlo.
+  **Actualización (ver "Checkpoint de continuidad" más abajo):** esta nota se escribió
+  antes de la división E5.1/E5.2/E5.3/E5.4 de PL-260. S4-007 sigue **no iniciado** y
+  **no ha sido reemplazado ni absorbido por ninguna entrega E1-E10** — pero su
+  implementación queda **condicionada** por PL-260 §0.1.4: `construirHechosEscenario.js`
+  (`src/ia/`, consumido hoy por 6 módulos reales) debe extraerse primero a una capa
+  neutral para no seguir agregando consumidores exclusivos a `src/ia` que luego haya que
+  migrar — esa extracción es **E5.2**. En consecuencia, el único siguiente paso operativo
+  del plan vigente es **E5.2**, no S4-007; S4-007 podrá retomarse una vez E5.2 esté
+  cerrado y autorizado.
+
+## Checkpoint de continuidad — E3, E4, E4-C1 cerrados; E5.1 aprobado como diseño
+
+Registro de continuidad entre el trabajo de Slices (arriba) y el plan de entregas E1-E10
+de `docs/producto/PL-260-proximo-mvp-motor-auditable-y-explicacion-baldor.md` — no
+reescribe ni reinterpreta el historial de Slices anterior, solo lo enlaza con los
+checkpoints E3-E5.1 documentados en detalle allí (§6-§8).
+
+- **Cierre de E3** (piso/techo legal y Contrato D) — 5 commits:
+  `f967c8c8e92c05e45ebf377e81d02be57e43bf90`,
+  `973152ebe3ae683e414a86f66d76daddf2ad184a`,
+  `556b0ba802316b84821905f8b83e904a4471ca94`,
+  `ed7698ccd93ae122ec67818c1e1a1ab57d15c3d8`,
+  `0b474f51ab708946037fcf96c8784f893cb972cc`.
+- **Cierre de E4** (caminos reconstruidos sobre D) — commit
+  `aabf01d2ca8cf0bf900bcd8da5a1ac21ffadefce`.
+- **Cierre correctivo E4-C1** (correcciones de claridad/validación de UX sobre la
+  proyección RPM, derivadas de validación manual de Carlos en Preview) — commit
+  `5a4e545d3f9e08f87f88cfb0b73643179d2c9c53`.
+- **Aprobación de diseño E5.1** (Contrato F — `EjercicioResueltoRPM`) — aprobado por
+  Carlos y Atlas como diseño completo, **sin ningún código implementado**. Detalle
+  completo (estructura de `EjercicioResueltoRPM`/`CaminoResuelto`/`PasoAuditable`,
+  invariantes I1-I8, decisión de continuidad de cotización futura, frontera E5/E6,
+  división E5.2/E5.3/E5.4) en PL-260 §8.
+- **Siguiente paso: E5.2** — extracción mecánica de `src/ia/construirHechosEscenario.js`
+  a una capa neutral, sin cambio de comportamiento, como preparación para E5.3.
+  Requiere autorización explícita propia antes de iniciarse.

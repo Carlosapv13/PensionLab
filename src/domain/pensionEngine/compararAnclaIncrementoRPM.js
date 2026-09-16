@@ -161,10 +161,14 @@ function esIblValido(ibl) {
 // parametrosLegalesBase: el contrato público ya no acepta parámetros legales, así que no hay
 // nada que validar ni que rechazar en ese frente — la ausencia misma del campo en la firma
 // es la protección, no una validación en tiempo de ejecución.
-function primerCampoInvalido({ fecha, sexo, semanasCotizadas, ibl }) {
+function primerCampoInvalido({ fecha, fechaAplicacionRegla, sexo, semanasCotizadas, ibl }) {
   const reglas = [
     ['sexo', !esSexoValido(sexo), "sexo ausente o no reconocido — se esperaba 'Mujer' u 'Hombre'; nunca se asume un sexo por defecto."],
     ['fecha', !esFechaValida(fecha), 'fecha ausente o con formato inválido.'],
+    // E5.4-A: validada como campo propio, nunca sustituida en silencio por `fecha` cuando es
+    // inválida — aunque su default sea `fecha`, una vez que el llamador la provee explícita
+    // y mal formada, debe detenerse igual que cualquier otro campo (detención segura).
+    ['fechaAplicacionRegla', !esFechaValida(fechaAplicacionRegla), 'fechaAplicacionRegla ausente o con formato inválido.'],
     ['semanasCotizadas', !esSemanasValida(semanasCotizadas), 'semanasCotizadas ausente, no numérica o negativa.'],
     ['ibl', !esIblValido(ibl), 'ibl ausente, no numérico o no positivo.'],
   ]
@@ -172,10 +176,11 @@ function primerCampoInvalido({ fecha, sexo, semanasCotizadas, ibl }) {
   return fallo ? { campo: fallo[0], mensaje: fallo[2] } : null
 }
 
-function resultadoNoEvaluable({ fecha, sexo, semanasCotizadas, ibl, razon }) {
+function resultadoNoEvaluable({ fecha, fechaAplicacionRegla, sexo, semanasCotizadas, ibl, razon }) {
   return {
     evaluable: false,
     fecha: typeof fecha === 'string' ? fecha : null,
+    fechaAplicacionRegla: typeof fechaAplicacionRegla === 'string' ? fechaAplicacionRegla : null,
     sexo: esSexoValido(sexo) ? sexo : null,
     sexoResuelto: null,
     semanasCotizadas: esSemanasValida(semanasCotizadas) ? semanasCotizadas : null,
@@ -228,11 +233,32 @@ function construirIncertidumbreJuridica(anclasDifieren) {
 
 /**
  * Compara, sin decidir cuál es correcta, las dos interpretaciones en disputa del ancla del
- * incremento de tasa de reemplazo RPM (Art. 34 Ley 100/1993) para un caso concreto. Todos los
- * parámetros legales (parametrización de la fórmula, SMLV, mínimo aplicable por sexo) se
- * resuelven internamente con la MISMA `fecha` — el contrato público no acepta ningún
- * parámetro legal externo, precisamente para que no pueda mezclarse una fecha de cálculo con
- * parámetros legales resueltos para otra fecha.
+ * incremento de tasa de reemplazo RPM (Art. 34 Ley 100/1993) para un caso concreto.
+ *
+ * Cierre de diseño, cuarta ronda (E5.4-A, corrección previa al primer consumidor real,
+ * `evaluarPoliticasEjercicioRPM.js`): `fecha` y `fechaAplicacionRegla` separan dos preguntas
+ * distintas que antes se resolvían con un único parámetro —
+ * 1. `fecha` sigue resolviendo TODO lo monetario/de fórmula con una sola fecha, exactamente
+ *    como antes: SMLV, su vigencia (`evaluarVigenciaSmlv`), y la parametrización de la tasa de
+ *    reemplazo (incluida la ancla fija, invariante en el tiempo). Nunca cambia de significado.
+ * 2. `fechaAplicacionRegla` (nuevo, aditivo, default `fecha`) resuelve ÚNICAMENTE el mínimo
+ *    aplicable DINÁMICO de mujer (`obtenerSemanasMinimas(fechaAplicacionRegla, sexoResuelto,
+ *    'RPM')`) — la fecha en la que efectivamente se aplicaría el cronograma decreciente de
+ *    C-197/2023, que en una proyección casi nunca coincide con la fecha de valoración
+ *    monetaria. Mismo criterio que ya usa `evaluarElegibilidadProyectadaRPM.js` para el mismo
+ *    cronograma (`semanasMinimasAplicables.fechaAplicacion` = `fechaObjetivoSolicitada`, nunca
+ *    `fecha`) — este archivo no inventa un criterio nuevo, adopta el ya vigente en Contrato A.
+ *
+ * Por qué NO se resuelve todo con `fechaAplicacionRegla`: el SMLV y la ancla fija son cifras
+ * monetarias/de fórmula que deben leerse en pesos y parámetros de HOY (fechaBaseMonetaria) —
+ * proyectarlas al año de reconocimiento futuro inventaría un SMLV o una parametrización que
+ * todavía no existe. Solo el mínimo dinámico de mujer es, por diseño legal (cronograma ya
+ * vigente hoy, con valores conocidos por año), correcto de resolver en la fecha futura en que
+ * se aplicaría.
+ *
+ * Default `fechaAplicacionRegla = fecha` preserva EXACTAMENTE el comportamiento anterior a
+ * esta ronda para cualquier llamador que no conozca el parámetro nuevo (ninguna prueba
+ * existente pasa `fechaAplicacionRegla`, así que ninguna cambia de resultado).
  *
  * Consume el contrato de vigencia creado en E3-A (`evaluarVigenciaSmlv`,
  * `ajustarMesadaLegalRPM.js`): el SMLV resuelto nunca se usa para calcular ninguna tasa
@@ -241,8 +267,13 @@ function construirIncertidumbreJuridica(anclasDifieren) {
  * aquí que el que ya aplica el piso/techo legal.
  *
  * @param {Object} params
- * @param {string} params.fecha - ISO. Fecha en la que se resuelven TODAS las reglas legales
- *   (parametrización de la tasa de reemplazo, SMLV, mínimo aplicable por sexo).
+ * @param {string} params.fecha - ISO. Fecha en la que se resuelven SMLV, su vigencia y la
+ *   parametrización de la tasa de reemplazo (ancla fija incluida).
+ * @param {string} [params.fechaAplicacionRegla] - ISO. Default `fecha`. Fecha en la que se
+ *   resuelve ÚNICAMENTE el mínimo aplicable dinámico de mujer. Si se provee explícitamente y
+ *   tiene formato inválido, NUNCA se sustituye en silencio por `fecha` — produce
+ *   `evaluable:false`/`ENTRADA_INVALIDA` con `detalle.campo:'fechaAplicacionRegla'`, igual que
+ *   cualquier otro campo mal formado (detención segura).
  * @param {('Mujer'|'Hombre')} params.sexo - Nunca se asume 'Hombre' por defecto si falta. Se
  *   usa EXCLUSIVAMENTE para resolver el mínimo aplicable de la interpretación dinámica —
  *   nunca para la ancla fija.
@@ -252,6 +283,7 @@ function construirIncertidumbreJuridica(anclasDifieren) {
  * @returns {{
  *   evaluable: boolean,
  *   fecha: string|null,
+ *   fechaAplicacionRegla: string|null,
  *   sexo: ('Mujer'|'Hombre')|null,
  *   sexoResuelto: ('F'|'M')|null,
  *   semanasCotizadas: number|null,
@@ -271,11 +303,12 @@ function construirIncertidumbreJuridica(anclasDifieren) {
  *   trazabilidadNormativa: Array<Object>,
  * }}
  */
-export function compararAnclaIncrementoRPM({ fecha, sexo, semanasCotizadas, ibl } = {}) {
-  const campoInvalido = primerCampoInvalido({ fecha, sexo, semanasCotizadas, ibl })
+export function compararAnclaIncrementoRPM({ fecha, fechaAplicacionRegla = fecha, sexo, semanasCotizadas, ibl } = {}) {
+  const campoInvalido = primerCampoInvalido({ fecha, fechaAplicacionRegla, sexo, semanasCotizadas, ibl })
   if (campoInvalido) {
     return resultadoNoEvaluable({
       fecha,
+      fechaAplicacionRegla,
       sexo,
       semanasCotizadas,
       ibl,
@@ -288,24 +321,26 @@ export function compararAnclaIncrementoRPM({ fecha, sexo, semanasCotizadas, ibl 
   // Nunca lanza: mismo criterio "detención segura, sin throw" ya establecido en
   // ajustarMesadaLegalRPM.js. Las tres resoluciones legales SÍ pueden lanzar (fecha fuera de
   // la vigencia de cualquier entrada cargada) — esta función captura eso como un caso de
-  // datos insuficientes, no como un error de programación. Las tres se resuelven con la
-  // MISMA `fecha` — ninguna se difiere ni se cachea entre llamadas.
+  // datos insuficientes, no como un error de programación. `fecha` resuelve parametrización y
+  // SMLV; `fechaAplicacionRegla` resuelve el mínimo dinámico (E5.4-A) — ninguna de las tres se
+  // difiere ni se cachea entre llamadas.
   let parametrosPrincipalesResueltos
   let smlvResuelto
   let minimoAplicableResuelto
   try {
     parametrosPrincipalesResueltos = obtenerParametrosTasaReemplazoRPM(fecha)
     smlvResuelto = obtenerSmlv(fecha)
-    minimoAplicableResuelto = obtenerSemanasMinimas(fecha, sexoResuelto, 'RPM')
+    minimoAplicableResuelto = obtenerSemanasMinimas(fechaAplicacionRegla, sexoResuelto, 'RPM')
   } catch (error) {
     return resultadoNoEvaluable({
       fecha,
+      fechaAplicacionRegla,
       sexo,
       semanasCotizadas,
       ibl,
       razon: {
         codigo: 'FUENTE_LEGAL_NO_ENCONTRADA',
-        mensaje: `No se encontró una regla legal vigente para la fecha ${fecha}: ${error.message}`,
+        mensaje: `No se encontró una regla legal vigente: ${error.message}`,
       },
     })
   }
@@ -336,6 +371,7 @@ export function compararAnclaIncrementoRPM({ fecha, sexo, semanasCotizadas, ibl 
     return {
       evaluable: false,
       fecha,
+      fechaAplicacionRegla,
       sexo,
       sexoResuelto,
       semanasCotizadas,
@@ -350,9 +386,9 @@ export function compararAnclaIncrementoRPM({ fecha, sexo, semanasCotizadas, ibl 
         codigo: 'SEMANAS_INSUFICIENTES_PARA_MINIMO_APLICABLE',
         mensaje:
           `Con ${semanasCotizadas} semanas no se alcanza el mínimo aplicable (${minimoAplicableResuelto.valor}) para ` +
-          `sexo=${sexo} en la fecha ${fecha} — no se compara tasa de reemplazo porque no hay evidencia de que exista ` +
-          'siquiera un requisito de semanas cumplido que cuantificar. No es una afirmación de que la persona no tiene ' +
-          'derecho a pensión (esta función no evalúa edad ni otros requisitos).',
+          `sexo=${sexo} en la fecha de aplicación de la regla ${fechaAplicacionRegla} — no se compara tasa de reemplazo ` +
+          'porque no hay evidencia de que exista siquiera un requisito de semanas cumplido que cuantificar. No es una ' +
+          'afirmación de que la persona no tiene derecho a pensión (esta función no evalúa edad ni otros requisitos).',
       },
       trazabilidadNormativa,
     }
@@ -368,6 +404,7 @@ export function compararAnclaIncrementoRPM({ fecha, sexo, semanasCotizadas, ibl 
     return {
       evaluable: false,
       fecha,
+      fechaAplicacionRegla,
       sexo,
       sexoResuelto,
       semanasCotizadas,
@@ -416,6 +453,7 @@ export function compararAnclaIncrementoRPM({ fecha, sexo, semanasCotizadas, ibl 
   return {
     evaluable: true,
     fecha,
+    fechaAplicacionRegla,
     sexo,
     sexoResuelto,
     semanasCotizadas,

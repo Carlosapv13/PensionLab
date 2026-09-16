@@ -1334,3 +1334,26 @@ checkpoints E3-E5.1 documentados en detalle allí (§6-§8).
   invoca `compararAnclaIncrementoRPM.js`. Detalle completo en PL-260 §8.6.
   **Siguiente paso: E5.4** (`evaluarPoliticasEjercicioRPM.js`), que requiere
   autorización explícita propia, separada de este cierre.
+- **E5.4-A — implementado y cerrado en este mismo cambio.** Checkpoint correctivo,
+  detectado durante el diagnóstico de diseño de E5.4 y autorizado por Carlos y Atlas
+  antes de tocar el adaptador: `compararAnclaIncrementoRPM.js` resolvía el mínimo
+  dinámico de mujer (cronograma decreciente de C-197/2023) con la misma `fecha` que
+  también resuelve el SMLV, su vigencia y la parametrización de la tasa de reemplazo
+  (ancla fija) — en una proyección a varios años esto podía ocultar por completo una
+  divergencia jurídica real entre las dos interpretaciones, al leer el cronograma en la
+  fecha de valoración monetaria en vez de en la fecha en que efectivamente se aplicaría.
+  Corrección: nuevo parámetro aditivo `fechaAplicacionRegla = fecha` — `fecha` conserva
+  exactamente su rol anterior (SMLV, vigencia monetaria, ancla fija); `fechaAplicacionRegla`
+  gobierna únicamente `obtenerSemanasMinimas(fechaAplicacionRegla, sexoResuelto, 'RPM')`.
+  Mismo criterio que ya usa `evaluarElegibilidadProyectadaRPM.js` para el mismo
+  cronograma (`semanasMinimasAplicables.fechaAplicacion`) — E5.4-A no introduce un
+  criterio nuevo, alinea el comparador con el que Contrato A ya usaba. Caso probado:
+  valoración 2026-01-01, aplicación 2031-01-01, mujer, ~1300 semanas — mínimo dinámico
+  1125 (no 1250) y una divergencia de 4.5 puntos entre interpretaciones que, sin esta
+  separación, quedaba completamente oculta (diferencia 0). 8 pruebas nuevas en
+  `compararAnclaIncrementoRPM.test.js`; comparador 63/63 pruebas; suite completa 73
+  archivos / 1503 pruebas en verde; lint y build correctos. Alcance exclusivo:
+  `compararAnclaIncrementoRPM.js` + su test — ningún cambio en Contrato F, en
+  `generarCaminosRPM.js`, en elegibilidad/proyección, en UI ni en IA.
+  **E5.4 (`evaluarPoliticasEjercicioRPM.js`) sigue sin implementarse** — sigue siendo el
+  siguiente paso operativo, ahora sin el defecto de fechas que E5.4-A cerró.

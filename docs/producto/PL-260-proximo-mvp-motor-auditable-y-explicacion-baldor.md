@@ -316,9 +316,10 @@ Ronda de correcciones derivadas de la validación manual de Carlos en Preview so
 ## 8. E5.1 — Diseño del Contrato `EjercicioResueltoRPM` (F) — aprobado, sin implementación
 
 **Estado: diseño aprobado por Carlos y Atlas. E5.2 (extracción mecánica) y E5.3
-(`construirEjercicioResueltoRPM.js`, Contrato F) implementados y cerrados — ver §8.6. E5.4
-sigue sin ningún código y requiere autorización explícita independiente antes de
-implementarse.**
+(`construirEjercicioResueltoRPM.js`, Contrato F) implementados y cerrados — ver §8.6.
+E5.4-A (checkpoint correctivo del comparador, ver §8.6) implementado y cerrado. E5.4
+(el adaptador `evaluarPoliticasEjercicioRPM.js` en sí) sigue sin ningún código y
+requiere autorización explícita independiente antes de implementarse.**
 
 ### 8.1 Contratos A-E (reconstruidos desde el código, evidencia exacta)
 
@@ -430,13 +431,14 @@ La confirmación queda vinculada a `edadJubilacionDeseada`: cambiarla la invalid
 
 E5 (F, dominio) decide el `codigo` del supuesto, `requiereConfirmacion`, y calcula `publicable` a partir de la confirmación ya recibida — nunca redacta texto, nunca captura el clic, nunca decide dónde vive el estado. E6 redacta el texto fijo y el del botón, captura el clic, decide dónde persiste el estado de confirmación durante la sesión y qué cambio de datos dispara una nueva llamada a F sin confirmación.
 
-### 8.6 División E5.2 / E5.3 / E5.4
+### 8.6 División E5.2 / E5.3 / E5.4-A / E5.4
 
 | Checkpoint | Contenido |
 |---|---|
 | **E5.2** | **Implementado; cierre registrado en este mismo cambio.** Movimiento mecánico de `construirHechosEscenario.js` de `src/ia/` a `src/transparency/` (revisado antes el residuo de Sprint 1 en `src/domain/transparency/explainCalculation.js`, confirmado sin relación). Ubicación final `src/transparency/`, no `src/domain/transparency/` (evita que `domain/` dependa de `src/format/`). Corrección de evidencia: la cifra de "6 consumidores actuales" de una versión anterior de esta fila no coincidía con el código — el grep real muestra 2 consumidores de producción (`src/ia/explicarCaminos.js`, `src/pages/ProyectaTuPensionRPM.jsx`) más 1 archivo de pruebas propio que importa el módulo directamente; el resto de apariciones en el código son comentarios, no consumidores. Sin reexport temporal desde `src/ia/`. Sin cambio de comportamiento: 72 archivos de prueba / 1465 pruebas en verde (mismo conteo que el baseline previo al movimiento), lint y build correctos. |
 | **E5.3** | **Implementado y cerrado en este mismo cambio.** `construirEjercicioResueltoRPM.js` (`src/domain/pensionEngine/`) construye el Contrato F con la estructura `caminos → pasos auditables`, recibiendo `politicasInvolucradas` como parámetro externo (nunca invoca `evaluarPoliticasEjercicioRPM.js`/`compararAnclaIncrementoRPM.js`) — compone y valida las salidas de A-E, sin recalcular ninguna cifra. Implementa los 7 `PasoAuditable` (`DATOS_UTILIZADOS`, `IBL`, `TASA_REEMPLAZO`, `RESULTADO_MATEMATICO`, `AJUSTE_LEGAL`, `RESULTADO_FINAL`, `COMPARACION_OBJETIVO`) y cubre I1-I8 (I3 e I5 con entrada sintética de política/confirmación, documentada como tal — la parte jurídica real queda para E5.4). 30 pruebas nuevas (`construirEjercicioResueltoRPM.test.js`); suite completa 73 archivos / 1495 pruebas en verde; lint y build correctos. **F permanece dormida, sin ningún consumidor real** — de lo contrario un caso real de mujer en el rango divergente se marcaría incorrectamente `completo:true` antes de que E5.4 exista. |
-| **E5.4** | `src/domain/pensionEngine/evaluarPoliticasEjercicioRPM.js` — invoca `compararAnclaIncrementoRPM.js` con los datos reales del ejercicio y produce `politicasInvolucradas`. Cierra I3/I5 (parte jurídica) con datos reales. Requiere un fixture nuevo de mujer en el rango divergente de semanas — **se creará en este checkpoint**, todavía no existe. |
+| **E5.4-A** | **Implementado y cerrado en este mismo cambio.** Checkpoint correctivo detectado durante el diagnóstico de diseño de E5.4 (nunca durante E3-B): `compararAnclaIncrementoRPM.js` resolvía el mínimo dinámico de mujer con la misma `fecha` que también resuelve SMLV/vigencia/ancla fija — en una proyección a varios años esto podía ocultar por completo una divergencia jurídica real (caso probado: valoración 2026-01-01, aplicación 2031-01-01, mínimo dinámico 1125 en vez de 1250, divergencia de 4.5 puntos entre interpretaciones, oculta a 0 sin la corrección). Corrección: parámetro aditivo `fechaAplicacionRegla = fecha` — `fecha` conserva su rol anterior sin cambios; `fechaAplicacionRegla` gobierna únicamente `obtenerSemanasMinimas(fechaAplicacionRegla, sexoResuelto, 'RPM')`, mismo criterio que ya usa `evaluarElegibilidadProyectadaRPM.js` (`semanasMinimasAplicables.fechaAplicacion`). 8 pruebas nuevas en `compararAnclaIncrementoRPM.test.js` (comparador 63/63); suite completa 73 archivos / 1503 pruebas en verde; lint y build correctos. Alcance exclusivo de `compararAnclaIncrementoRPM.js` + su test — Contrato F, `generarCaminosRPM.js`, elegibilidad/proyección, UI e IA sin tocar. |
+| **E5.4** | `src/domain/pensionEngine/evaluarPoliticasEjercicioRPM.js` — invoca `compararAnclaIncrementoRPM.js` con los datos reales del ejercicio y produce `politicasInvolucradas`. Cierra I3/I5 (parte jurídica) con datos reales. Requiere un fixture nuevo de mujer en el rango divergente de semanas — **se creará en este checkpoint**, todavía no existe. **Sigue sin implementarse** — siguiente paso operativo, ahora sobre un comparador ya corregido por E5.4-A. |
 
 ### 8.7 Pendientes de E5.1 (no bloqueantes para el diseño, a resolver durante la implementación)
 

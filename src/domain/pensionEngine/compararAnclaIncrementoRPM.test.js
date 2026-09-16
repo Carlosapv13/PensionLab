@@ -500,3 +500,189 @@ describe('compararAnclaIncrementoRPM — invariantes estructurales', () => {
     expect(entradaInvalida.trazabilidadNormativa).toEqual([])
   })
 })
+
+// E5.4-A (checkpoint correctivo previo al adaptador E5.4, aprobado por Carlos/Atlas tras el
+// diagnóstico D4) — separa la fecha de valoración monetaria (`fecha`: SMLV, su vigencia y la
+// parametrización de la tasa de reemplazo, ancla fija incluida) de la fecha en la que
+// efectivamente se aplicaría el cronograma decreciente de mujer (`fechaAplicacionRegla`,
+// consumida ÚNICAMENTE por `obtenerSemanasMinimas` para el mínimo dinámico). Antes de esta
+// ronda, una proyección a varios años ocultaba divergencias reales entre las dos
+// interpretaciones al evaluar el cronograma en la fecha de hoy en vez de en la fecha futura de
+// reconocimiento — ver diagnóstico D4 para el ejemplo numérico completo (mujer, 1300 semanas,
+// fechaBaseMonetaria 2026-01-01, fechaAplicacionRegla 2031-01-01: sin esta separación la
+// diferencia entre interpretaciones era 0 puntos; con ella, 4.5 puntos).
+describe('compararAnclaIncrementoRPM — E5.4-A: fechaAplicacionRegla separada de fecha (mínimo dinámico)', () => {
+  it('1. Compatibilidad: omitir fechaAplicacionRegla produce exactamente el comportamiento anterior', () => {
+    const conNuevoParametroOmitido = compararAnclaIncrementoRPM({ fecha: '2026-06-15', sexo: 'Mujer', semanasCotizadas: 1300, ibl: SMLV_2026 })
+    const explicitandoElMismoValor = compararAnclaIncrementoRPM({
+      fecha: '2026-06-15',
+      fechaAplicacionRegla: '2026-06-15',
+      sexo: 'Mujer',
+      semanasCotizadas: 1300,
+      ibl: SMLV_2026,
+    })
+    expect(conNuevoParametroOmitido).toEqual(explicitandoElMismoValor)
+    // Mismos valores exactos que el caso "central de la controversia" ya cerrado antes de
+    // E5.4-A (línea ~130 de este archivo) — la ronda no cambió ni un solo campo para quien no
+    // usa el parámetro nuevo.
+    expect(conNuevoParametroOmitido.interpretacionPrincipal.bloquesAdicionales).toBe(0)
+    expect(conNuevoParametroOmitido.interpretacionAlternativa.bloquesAdicionales).toBe(1)
+    expect(conNuevoParametroOmitido.diferencia.puntosPorcentuales).toBeCloseTo(1.5, 10)
+    expect(conNuevoParametroOmitido.fechaAplicacionRegla).toBe('2026-06-15')
+  })
+
+  it('2. Caso real proyectado: fecha monetaria 2026, fecha de aplicación 2031, mujer, ~1300 semanas — mínimo dinámico 1125, diferencia de 4.5 puntos', () => {
+    // 1299.857142857143 = semanasCotizadas.total real, verificado ejecutando
+    // generarCaminosRPM() con historia 1990-2025 + declaración de 1039 semanas para una mujer
+    // nacida en 1974-01-01 con edadJubilacionDeseada=57 y fecha=2026-01-01 (fixture del
+    // diagnóstico D4) — no aproximada, es la cifra exacta que produciría ese ejercicio real.
+    const SEMANAS_FIXTURE_D4 = 1299.857142857143
+    const r = compararAnclaIncrementoRPM({
+      fecha: '2026-01-01',
+      fechaAplicacionRegla: '2031-01-01',
+      sexo: 'Mujer',
+      semanasCotizadas: SEMANAS_FIXTURE_D4,
+      ibl: SMLV_2026,
+    })
+    expect(r.evaluable).toBe(true)
+    expect(r.minimoAplicable.valor).toBe(1125)
+    // ibl=SMLV_2026 da s=1 (tasaInicial=65% plana, mismo truco que el resto de este archivo) —
+    // aísla el efecto de fechaAplicacionRegla sobre los bloques, sin ruido de tasaInicial.
+    expect(r.interpretacionPrincipal.bloquesAdicionales).toBe(0)
+    expect(r.interpretacionPrincipal.tasaFinalAplicada).toBe(65)
+    expect(r.interpretacionAlternativa.bloquesAdicionales).toBe(3)
+    expect(r.interpretacionAlternativa.tasaFinalAplicada).toBeCloseTo(69.5, 10)
+    expect(r.diferencia.puntosPorcentuales).toBeCloseTo(4.5, 10)
+    expect(r.diferencia.existeDiferencia).toBe(true)
+    expect(r.incertidumbreJuridica.existe).toBe(true)
+
+    // Sin la separación (fechaAplicacionRegla implícita = fecha = 2026), la misma persona,
+    // con los mismos datos, muestra 0 puntos de diferencia — el hallazgo exacto de D4: no es
+    // que el caso límite se desplace, es que la divergencia real queda completamente oculta.
+    const sinSeparar = compararAnclaIncrementoRPM({ fecha: '2026-01-01', sexo: 'Mujer', semanasCotizadas: SEMANAS_FIXTURE_D4, ibl: SMLV_2026 })
+    expect(sinSeparar.minimoAplicable.valor).toBe(1250)
+    expect(sinSeparar.interpretacionAlternativa.bloquesAdicionales).toBe(0)
+    expect(sinSeparar.diferencia.puntosPorcentuales).toBeCloseTo(0, 10)
+    expect(sinSeparar.diferencia.existeDiferencia).toBe(false)
+  })
+
+  it('3. `fecha` sigue gobernando SMLV y vigencia monetaria — inalterado por fechaAplicacionRegla', () => {
+    // 2026-02-12 cae en la ventana de fundamento normativo no verificado del SMLV (E3-A) —
+    // debe seguir bloqueando el cálculo sin importar qué fechaAplicacionRegla se declare,
+    // porque esa ventana depende únicamente de `fecha`.
+    const r = compararAnclaIncrementoRPM({
+      fecha: '2026-02-12',
+      fechaAplicacionRegla: '2031-01-01',
+      sexo: 'Mujer',
+      semanasCotizadas: 1300,
+      ibl: SMLV_2026,
+    })
+    expect(r.evaluable).toBe(false)
+    expect(r.razon.codigo).toBe('FUNDAMENTO_NORMATIVO_NO_VERIFICADO')
+    expect(r.fecha).toBe('2026-02-12')
+  })
+
+  it('4. `fechaAplicacionRegla` gobierna únicamente el mínimo dinámico — nunca la ancla fija ni el SMLV', () => {
+    const fechaAplicacionRegla2036 = compararAnclaIncrementoRPM({
+      fecha: '2026-06-15',
+      fechaAplicacionRegla: '2036-06-15',
+      sexo: 'Mujer',
+      semanasCotizadas: 1300,
+      ibl: SMLV_2026,
+    })
+    // Ancla fija (1300) y SMLV siguen resueltos con `fecha` (2026): tasaInicial idéntica a
+    // cualquier otro caso con ibl=SMLV_2026 en 2026 — la única cifra que cambia es el mínimo
+    // dinámico, resuelto ahora con fechaAplicacionRegla=2036 (piso del cronograma, 1000).
+    expect(fechaAplicacionRegla2036.minimoAplicable.valor).toBe(1000)
+    expect(fechaAplicacionRegla2036.interpretacionPrincipal.semanasBaseIncremento).toBe(1300)
+    expect(fechaAplicacionRegla2036.interpretacionPrincipal.tasaFinalAplicada).toBe(65)
+    expect(fechaAplicacionRegla2036.interpretacionAlternativa.semanasBaseIncremento).toBe(1000)
+  })
+
+  it('5. Hombre: el parámetro nuevo no altera el resultado sustancial (la ancla de hombre no tiene cronograma)', () => {
+    const sinNuevoParametro = compararAnclaIncrementoRPM({ fecha: '2026-01-01', sexo: 'Hombre', semanasCotizadas: 1300, ibl: SMLV_2026 })
+    const conNuevoParametro = compararAnclaIncrementoRPM({
+      fecha: '2026-01-01',
+      fechaAplicacionRegla: '2031-01-01',
+      sexo: 'Hombre',
+      semanasCotizadas: 1300,
+      ibl: SMLV_2026,
+    })
+    expect(conNuevoParametro.interpretacionPrincipal.tasaFinalAplicada).toBe(sinNuevoParametro.interpretacionPrincipal.tasaFinalAplicada)
+    expect(conNuevoParametro.interpretacionAlternativa.tasaFinalAplicada).toBe(sinNuevoParametro.interpretacionAlternativa.tasaFinalAplicada)
+    expect(conNuevoParametro.diferencia.existeDiferencia).toBe(false)
+    expect(conNuevoParametro.minimoAplicable.valor).toBe(1300)
+  })
+
+  it('6. Mujer con fecha de aplicación inválida: detención segura, código y campo correctos, nunca sustituida en silencio por `fecha`', () => {
+    const r = compararAnclaIncrementoRPM({
+      fecha: '2026-01-01',
+      fechaAplicacionRegla: 'no-es-fecha',
+      sexo: 'Mujer',
+      semanasCotizadas: 1300,
+      ibl: SMLV_2026,
+    })
+    expect(r.evaluable).toBe(false)
+    expect(r.razon.codigo).toBe('ENTRADA_INVALIDA')
+    expect(r.razon.detalle.campo).toBe('fechaAplicacionRegla')
+    // Se conserva tal cual (nunca sustituida por `fecha`, ni descartada): visible para quien
+    // audite qué llegó realmente a la función.
+    expect(r.fechaAplicacionRegla).toBe('no-es-fecha')
+    expect(r.fecha).toBe('2026-01-01')
+
+    // fechaAplicacionRegla ausente explícitamente (undefined) SÍ activa el default (=fecha) —
+    // caso distinto de "inválida": no debe producir ENTRADA_INVALIDA.
+    const conUndefinedExplicito = compararAnclaIncrementoRPM({
+      fecha: '2026-01-01',
+      fechaAplicacionRegla: undefined,
+      sexo: 'Mujer',
+      semanasCotizadas: 1300,
+      ibl: SMLV_2026,
+    })
+    expect(conUndefinedExplicito.evaluable).toBe(true)
+    expect(conUndefinedExplicito.fechaAplicacionRegla).toBe('2026-01-01')
+  })
+
+  it('7. Caso sin el parámetro nuevo: no lanza y sigue detectando entrada inválida en los mismos campos que antes', () => {
+    expect(() => compararAnclaIncrementoRPM({ sexo: 'Mujer', semanasCotizadas: 1300, ibl: SMLV_2026 })).not.toThrow()
+    const r = compararAnclaIncrementoRPM({ sexo: 'Mujer', semanasCotizadas: 1300, ibl: SMLV_2026 })
+    expect(r.evaluable).toBe(false)
+    expect(r.razon.detalle.campo).toBe('fecha')
+  })
+
+  it('8. Trazabilidad: la salida contiene ambas fechas, claramente diferenciadas, en todas las formas de resultado', () => {
+    const evaluable = compararAnclaIncrementoRPM({
+      fecha: '2026-01-01',
+      fechaAplicacionRegla: '2031-01-01',
+      sexo: 'Mujer',
+      semanasCotizadas: 1300,
+      ibl: SMLV_2026,
+    })
+    expect(evaluable.fecha).toBe('2026-01-01')
+    expect(evaluable.fechaAplicacionRegla).toBe('2031-01-01')
+
+    const noEvaluablePorSemanas = compararAnclaIncrementoRPM({
+      fecha: '2026-01-01',
+      fechaAplicacionRegla: '2031-01-01',
+      sexo: 'Mujer',
+      semanasCotizadas: 100,
+      ibl: SMLV_2026,
+    })
+    expect(noEvaluablePorSemanas.fecha).toBe('2026-01-01')
+    expect(noEvaluablePorSemanas.fechaAplicacionRegla).toBe('2031-01-01')
+    expect(noEvaluablePorSemanas.razon.mensaje).toContain('2031-01-01')
+
+    const entradaInvalida = compararAnclaIncrementoRPM({
+      fecha: 'no-es-fecha',
+      fechaAplicacionRegla: '2031-01-01',
+      sexo: 'Mujer',
+      semanasCotizadas: 1300,
+      ibl: SMLV_2026,
+    })
+    // 'no-es-fecha' es un string (aunque con formato inválido) — se conserva tal cual, mismo
+    // criterio ya establecido para este campo antes de E5.4-A (nunca se sustituye ni se anula
+    // un valor que sí llegó, solo se anulan los que ni siquiera son del tipo esperado).
+    expect(entradaInvalida.fecha).toBe('no-es-fecha')
+    expect(entradaInvalida.fechaAplicacionRegla).toBe('2031-01-01')
+  })
+})

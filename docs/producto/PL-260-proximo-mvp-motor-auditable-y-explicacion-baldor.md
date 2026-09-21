@@ -252,7 +252,7 @@ lectura de la norma), no como algo que la ley ya autoriza.
 | **E3** | Piso de pensión mínima y Contrato D (ajustes legales). | Creadas en E3: piso mayor/igual/menor al resultado matemático; objetivo mayor/igual/menor al piso; ningún aporte cuando el base ajustado ya alcanza el objetivo. | **Bloqueado por Carril 2** (ancla de incremento mujer, si el caso cae en el rango divergente) y por el cierre de E1 (fuente del piso). | **Cerrado** — ver §6.1 para los 5 commits | Prohibido |
 | **E4** | Caminos, búsqueda inversa, barrido — reconstruidos sobre D, no sobre C. Nueva demostración de monotonicidad con piso incluido. | Creadas en E4: curva plana durante el piso y creciente después; coherencia entre camino base/alternativo tras el piso. | Depende de E3. | **Cerrado** — commit `aabf01d2ca8cf0bf900bcd8da5a1ac21ffadefce` (implementación) + `5a4e545d3f9e08f87f88cfb0b73643179d2c9c53` (corrección correctiva E4-C1, ver §7) | Prohibido |
 | **E5** | Contrato `EjercicioResueltoRPM` (F) con invariantes I1-I8 como tests. | Creadas en E5: los 8 invariantes, ejecutados sobre los fixtures de E2-E4. | Ninguna adicional a las de E3/E4. | **Cerrado** — E5.1 (diseño), E5.2, E5.3, E5.4-A y E5.4 (implementación completa) — ver §8.6. | Prohibido |
-| **E6** | Experiencia visual — dos niveles (Nivel esencial y Nivel completo, ver §9), wireframes ya diseñados. **Depende obligatoriamente de E3, E4 y E5** — no empieza antes. | Creadas en E6: accesibilidad (teclado, lectores de pantalla), coherencia visual tarjeta/gráfica/Nivel completo. | Las mismas de E3-E5, heredadas. | **E6.1 (diseño del contrato visual) aprobado, sin código — ver §9.** Implementación (E6.2 en adelante) sigue **prohibida hasta autorización explícita**. | Prohibido |
+| **E6** | Experiencia visual — dos niveles (Nivel esencial y Nivel completo, ver §9), contrato visual determinista definido en E6.1. **Depende obligatoriamente de E3, E4 y E5** — no empieza antes. | Creadas en E6: accesibilidad (teclado, lectores de pantalla), coherencia visual tarjeta/gráfica/Nivel completo. | Las mismas de E3-E5, heredadas. | **E6.1 (diseño del contrato visual) aprobado, sin código — ver §9.** E6.2 (adaptador visual puro y dormido) implementado, auditado y cerrado. Implementación visible (E6.3 en adelante) sigue **prohibida hasta autorización explícita**. | Prohibido |
 | **E7** | Auditoría y ampliación adversarial — no el momento inicial de escribir pruebas. Combina casos de E2-E6, busca huecos, agrega pruebas de propiedades/límites/combinaciones no cubiertas individualmente. | Ampliación, no creación desde cero. | Ninguna adicional. | Prohibido | Prohibido |
 | **E8** | Preview y validación manual. **Depende del cierre de todas las reglas jurídicas necesarias para los casos que se muestren** — ningún caso con una política `NO_RESUELTA` involucrada se exhibe como resultado confiable en Preview. | Checklist manual firmado por Carlos. | Total, específica a cada caso mostrado. | Prohibido | Permitido solo a Preview, y solo para lo ya jurídicamente cerrado |
 | **E9** | Prueba final de Oscar. **Misma dependencia jurídica que E8** — los 3 casos originales de Oscar solo se muestran con cifra final si su piso/ancla ya están resueltos; si no, se muestra el estado intermedio honesto (elegibilidad confirmada, cuantía pendiente de regla jurídica). | Los 4 fixtures de Oscar, ejecutados también manualmente en Preview. | Total. | Prohibido | Permitido solo a Preview |
@@ -324,8 +324,10 @@ Ronda de correcciones derivadas de la validación manual de Carlos en Preview so
 comparador) y E5.4 (`evaluarPoliticasEjercicioRPM.js`, adaptador jurídico con datos reales)
 implementados y cerrados — ver §8.6. **E5 queda completo.** Siguiente paso operativo del
 plan vigente: **E6** (experiencia visual, dos niveles — Nivel esencial y Nivel completo, ver
-§9), cuyo diseño (E6.1) ya está aprobado y cerrado sin código — la implementación (E6.2 en
-adelante) requiere autorización explícita, independiente y separada — no iniciada.**
+§9), cuyo diseño (E6.1) ya está aprobado y cerrado sin código. **E6.2 (adaptador visual puro
+y dormido) implementado, auditado y cerrado — cierre registrado en este mismo cambio, ver
+§9.6.** La implementación de E6.3 en adelante requiere autorización explícita, independiente
+y separada — no iniciada.**
 
 ### 8.1 Contratos A-E (reconstruidos desde el código, evidencia exacta)
 
@@ -584,8 +586,8 @@ Híbrida (Carlos/Atlas):
 
 | Checkpoint | Alcance | Dormido/visible | Autorización |
 |---|---|---|---|
-| **E6.2** | `construirModeloVisualEjercicioRPM` — adaptador puro, con pruebas Vitest exhaustivas. | Dormido — cero consumidor | Propia, explícita — **único siguiente checkpoint operativo, sigue sin autorizarse** |
-| **E6.3** | Integración real dormida — la página invoca los pasos 1-4 de §9.3 tras un interruptor (mismo patrón `IA_EXPUESTA_EN_MVP`), sin cambiar nada visible. | Dormido (interruptor apagado) | Propia, explícita |
+| **E6.2** | `construirModeloVisualEjercicioRPM` — adaptador puro, con pruebas Vitest exhaustivas. **Implementado, auditado y cerrado — cierre registrado en este mismo cambio, ver §9.8.** | Dormido — cero consumidor | Ejecutado y cerrado |
+| **E6.3** | Integración real dormida — la página invoca los pasos 1-4 de §9.3 tras un interruptor (mismo patrón `IA_EXPUESTA_EN_MVP`), sin cambiar nada visible. **No iniciado.** | Dormido (interruptor apagado) | Propia, explícita — **siguiente checkpoint operativo, sigue sin autorizarse** |
 | **E6.4** | Gate de confirmación de continuidad (§9.4), aislado — primeras pruebas de componente reales, aquí se solicita la dependencia de RTL. | Real, tras activar E6.5 | Propia, explícita — incluye aprobar la dependencia nueva |
 | **E6.5** | Nivel esencial visual real — primer consumidor visible de F; disclosure de política `NO_RESUELTA`/`completo`/`publicable`. | **Real — primer consumidor visible de F** | Propia, explícita |
 | **E6.6** | Nivel completo — acordeón por camino, pasos auditables en orden de Contrato F. | Real | Propia, explícita |
@@ -601,3 +603,28 @@ debe activar S4-007 ni ningún llamado a IA** — son capas paralelas sobre el m
 cada una con su propio re-shaping (`construirHechosEscenario.js` para IA;
 `construirModeloVisualEjercicioRPM` para E6). Ningún checkpoint de §9.6 modifica
 `IA_EXPUESTA_EN_MVP` ni ningún archivo de `src/ia/`/`api/`.
+
+### 9.8 E6.2 — implementado, auditado y cerrado
+
+**Estado: implementado; cierre registrado en este mismo cambio (2026-09-20).** Sin conexión a
+`ProyectaTuPensionRPM.jsx`, sin activar Contrato F, S4-007 ni IA en la aplicación real.
+
+**Archivos creados** (únicos dos autorizados para este checkpoint):
+- `src/pages/construirModeloVisualEjercicioRPM.js` — adaptador visual puro (`construirModeloVisualEjercicioRPM({ ejercicioResuelto, politicasInvolucradas })`), siguiendo el patrón de helpers de página fijado en E6.1 §9.2. **Sin consumidor real** — `ProyectaTuPensionRPM.jsx` no lo importa; verificado por búsqueda de importaciones en todo `src/`.
+- `src/pages/construirModeloVisualEjercicioRPM.test.js` — 28 pruebas, mayoritariamente construidas con fixtures reales vía `generarCaminosRPM`/`evaluarPoliticasEjercicioRPM`/`construirEjercicioResueltoRPM` (Contrato F cerrado), con fixtures sintéticos identificados expresamente y acotados a bordes que un Contrato F válido no puede producir hoy.
+
+**Correcciones al modelo conceptual aproximado de §9.2** (nombres reales de F, nunca inventados): `confirmacionContinuidad` usa los nombres reales de F (`requiereConfirmacion`, `confirmacion.confirmado`), no los aproximados `requerida`/`confirmada` que sugería §9.2; `resumen.esfuerzo` se copia desde `caminos[].esfuerzo` (campo de primer nivel de `CaminoResuelto`), nunca desde un paso; el paquete `completo`/`publicable`/razones que §9.2 llamaba `estado` se expone como `estadoEjercicio`, para no colisionar con el wrapper `estado: 'MODELO_VISUAL_CONSTRUIDO'|'ENTRADA_INVALIDA'` (necesario para el caso inválido, que §9.2 no había diseñado).
+
+**Orden de los pasos:** el adaptador conserva literalmente el orden de `pasos[]` tal como lo recibe de Contrato F — nunca lo reordena por código ni lo reconstruye a partir del índice. Verificado con una prueba que invierte deliberadamente el orden real de los 7 pasos y confirma que el modelo reproduce ese orden invertido, no el canónico.
+
+**Decisión sobre `esfuerzo` ausente en un camino viable:** Contrato F no exige `esfuerzo` en `camposFaltantesCaminoViable()` (a diferencia de `ibl`/`ajusteLegal`), pero `generarCaminosRPM.js` (`construirCamino()`) lo calcula de forma incondicional para todo escenario `'viable'` — nunca ocurre en la práctica desde una salida real. El adaptador copia `esfuerzo` desde `caminos[].esfuerzo` tal cual llegue, sin agregar una validación que Contrato F mismo no exige — ampliar ese contrato no es responsabilidad de este adaptador.
+
+**Defecto encontrado y corregido durante la auditoría posterior a la primera implementación:** dos pasos con el mismo `codigo` en un mismo camino viable pasaban la validación original sin error (la comprobación de campos "faltantes" solo verifica pertenencia, nunca cuenta ocurrencias) — `indexarPasosPorCodigo` sobrescribía el primero en silencio al indexar. Verificado empíricamente (desactivando temporalmente la corrección y confirmando que la prueba fallaba). Corregido: nuevo código `PASO_CON_CODIGO_DUPLICADO`, detección por conteo de ocurrencias — cualquier código repetido, conocido o no, produce `ENTRADA_INVALIDA`, con dos pruebas dedicadas.
+
+**Resultado final:**
+- 28/28 pruebas específicas del adaptador en verde.
+- Suite completa: 75 archivos / 1554 pruebas en verde.
+- Lint sin hallazgos; build exitoso.
+- Cero consumidores reales del nuevo módulo (verificado por búsqueda de importaciones).
+
+**E6.3 no se inició** — requiere autorización explícita y separada, igual que cada checkpoint anterior de este plan.

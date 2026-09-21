@@ -1441,3 +1441,36 @@ checkpoints E3-E5.1 documentados en detalle allí (§6-§8).
   en este checkpoint** — Contrato F, `evaluarPoliticasEjercicioRPM.js`, comparador, UI, IA,
   README y matriz QA permanecen exactamente como estaban. **E6.2 (adaptador visual puro y
   dormido) es el único siguiente checkpoint operativo — sigue sin autorización explícita.**
+- **E6.2 — adaptador visual puro y dormido, implementado, auditado y cerrado (2026-09-20) —
+  cierre registrado en este mismo cambio.** Alcance implementado, exactamente los dos
+  archivos autorizados: `src/pages/construirModeloVisualEjercicioRPM.js` (función
+  `construirModeloVisualEjercicioRPM({ ejercicioResuelto, politicasInvolucradas })`, patrón
+  de helpers de página fijado en E6.1) y `src/pages/construirModeloVisualEjercicioRPM.test.js`
+  (28 pruebas, fixtures reales vía `generarCaminosRPM`/`evaluarPoliticasEjercicioRPM`/
+  `construirEjercicioResueltoRPM`, sintéticos identificados expresamente). **El adaptador
+  permanece dormido** — cero consumidores reales (verificado por búsqueda de importaciones
+  en todo `src/`), sin conexión a `ProyectaTuPensionRPM.jsx`, sin activar Contrato F, S4-007
+  ni IA en la aplicación real.
+  **Hallazgo y corrección de la auditoría posterior a la primera implementación:** dos pasos
+  con el mismo `codigo` en un camino viable pasaban la validación original sin error (la
+  comprobación de campos "faltantes" solo verifica pertenencia, nunca cuenta ocurrencias) —
+  al indexar por código, el segundo paso sobrescribía al primero en silencio. Verificado
+  empíricamente (se desactivó la corrección de forma temporal y se confirmó que la prueba
+  fallaba, luego se restauró). Corregido con un nuevo código `PASO_CON_CODIGO_DUPLICADO`
+  (detección por conteo de ocurrencias, independiente de la comprobación de faltantes) —
+  cualquier código repetido, conocido o no, produce ahora `ENTRADA_INVALIDA`, con dos
+  pruebas dedicadas. También verificado por lectura y prueba: el adaptador conserva
+  literalmente el orden de `pasos[]` recibido de Contrato F (nunca lo reordena por código ni
+  lo reconstruye desde el índice — probado invirtiendo deliberadamente el orden real de los
+  7 pasos). Sobre `esfuerzo` ausente en un camino viable (hueco real de validación en
+  Contrato F, que no lo exige en `camposFaltantesCaminoViable()`): confirmado que
+  `generarCaminosRPM.js` lo calcula de forma incondicional para todo escenario `'viable'`
+  — nunca ocurre en la práctica — y el adaptador lo copia tal cual desde `caminos[].esfuerzo`
+  sin agregar una validación que Contrato F mismo no exige.
+  **Verificaciones finales:** 28/28 pruebas específicas del adaptador en verde; suite
+  completa 75 archivos / 1554 pruebas en verde; lint sin hallazgos; build exitoso; cero
+  consumidores reales confirmados por búsqueda de importaciones. Detalle completo,
+  correspondencia de nombres con Contrato F y tabla campo por campo en PL-260 §9.8.
+  **E6.3 (integración real dormida en `ProyectaTuPensionRPM.jsx`, tras un interruptor) es
+  el siguiente checkpoint del plan vigente — no iniciado, pendiente de diseño y
+  autorización explícita y separada.**

@@ -90,9 +90,13 @@ del plan original, no lo sustituyen.
    decisión que se pueda posponer a una versión futura del producto.
 6. **La experiencia Baldor tendrá dos niveles visuales — respuesta esencial y ejercicio
    completo paso a paso — y el ejercicio completo NO se difiere.** Corrige la
-   recomendación de la revisión crítica (que sugería posponer el Nivel 3 completo) — Carlos
+   recomendación de la revisión crítica (que sugería posponer el ejercicio completo) — Carlos
    decidió que el ejercicio completo es parte obligatoria del próximo MVP, no una mejora
-   futura.
+   futura. **Nota de corrección (E6.1, 2026-09-20):** en versiones anteriores de este
+   documento, distintas menciones sueltas a E6 hablaban de "Niveles 1-3" — nunca hubo un
+   tercer nivel documentado; esta es, y siempre fue, la única definición real: dos niveles
+   ("Nivel esencial" y "Nivel completo", nomenclatura fijada en E6.1, §9). Toda mención
+   posterior de "Niveles 1-3" en este documento queda corregida.
 7. **La Garantía de Pensión Mínima (GPM) de RAIS queda fuera de este MVP**, bajo la
    condición explícita de que su ausencia siga declarada (ya lo está,
    `LIMITACION_ANUALIZACION_SIMPLIFICADA` en `calcularProyeccionRAIS.js`) y de que **nunca
@@ -248,7 +252,7 @@ lectura de la norma), no como algo que la ley ya autoriza.
 | **E3** | Piso de pensión mínima y Contrato D (ajustes legales). | Creadas en E3: piso mayor/igual/menor al resultado matemático; objetivo mayor/igual/menor al piso; ningún aporte cuando el base ajustado ya alcanza el objetivo. | **Bloqueado por Carril 2** (ancla de incremento mujer, si el caso cae en el rango divergente) y por el cierre de E1 (fuente del piso). | **Cerrado** — ver §6.1 para los 5 commits | Prohibido |
 | **E4** | Caminos, búsqueda inversa, barrido — reconstruidos sobre D, no sobre C. Nueva demostración de monotonicidad con piso incluido. | Creadas en E4: curva plana durante el piso y creciente después; coherencia entre camino base/alternativo tras el piso. | Depende de E3. | **Cerrado** — commit `aabf01d2ca8cf0bf900bcd8da5a1ac21ffadefce` (implementación) + `5a4e545d3f9e08f87f88cfb0b73643179d2c9c53` (corrección correctiva E4-C1, ver §7) | Prohibido |
 | **E5** | Contrato `EjercicioResueltoRPM` (F) con invariantes I1-I8 como tests. | Creadas en E5: los 8 invariantes, ejecutados sobre los fixtures de E2-E4. | Ninguna adicional a las de E3/E4. | **Cerrado** — E5.1 (diseño), E5.2, E5.3, E5.4-A y E5.4 (implementación completa) — ver §8.6. | Prohibido |
-| **E6** | Experiencia visual (Niveles 1-3, wireframes ya diseñados). **Depende obligatoriamente de E3, E4 y E5** — no empieza antes. | Creadas en E6: accesibilidad (teclado, lectores de pantalla), coherencia visual tarjeta/gráfica/Baldor. | Las mismas de E3-E5, heredadas. | Prohibido | Prohibido |
+| **E6** | Experiencia visual — dos niveles (Nivel esencial y Nivel completo, ver §9), wireframes ya diseñados. **Depende obligatoriamente de E3, E4 y E5** — no empieza antes. | Creadas en E6: accesibilidad (teclado, lectores de pantalla), coherencia visual tarjeta/gráfica/Nivel completo. | Las mismas de E3-E5, heredadas. | **E6.1 (diseño del contrato visual) aprobado, sin código — ver §9.** Implementación (E6.2 en adelante) sigue **prohibida hasta autorización explícita**. | Prohibido |
 | **E7** | Auditoría y ampliación adversarial — no el momento inicial de escribir pruebas. Combina casos de E2-E6, busca huecos, agrega pruebas de propiedades/límites/combinaciones no cubiertas individualmente. | Ampliación, no creación desde cero. | Ninguna adicional. | Prohibido | Prohibido |
 | **E8** | Preview y validación manual. **Depende del cierre de todas las reglas jurídicas necesarias para los casos que se muestren** — ningún caso con una política `NO_RESUELTA` involucrada se exhibe como resultado confiable en Preview. | Checklist manual firmado por Carlos. | Total, específica a cada caso mostrado. | Prohibido | Permitido solo a Preview, y solo para lo ya jurídicamente cerrado |
 | **E9** | Prueba final de Oscar. **Misma dependencia jurídica que E8** — los 3 casos originales de Oscar solo se muestran con cifra final si su piso/ancla ya están resueltos; si no, se muestra el estado intermedio honesto (elegibilidad confirmada, cuantía pendiente de regla jurídica). | Los 4 fixtures de Oscar, ejecutados también manualmente en Preview. | Total. | Prohibido | Permitido solo a Preview |
@@ -319,8 +323,9 @@ Ronda de correcciones derivadas de la validación manual de Carlos en Preview so
 (`construirEjercicioResueltoRPM.js`, Contrato F), E5.4-A (checkpoint correctivo del
 comparador) y E5.4 (`evaluarPoliticasEjercicioRPM.js`, adaptador jurídico con datos reales)
 implementados y cerrados — ver §8.6. **E5 queda completo.** Siguiente paso operativo del
-plan vigente: **E6** (experiencia visual, Niveles 1-3), que requiere autorización explícita
-independiente y separada — no iniciado.**
+plan vigente: **E6** (experiencia visual, dos niveles — Nivel esencial y Nivel completo, ver
+§9), cuyo diseño (E6.1) ya está aprobado y cerrado sin código — la implementación (E6.2 en
+adelante) requiere autorización explícita, independiente y separada — no iniciada.**
 
 ### 8.1 Contratos A-E (reconstruidos desde el código, evidencia exacta)
 
@@ -446,3 +451,153 @@ E5 (F, dominio) decide el `codigo` del supuesto, `requiereConfirmacion`, y calcu
 - Si el detalle año-a-año de indexación IPC va dentro del paso `IBL` o se omite.
 - Forma exacta de `errores[].campo` para otros casos de entrada malformada distintos del código desconocido.
 - ~~Fixture de mujer en el rango divergente de `PoliticaAnclaIncrementoMujer` — asignado a E5.4, sigue sin existir.~~ Resuelto en E5.4 (`resultadoRealMujerRangoDivergente`, `evaluarPoliticasEjercicioRPM.test.js`).
+
+## 9. E6.1 — Diseño del contrato visual de la experiencia Baldor — aprobado, sin implementación
+
+**Estado: diseño aprobado por Carlos y Atlas (2026-09-20), sin ningún código. No modifica el
+código ni el contrato de E5 — Contrato F (`construirEjercicioResueltoRPM.js`) y
+`evaluarPoliticasEjercicioRPM.js` permanecen exactamente como cerraron en §8.6, sin ningún
+consumidor real. Implementación (E6.2 en adelante) requiere autorización explícita, propia y
+separada de esta aprobación de diseño — sigue sin iniciarse.**
+
+### 9.1 Los dos niveles reales (corrige "Niveles 1-3")
+
+Investigación previa a este diseño (E6.1): inspección directa del XML interno de
+`docs/producto/PL-240 - Filosofía de Experiencia de PensionLab - v1.0.docx` (sin modificarlo,
+sin extraerlo, solo lectura) confirmó que ese documento **no contiene ninguna mención de
+"Nivel 1/2/3" ni de "Baldor"** aplicada a la presentación de resultados — sus menciones de
+"niveles" son sobre validación de coherencia de datos declarados (S3-008), un concepto
+distinto. Tampoco existe en `docs/tecnico/arquitectura/PL-230-...md` (versión ya trackeada).
+La única definición real, en todo el repositorio, es §0.1 punto 6 de este documento: **dos**
+niveles, nunca tres. Toda referencia previa a "Niveles 1-3" en este archivo (§0.1 punto 6,
+tabla §3, §8) queda corregida por las notas insertadas en esos puntos.
+
+| | Nivel esencial | Nivel completo |
+|---|---|---|
+| **Propósito** | Responder de inmediato "¿qué pensión puedo esperar y con qué caminos?", sin exigir que la persona entienda el desglose legal. | Auditar, camino por camino, exactamente cómo se llegó a cada cifra, con fundamento normativo — la promesa de trazabilidad de PL-240 aplicada al resultado. |
+| **Información mostrada** | Por camino: `decision`, `tipo`, cifra final, comparación contra objetivo, esfuerzo (IBC actual/propuesto/aumento). A nivel de ejercicio: `completo`, `publicable` y, si alguno es `false`, el motivo en lenguaje simple. | Los 7 `PasoAuditable` completos de cada camino viable, en el orden exacto de Contrato F, con fundamento normativo donde exista. `supuestosEscenario` completo. Toda política jurídica involucrada, desglosada. |
+| **Fuente exacta en `EjercicioResueltoRPM`** | `caminos[].estado/tipo/decision`; dentro de `caminos[].pasos[]`, los códigos `RESULTADO_FINAL`/`COMPARACION_OBJETIVO`; `caminos[].esfuerzo`; `completo`, `publicable`, `razonesIncompleto`, `razonesNoPublicable`, `supuestosEscenario`. | `caminos[]` completo (sin recorte), incluido `pasos[]`; `elegibilidad`, `disponibilidadCuantia`, `fechaBaseMonetaria`; más `politicasInvolucradas` (entrada separada del adaptador, ver §9.2). |
+| **Interacción** | El formulario existente (edad/objetivo/restricción) + el gate de confirmación de continuidad (§9.4). | **Decisión Carlos/Atlas (2026-09-20):** una sección expandible por cada camino. El resumen del camino (mismo contenido que el Nivel esencial de ese camino) permanece siempre visible; al expandir, los pasos auditables se muestran en el orden exacto de Contrato F (`DATOS_UTILIZADOS → IBL → TASA_REEMPLAZO → RESULTADO_MATEMATICO → AJUSTE_LEGAL → RESULTADO_FINAL → COMPARACION_OBJETIVO`). |
+| **Oculto inicialmente** | Los 7 `PasoAuditable` completos, `trazabilidadNormativa`, detalle de `disponibilidadCuantia`/`elegibilidad`. | Nada estructural una vez expandido un camino; antes de expandir, sus pasos. |
+| **`completo:false`** | La cifra sigue mostrándose (nunca se oculta un número ya calculado) junto al mensaje exacto de `razonesIncompleto[].mensaje`, literal. | Mismo checklist explícito, visible independientemente del Nivel esencial — nunca visible en un solo nivel únicamente. |
+| **`publicable:false`** | Cifra visible, rotulada explícitamente como no definitiva; si la causa es `CONFIRMACION_AUSENTE`, el gate de continuidad queda visible y prominente. | Mismo checklist explícito, repetido. |
+| **Caminos descartados** | `razonDescartado.mensaje` únicamente, mismo tratamiento visual que hoy (`.camino-celda--descartado`). | **Decisión Carlos/Atlas:** muestran únicamente su razón — nunca una sección expandible vacía (I7 garantiza `pasos:[]` para un camino descartado; la UI nunca debe ofrecer expandir algo que no tiene contenido). |
+| **Políticas `NO_RESUELTA`** | Disclosure obligatorio, hoy inexistente. | Sección propia, mensaje jurídico completo por política — posible solo porque el adaptador recibe `politicasInvolucradas` como entrada separada (§9.2), ya que Contrato F no la reexpone. |
+
+### 9.2 Contrato conceptual del adaptador — `construirModeloVisualEjercicioRPM`
+
+```
+construirModeloVisualEjercicioRPM({ ejercicioResuelto, politicasInvolucradas })
+  → ModeloVisualEjercicioRPM
+```
+
+Función pura, sin código todavía. Reglas fijadas (Carlos/Atlas):
+
+- Recibe únicamente la salida ya construida de Contrato F (`ejercicioResuelto`) más
+  `politicasInvolucradas` como entrada **separada** — el mismo arreglo que el orquestador ya
+  tiene disponible del paso 2 de §9.3, sin que Contrato F cambie su contrato para reexponerlo.
+- Solo puede copiar, seleccionar y organizar datos — nunca calcular ni reinterpretar: no
+  recalcula IBL, tasa, piso, mesada, distancia ni esfuerzo; no vuelve a decidir `completo` ni
+  `publicable`; no redacta ninguna conclusión jurídica ni mensaje nuevo.
+- Extrae de `pasos[]` los datos de cada nivel una sola vez, indexados por código (nunca un
+  arreglo que cada componente recorra con `.find(...)` repetidamente).
+- Conserva el orden de `caminos` (I6) y, literalmente, cifras, razones y mensajes.
+- Produce un modelo fácil de probar con funciones puras (Vitest, sin React).
+- Permanece dormido hasta que un checkpoint posterior (E6.3 en adelante) lo conecte a un
+  componente real.
+
+**Forma aproximada del resultado** (conceptual, no código final):
+
+```
+ModeloVisualEjercicioRPM {
+  estado: { completo, publicable, razonesIncompleto, razonesNoPublicable },  // literal de F
+  confirmacionContinuidad: { requerida, confirmada, textoAceptado, edadObjetivoConfirmada } | null,
+                                                                // de supuestosEscenario[0], literal
+  politicasJuridicas: Array<{ nombre, estado, aplicaAEsteEjercicio, mensaje }>,
+                                                                // literal del 2do argumento
+  caminos: [                                                  // mismo orden que ejercicioResuelto.caminos
+    {
+      id, tipo, estado, decision,                             // literal
+      resumen: { cifraFinal, cumpleObjetivo, delta, valorObjetivo, esfuerzo } | null,  // solo viable
+      pasos: { DATOS_UTILIZADOS, IBL, TASA_REEMPLAZO, RESULTADO_MATEMATICO,
+               AJUSTE_LEGAL, RESULTADO_FINAL, COMPARACION_OBJETIVO } | null,  // indexado, solo viable
+      razonDescartado: {...} | null,                          // solo descartado
+    }, ...
+  ],
+}
+```
+
+**Ubicación (Carlos/Atlas):** junto a `ProyectaTuPensionRPM` (ej. `src/pages/`), siguiendo el
+patrón de helpers de página ya usado por `ordenarCaminosParaPresentacion` en
+`ProyectaTuPensionRPM.helpers.js` — no en `src/domain/pensionEngine/` (no es una regla
+pensional) ni extraído a una capa compartida todavía, porque tendrá un solo consumidor. Se
+revisará si conviene extraerlo únicamente cuando exista un segundo consumidor real.
+
+### 9.3 Orquestación
+
+```
+1. generarCaminosRPM(...)                                    → resultadoGenerarCaminos   (E)
+2. evaluarPoliticasEjercicioRPM({ resultadoGenerarCaminos, sexo })
+                                                                → politicasInvolucradas
+3. construirEjercicioResueltoRPM({ resultadoGenerarCaminos,
+     edadJubilacionDeseada, confirmacionesSupuestos, politicasInvolucradas })
+                                                                → ejercicioResuelto        (F)
+4. construirModeloVisualEjercicioRPM({ ejercicioResuelto, politicasInvolucradas })
+                                                                → modeloVisual
+5. <ComponentesPresentacionales modeloVisual={modeloVisual} .../>
+```
+
+Los 4 primeros pasos viven en el mismo orquestador que hoy ya ejecuta el paso 1 síncronamente
+en cada render (`ProyectaTuPensionRPM.jsx`) — mismo patrón ya existente, sin arquitectura
+nueva. Se ejecutan una sola vez por render de la página; el resultado (`modeloVisual`)
+desciende como prop ya resuelta — ningún componente hijo invoca ninguna de las 4 funciones.
+
+### 9.4 Gate de confirmación de continuidad (contraste con §8.4)
+
+| | Diseño E6.1 | §8.4 |
+|---|---|---|
+| Estado en `App.jsx` | Un solo estado nuevo (ej. `confirmacionContinuidad`), mismo patrón que `trasladoRegimen`. | "vive en `App.jsx` durante la sesión (nunca persistido fuera de ella)." |
+| Forma | `{ codigo: 'CONTINUIDAD_SIN_INTERRUPCIONES', confirmado: true, textoAceptado: 'Entiendo y quiero explorar este escenario.', edadObjetivoConfirmada }` — mismo shape que `confirmacionesSupuestos[]` ya acepta F. | Texto exacto ya fijado por §8.4 — E6 no redacta. |
+| Edad asociada | `edadObjetivoConfirmada` = `edadJubilacionDeseada` al momento de confirmar. | "La confirmación queda vinculada a `edadJubilacionDeseada`." |
+| Cuándo se invalida | Únicamente al cambiar `edadJubilacionDeseada`. | "cambiarla la invalida." |
+| Cuándo NO se invalida | Cambios en objetivo económico, IBC, límite de esfuerzo o historia. | "no la invalidan." |
+| Cómo llega a F | Como único elemento de `confirmacionesSupuestos` en el paso 3 de §9.3 — parámetro ya existente en F desde E5.3, nunca alimentado por UI real. | Sin cambios necesarios al contrato de F. |
+| Antes de confirmar | Disclosure visible + botón; `publicable:false`/`CONFIRMACION_AUSENTE` visible en Nivel esencial; cifras ya calculadas siguen mostrándose. | "sin confirmación, el ejercicio no se presenta como listo para publicación." |
+| Después de confirmar | Disclosure colapsable a estado "confirmado" (sin timestamp); `publicable` puede pasar a `true` si el resto ya se cumple. | "Sin timestamp en el MVP — basta edad objetivo confirmada + texto exacto aceptado." |
+
+### 9.5 Estrategia de pruebas
+
+Híbrida (Carlos/Atlas):
+
+- **Vitest puro**, sin dependencias nuevas: `construirModeloVisualEjercicioRPM` — todas las
+  combinaciones de completo/publicable/política/descartado/orden, mismo patrón que las 1526
+  pruebas actuales (ninguna monta un componente).
+- **Pruebas de componentes**, cuando se implemente la primera interacción real (el gate de
+  confirmación de continuidad, E6.4 en §9.6) — requiere una dependencia nueva hoy inexistente
+  (`package.json` no tiene ningún `@testing-library/*`; `vite.config.js` no tiene entorno
+  `jsdom`; cero archivos `.test.jsx` en el repo). **No se agrega en E6.1** — se solicitará
+  explícitamente en el checkpoint que la necesite.
+- **Checklist manual posterior** para coherencia visual (resumen ↔ gráfica ↔ Nivel completo)
+  y una pasada real de lector de pantalla — mismo patrón ya usado en E8/E9.
+
+### 9.6 División E6.2-E6.7 (checkpoints posteriores, cada uno con autorización propia)
+
+| Checkpoint | Alcance | Dormido/visible | Autorización |
+|---|---|---|---|
+| **E6.2** | `construirModeloVisualEjercicioRPM` — adaptador puro, con pruebas Vitest exhaustivas. | Dormido — cero consumidor | Propia, explícita — **único siguiente checkpoint operativo, sigue sin autorizarse** |
+| **E6.3** | Integración real dormida — la página invoca los pasos 1-4 de §9.3 tras un interruptor (mismo patrón `IA_EXPUESTA_EN_MVP`), sin cambiar nada visible. | Dormido (interruptor apagado) | Propia, explícita |
+| **E6.4** | Gate de confirmación de continuidad (§9.4), aislado — primeras pruebas de componente reales, aquí se solicita la dependencia de RTL. | Real, tras activar E6.5 | Propia, explícita — incluye aprobar la dependencia nueva |
+| **E6.5** | Nivel esencial visual real — primer consumidor visible de F; disclosure de política `NO_RESUELTA`/`completo`/`publicable`. | **Real — primer consumidor visible de F** | Propia, explícita |
+| **E6.6** | Nivel completo — acordeón por camino, pasos auditables en orden de Contrato F. | Real | Propia, explícita |
+| **E6.7** | Accesibilidad transversal (teclado, lector de pantalla) + coherencia visual resumen↔gráfica↔Nivel completo. | Real | Propia, explícita |
+
+### 9.7 Relación con S4-007 — separación explícita (no confundir con E6)
+
+S4-007 (explicación con IA) está implementado, integrado y probado a nivel de código/contrato
+(commits `333787fc`/`db1bac72`), pero deliberadamente no expuesto en el MVP
+(`IA_EXPUESTA_EN_MVP = false`, commit `99cae1a`) — ver detalle cronológico completo en
+`docs/gestion/cierre-sprint-4.md`. **E6 es presentación determinista de Contrato F y nunca
+debe activar S4-007 ni ningún llamado a IA** — son capas paralelas sobre el mismo Contrato E,
+cada una con su propio re-shaping (`construirHechosEscenario.js` para IA;
+`construirModeloVisualEjercicioRPM` para E6). Ningún checkpoint de §9.6 modifica
+`IA_EXPUESTA_EN_MVP` ni ningún archivo de `src/ia/`/`api/`.

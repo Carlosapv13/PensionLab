@@ -1273,7 +1273,8 @@ introducida a mitad de este Slice y corregida antes del cierre.
   un criterio de aceptación a nivel de Entregable 2 completo (§11), no un bloqueo para
   cerrar este Slice individualmente — mismo tratamiento ya dado a "Carlos como primer
   caso real" en el cierre de S4-001.
-- S4-007 (Explicación IA de cada camino) — no iniciado.
+- S4-007 (Explicación IA de cada camino) — no iniciado (exacto al cierre de este Slice,
+  2026-08-23; ver corrección cronológica en "Pendiente para el siguiente Slice", más abajo).
 
 ### Pendiente para el siguiente Slice
 
@@ -1296,6 +1297,30 @@ introducida a mitad de este Slice y corregida antes del cierre.
   abajo) — **E5 queda completo**. S4-007 sigue **no iniciado**; el siguiente checkpoint del
   plan vigente es ahora **E6** (experiencia visual), que requiere autorización explícita
   propia, separada del cierre de E5.4.
+  **Corrección cronológica (E6.1, 2026-09-20) — la nota "S4-007 no iniciado" de arriba
+  quedó desactualizada un día después de escribirse, y nunca se corrigió hasta ahora.**
+  Verificado por historial Git, nunca reescrito, solo corregido aquí:
+  - `333787fc` (2026-08-24 21:34) — *"feat: agregar explicacion IA de caminos RPM (S4-007)
+    y su backend"*: implementa el conjunto completo (`src/ia/`, adaptadores, `api/`),
+    211/211 pruebas en verde.
+  - `db1bac72` (2026-08-24 21:49, el mismo día) — *"feat: integrar explicacion IA,
+    esfuerzo personalizado y orientacion en ProyectaTuPensionRPM"*: conecta S4-007 a la
+    pantalla real (botón "Entender este camino", bloque "Comparando tus caminos").
+  - `99cae1a` (2026-08-27) — *"chore: cerrar alcance del MVP sin exponer explicaciones
+    IA"*: introduce `const IA_EXPUESTA_EN_MVP = false` en `ProyectaTuPensionRPM.jsx` —
+    **decisión de alcance de producto, no reversión de la implementación**: el código,
+    los adaptadores y `api/explicar-caminos.js` permanecen intactos y probados, solo se
+    deja de renderizar la UI que los expone. Documentado también en `README.md`
+    ("Limitaciones conocidas del MVP") y en `docs/qa/matriz-pruebas-funcionales-mvp.md`
+    (caso RPM-024, estado 🟡 PARCIAL/LIMITADO: *"Lógica y contrato validados al 100%...
+    pero queda fuera del alcance de esta publicación del MVP"*).
+  **Estado real de S4-007, a esta fecha:** implementado, integrado y probado a nivel de
+  código/contrato; deliberadamente no expuesto al usuario en este MVP; con endurecimiento
+  de `validarConsistenciaExplicacion.js`/prompt pendiente (diagnóstico 2026-08-27: 3 de 4
+  respuestas reales dejaron tokens sin resolver visibles bajo `reasoning.effort:'minimal'`)
+  antes de considerar reactivar `IA_EXPUESTA_EN_MVP`. **No debe confundirse con E6 ni
+  activarse durante E6:** E6 es presentación determinista de Contrato F (ver PL-260 §9);
+  ningún checkpoint de E6 modifica `IA_EXPUESTA_EN_MVP` ni ningún archivo de `src/ia/`/`api/`.
 
 ## Checkpoint de continuidad — E3, E4, E4-C1 cerrados; E5.1 aprobado como diseño
 
@@ -1387,5 +1412,32 @@ checkpoints E3-E5.1 documentados en detalle allí (§6-§8).
   lint y build correctos. **El módulo permanece sin ningún consumidor real de producción**
   — no se integra con Contrato F, `App.jsx`, `pages/`, UI ni IA. **E5 queda completo.**
   Detalle completo en PL-260 §8.6. **Siguiente paso operativo del plan vigente: E6**
-  (experiencia visual, Niveles 1-3), que requiere autorización explícita independiente y
-  separada — no iniciado.
+  (experiencia visual, dos niveles — Nivel esencial y Nivel completo; "Niveles 1-3" era una
+  numeración incorrecta, corregida en PL-260 §9.1 — nunca hubo un tercer nivel documentado),
+  que requiere autorización explícita independiente y separada — no iniciado.
+- **E6.1 — diseño del contrato visual aprobado y cerrado, sin implementación.** Carlos y
+  Atlas aprueban (2026-09-20): (1) E6 tiene exactamente dos niveles visuales — Nivel esencial
+  (respuesta inmediata por camino + `completo`/`publicable`/razones) y Nivel completo
+  (ejercicio auditable paso a paso) — se elimina "Niveles 1-3" del diseño, sin respaldo
+  documental para un tercer nivel (verificado por lectura directa del XML interno de
+  `docs/producto/PL-240 - Filosofía de Experiencia de PensionLab - v1.0.docx`, sin
+  modificarlo: no contiene ninguna mención de "Nivel 1/2/3" ni "Baldor" aplicada a
+  presentación de resultados). (2) Interacción del Nivel completo: sección expandible por
+  camino, resumen siempre visible, pasos auditables en el orden exacto de Contrato F al
+  expandir; caminos descartados muestran únicamente su razón, nunca un acordeón vacío. (3)
+  El adaptador visual (`construirModeloVisualEjercicioRPM`, nombre conceptual) se ubicará
+  junto a `ProyectaTuPensionRPM` (patrón de helpers de página, un solo consumidor previsto).
+  (4) Recibe `ejercicioResuelto` y `politicasInvolucradas` como entradas separadas —
+  conserva el detalle estructurado de políticas sin modificar Contrato F; solo copia,
+  selecciona y organiza datos, nunca calcula ni reinterpreta. (5) Estrategia de pruebas
+  híbrida: Vitest puro para el adaptador, pruebas de componentes cuando se implemente la
+  primera interacción real (gate de confirmación de continuidad, requiere
+  `@testing-library/react` — no agregada todavía), checklist manual para experiencia
+  visual/lector de pantalla. (6) S4-007 queda caracterizado correctamente: implementado,
+  integrado y probado a nivel de código/contrato; deliberadamente no expuesto en el MVP
+  (`IA_EXPUESTA_EN_MVP = false`); separado de E6 — E6 nunca activa IA. Detalle completo,
+  contrato conceptual del adaptador, orquestación E→políticas→F→modelo visual→componentes,
+  diseño del gate de continuidad y división E6.2-E6.7 en PL-260 §9. **Ningún código nuevo
+  en este checkpoint** — Contrato F, `evaluarPoliticasEjercicioRPM.js`, comparador, UI, IA,
+  README y matriz QA permanecen exactamente como estaban. **E6.2 (adaptador visual puro y
+  dormido) es el único siguiente checkpoint operativo — sigue sin autorización explícita.**

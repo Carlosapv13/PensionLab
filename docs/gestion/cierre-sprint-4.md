@@ -1290,8 +1290,12 @@ introducida a mitad de este Slice y corregida antes del cierre.
   extrajo a `src/transparency/` en **E5.2**, y el Contrato F (`construirEjercicioResueltoRPM.js`)
   ya se implementó y cerró en **E5.3** (ambos mecánico/composición, sin cambio de
   comportamiento del motor). Esto **no convierte a S4-007 en el siguiente paso**: el
-  siguiente checkpoint del plan vigente es **E5.4** (`evaluarPoliticasEjercicioRPM.js`),
-  que requiere autorización explícita propia, separada del cierre de E5.3.
+  siguiente checkpoint del plan vigente era **E5.4** (`evaluarPoliticasEjercicioRPM.js`),
+  que requería autorización explícita propia, separada del cierre de E5.3.
+  **Segunda actualización:** E5.4 ya se implementó y cerró (ver entrada de checkpoint más
+  abajo) — **E5 queda completo**. S4-007 sigue **no iniciado**; el siguiente checkpoint del
+  plan vigente es ahora **E6** (experiencia visual), que requiere autorización explícita
+  propia, separada del cierre de E5.4.
 
 ## Checkpoint de continuidad — E3, E4, E4-C1 cerrados; E5.1 aprobado como diseño
 
@@ -1355,5 +1359,33 @@ checkpoints E3-E5.1 documentados en detalle allí (§6-§8).
   archivos / 1503 pruebas en verde; lint y build correctos. Alcance exclusivo:
   `compararAnclaIncrementoRPM.js` + su test — ningún cambio en Contrato F, en
   `generarCaminosRPM.js`, en elegibilidad/proyección, en UI ni en IA.
-  **E5.4 (`evaluarPoliticasEjercicioRPM.js`) sigue sin implementarse** — sigue siendo el
-  siguiente paso operativo, ahora sin el defecto de fechas que E5.4-A cerró.
+- **E5.4 — implementado y cerrado.** `src/domain/pensionEngine/evaluarPoliticasEjercicioRPM.js`
+  (+ `evaluarPoliticasEjercicioRPM.test.js`) — adaptador entre los datos reales de un
+  ejercicio (`generarCaminosRPM.js`) y `compararAnclaIncrementoRPM.js`, produce
+  `politicasInvolucradas` en la forma que consume Contrato F sin recalcular ninguna cifra
+  del comparador. Usa el primer camino viable con datos numéricos utilizables, sin ordenar
+  ni comparar los demás caminos (I6); separa `fechaBaseMonetaria` (SMLV/ancla fija) de
+  `fechaAplicacionRegla` (`elegibilidad.semanasMinimasAplicables.fechaAplicacion`, mínimo
+  dinámico — mismo criterio de E5.4-A).
+  **Corrección de revisión final:** `compararAnclaIncrementoRPM({ fechaAplicacionRegla =
+  fecha })` activa su default de JavaScript exactamente cuando recibe `undefined` — con
+  `fechaAplicacion` ausente, el adaptador evaluaría en silencio con la fecha monetaria del
+  camino en vez de la fecha real de aplicación de la regla. Corregido con una validación
+  explícita en E5.4, antes de invocar el comparador (que permanece cerrado, sin tocar):
+  `estado: 'ENTRADA_INVALIDA'`, código `COMPARADOR_RECHAZO_ENTRADA_DERIVADA`, campo exacto
+  `resultadoGenerarCaminos.elegibilidad.semanasMinimasAplicables.fechaAplicacion`.
+  **Decisión de diseño Carlos/Atlas (cierre de la revisión final, 2026-09-20):**
+  `SEMANAS_INSUFICIENTES_PARA_MINIMO_APLICABLE` produce literalmente
+  `politicasInvolucradas: []` (nunca una entrada `RESUELTA` inerte), consistente con el caso
+  evaluable sin incertidumbre jurídica, que también devuelve `[]`. Bloqueos jurídicos/de
+  vigencia del SMLV producen fail-closed `NO_RESUELTA`/`aplicaAEsteEjercicio:true`,
+  conservando el mensaje literal del comparador. Fixture nuevo de mujer en el rango
+  divergente (valoración 2026-01-01, aplicación 2031-01-01, mínimo dinámico 1125,
+  divergencia de 4.5 puntos) creado en este checkpoint, con integración probada contra
+  Contrato F: una política `NO_RESUELTA` aplicable produce `completo:false` y
+  `publicable:false`. 23 pruebas nuevas; suite completa 74 archivos / 1526 pruebas en verde;
+  lint y build correctos. **El módulo permanece sin ningún consumidor real de producción**
+  — no se integra con Contrato F, `App.jsx`, `pages/`, UI ni IA. **E5 queda completo.**
+  Detalle completo en PL-260 §8.6. **Siguiente paso operativo del plan vigente: E6**
+  (experiencia visual, Niveles 1-3), que requiere autorización explícita independiente y
+  separada — no iniciado.

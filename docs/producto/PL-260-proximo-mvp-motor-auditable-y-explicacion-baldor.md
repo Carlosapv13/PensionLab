@@ -252,7 +252,7 @@ lectura de la norma), no como algo que la ley ya autoriza.
 | **E3** | Piso de pensión mínima y Contrato D (ajustes legales). | Creadas en E3: piso mayor/igual/menor al resultado matemático; objetivo mayor/igual/menor al piso; ningún aporte cuando el base ajustado ya alcanza el objetivo. | **Bloqueado por Carril 2** (ancla de incremento mujer, si el caso cae en el rango divergente) y por el cierre de E1 (fuente del piso). | **Cerrado** — ver §6.1 para los 5 commits | Prohibido |
 | **E4** | Caminos, búsqueda inversa, barrido — reconstruidos sobre D, no sobre C. Nueva demostración de monotonicidad con piso incluido. | Creadas en E4: curva plana durante el piso y creciente después; coherencia entre camino base/alternativo tras el piso. | Depende de E3. | **Cerrado** — commit `aabf01d2ca8cf0bf900bcd8da5a1ac21ffadefce` (implementación) + `5a4e545d3f9e08f87f88cfb0b73643179d2c9c53` (corrección correctiva E4-C1, ver §7) | Prohibido |
 | **E5** | Contrato `EjercicioResueltoRPM` (F) con invariantes I1-I8 como tests. | Creadas en E5: los 8 invariantes, ejecutados sobre los fixtures de E2-E4. | Ninguna adicional a las de E3/E4. | **Cerrado** — E5.1 (diseño), E5.2, E5.3, E5.4-A y E5.4 (implementación completa) — ver §8.6. | Prohibido |
-| **E6** | Experiencia visual — dos niveles (Nivel esencial y Nivel completo, ver §9), contrato visual determinista definido en E6.1. **Depende obligatoriamente de E3, E4 y E5** — no empieza antes. | Creadas en E6: accesibilidad (teclado, lectores de pantalla), coherencia visual tarjeta/gráfica/Nivel completo. | Las mismas de E3-E5, heredadas. | **E6.1 (diseño del contrato visual) aprobado, sin código — ver §9.** E6.2 (adaptador visual puro y dormido) implementado, auditado y cerrado. E6.3 (integración real pero dormida) implementado, auditado y cerrado. Implementación visible (E6.5 en adelante) sigue **prohibida hasta autorización explícita**. | Prohibido |
+| **E6** | Experiencia visual — dos niveles (Nivel esencial y Nivel completo, ver §9), contrato visual determinista definido en E6.1. **Depende obligatoriamente de E3, E4 y E5** — no empieza antes. | Creadas en E6: accesibilidad (teclado, lectores de pantalla), coherencia visual tarjeta/gráfica/Nivel completo. | Las mismas de E3-E5, heredadas. | **E6.1 (diseño del contrato visual) aprobado, sin código — ver §9.** E6.2 (adaptador visual puro y dormido) implementado, auditado y cerrado. E6.3 (integración real pero dormida) implementado, auditado y cerrado. E6.4 (control aislado de confirmación de continuidad, sin conexión todavía) implementado, auditado y cerrado. Implementación visible (E6.5 en adelante) sigue **prohibida hasta autorización explícita**. | Prohibido |
 | **E7** | Auditoría y ampliación adversarial — no el momento inicial de escribir pruebas. Combina casos de E2-E6, busca huecos, agrega pruebas de propiedades/límites/combinaciones no cubiertas individualmente. | Ampliación, no creación desde cero. | Ninguna adicional. | Prohibido | Prohibido |
 | **E8** | Preview y validación manual. **Depende del cierre de todas las reglas jurídicas necesarias para los casos que se muestren** — ningún caso con una política `NO_RESUELTA` involucrada se exhibe como resultado confiable en Preview. | Checklist manual firmado por Carlos. | Total, específica a cada caso mostrado. | Prohibido | Permitido solo a Preview, y solo para lo ya jurídicamente cerrado |
 | **E9** | Prueba final de Oscar. **Misma dependencia jurídica que E8** — los 3 casos originales de Oscar solo se muestran con cifra final si su piso/ancla ya están resueltos; si no, se muestra el estado intermedio honesto (elegibilidad confirmada, cuantía pendiente de regla jurídica). | Los 4 fixtures de Oscar, ejecutados también manualmente en Preview. | Total. | Prohibido | Permitido solo a Preview |
@@ -326,10 +326,10 @@ implementados y cerrados — ver §8.6. **E5 queda completo.** Siguiente paso op
 plan vigente: **E6** (experiencia visual, dos niveles — Nivel esencial y Nivel completo, ver
 §9), cuyo diseño (E6.1) ya está aprobado y cerrado sin código. **E6.2 (adaptador visual puro
 y dormido) implementado, auditado y cerrado.** **E6.3 (integración real pero dormida de la
-cadena visual en `ProyectaTuPensionRPM.jsx`) implementado, auditado y cerrado — cierre
-registrado en este mismo cambio, ver §9.9.** La implementación de E6.4 en adelante requiere
-autorización explícita,
-independiente y separada — no iniciada.**
+cadena visual en `ProyectaTuPensionRPM.jsx`) implementado, auditado y cerrado, ver §9.9.**
+**E6.4 (control aislado de confirmación de continuidad) implementado, auditado y cerrado —
+cierre registrado en este mismo cambio, ver §9.10.** La implementación de E6.5 en adelante
+requiere autorización explícita, independiente y separada — no iniciada.**
 
 ### 8.1 Contratos A-E (reconstruidos desde el código, evidencia exacta)
 
@@ -590,8 +590,8 @@ Híbrida (Carlos/Atlas):
 |---|---|---|---|
 | **E6.2** | `construirModeloVisualEjercicioRPM` — adaptador puro, con pruebas Vitest exhaustivas. **Implementado, auditado y cerrado — cierre registrado en este mismo cambio, ver §9.8.** | Dormido — cero consumidor | Ejecutado y cerrado |
 | **E6.3** | Integración real dormida — la página invoca los pasos 1-4 de §9.3 tras un interruptor (mismo patrón `IA_EXPUESTA_EN_MVP`), sin cambiar nada visible. **Implementado, auditado y cerrado — ver §9.9.** | Dormido (interruptor apagado) | Ejecutado y cerrado |
-| **E6.4** | Gate de confirmación de continuidad (§9.4), aislado — primeras pruebas de componente reales, aquí se solicita la dependencia de RTL. **No iniciado.** | Real, tras activar E6.5 | Propia, explícita — incluye aprobar la dependencia nueva — **siguiente checkpoint operativo, sigue sin autorizarse** |
-| **E6.5** | Nivel esencial visual real — primer consumidor visible de F; disclosure de política `NO_RESUELTA`/`completo`/`publicable`. | **Real — primer consumidor visible de F** | Propia, explícita |
+| **E6.4** | Gate de confirmación de continuidad (§9.4), aislado — primeras pruebas de componente reales; dependencia de RTL aprobada e instalada. **Implementado, auditado y cerrado — ver §9.10.** | Aislado — sin conexión a `App.jsx` ni a `ProyectaTuPensionRPM.jsx` | Ejecutado y cerrado |
+| **E6.5** | Nivel esencial visual real — primer consumidor visible de F; disclosure de política `NO_RESUELTA`/`completo`/`publicable`; conecta el estado de confirmación a `App.jsx` (invalidación por edad/sexo/régimen/fecha de nacimiento). **No iniciado.** | **Real — primer consumidor visible de F** | Propia, explícita — **siguiente checkpoint operativo, sigue sin autorizarse** |
 | **E6.6** | Nivel completo — acordeón por camino, pasos auditables en orden de Contrato F. | Real | Propia, explícita |
 | **E6.7** | Accesibilidad transversal (teclado, lector de pantalla) + coherencia visual resumen↔gráfica↔Nivel completo. | Real | Propia, explícita |
 
@@ -693,3 +693,55 @@ envuelven las funciones reales, nunca reimplementan su lógica).
 
 **E6.4 no se inició** — requiere autorización explícita y separada, igual que cada checkpoint
 anterior de este plan.
+
+### 9.10 E6.4 — implementado, auditado y cerrado
+
+**Estado: implementado; cierre registrado en este mismo cambio (2026-09-20).** Control
+**aislado** de confirmación de continuidad de cotización — sin conexión todavía a `App.jsx`
+ni a `ProyectaTuPensionRPM.jsx`; no se monta en ningún árbol real de la aplicación.
+
+**Archivos:**
+- `src/components/ConfirmacionContinuidadCotizacion.jsx` — componente puro y presentacional
+  (`{confirmacion, edadJubilacionDeseada, onConfirmar}` → JSX), primer consumidor de
+  `useId()` del repositorio para asociar el botón con el disclosure vía
+  `aria-describedby`.
+- `src/components/ConfirmacionContinuidadCotizacion.test.jsx` — 14 pruebas, primer archivo
+  `.test.jsx` del repositorio; entorno `jsdom` acotado a este archivo únicamente (directiva
+  `// @vitest-environment jsdom`), sin cambiar el entorno global de Vitest.
+- Dependencias nuevas: `@testing-library/react@16.3.3`, `@testing-library/user-event@14.6.7`,
+  `jsdom@30.1.0` — sin `@testing-library/jest-dom` (las aserciones usan API de DOM nativa).
+
+**Textos**: disclosure y botón, literales de PL-260 §8.4 (decisión ya aprobada, sin
+redactar de nuevo). Texto del estado posterior al clic, **aprobado por Carlos/Atlas en la
+auditoría de este checkpoint**: *"Elegiste explorar este escenario bajo el supuesto de
+cotización continua."* — describe la elección ya registrada, nunca afirma que la persona
+cotizará ni presume lo que comprendió (reemplaza el texto provisional *"Confirmaste que
+entiendes este supuesto y quieres explorar este escenario."*, descartado).
+
+**Defectos encontrados y corregidos durante la auditoría posterior a la primera
+implementación** (verificados empíricamente antes de corregir): `confirmacion` ausente
+(prop no pasada, `undefined` en vez de `null` explícito) producía
+`TypeError: Cannot read properties of undefined (reading 'confirmado')`; `onConfirmar`
+ausente producía `TypeError: onConfirmar is not a function` al hacer clic. Corregido con
+`confirmacion != null` (en vez de `!== null`, mismo criterio ya aplicado en E5.4/E6.3) y
+`onConfirmar = () => {}` como valor por defecto no-operativo. Cuatro pruebas de regresión
+agregadas.
+
+**Decisión de invalidación documentada, pendiente de implementar en E6.5** (Carlos/Atlas,
+cierre del diseño de E6.4): cuando la confirmación se conecte al estado de `App.jsx`,
+cambiar **edad objetivo, sexo, régimen actual o fecha de nacimiento** invalidará la
+confirmación; cambiar objetivo económico, IBC, límite de esfuerzo o historia de cotización
+**no** la invalidará. Este componente no implementa la invalidación (no tiene acceso a esos
+otros campos) — solo decide, dada una confirmación y la edad actual, si sigue vigente para
+esa edad.
+
+**Resultado final:**
+- 14/14 pruebas específicas del componente en verde.
+- Suite completa: 77 archivos / 1586 pruebas en verde.
+- Lint sin hallazgos; build exitoso — bundle sin cambio (423.62 kB), confirma cero
+  consumidor real.
+- Cero referencias al componente fuera de sus propios archivos.
+
+**E6.5 no se inició** — es el siguiente checkpoint del plan vigente: primer consumidor
+visible de Contrato F (Nivel esencial) y conexión real del estado de confirmación a
+`App.jsx` con su invalidación — requiere autorización explícita y separada.

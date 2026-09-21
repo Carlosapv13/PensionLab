@@ -1515,3 +1515,35 @@ checkpoints E3-E5.1 documentados en detalle allí (§6-§8).
   del `return`/JSX. Detalle completo en PL-260 §9.9.
   **E6.4 (gate de confirmación de continuidad, aislado) es el siguiente checkpoint del plan
   vigente — no iniciado, pendiente de diseño y autorización explícita y separada.**
+- **E6.4 — control aislado de confirmación de continuidad de cotización, implementado,
+  auditado y cerrado (2026-09-20) — cierre registrado en este mismo cambio.** Componente
+  puro y presentacional (`src/components/ConfirmacionContinuidadCotizacion.jsx`) + 14
+  pruebas (`ConfirmacionContinuidadCotizacion.test.jsx`, primer archivo `.test.jsx` del
+  repositorio, entorno `jsdom` acotado solo a ese archivo vía
+  `// @vitest-environment jsdom`, sin tocar la configuración global de Vitest).
+  **Todavía sin conexión con `App.jsx` ni con `ProyectaTuPensionRPM.jsx`** — no se monta en
+  ningún árbol real de la aplicación; cero referencias al componente fuera de sus propios
+  archivos.
+  Disclosure y botón: literales de PL-260 §8.4, sin redactar de nuevo. Texto del estado
+  posterior al clic, **aprobado por Carlos/Atlas**: *"Elegiste explorar este escenario bajo
+  el supuesto de cotización continua."* — describe la elección ya registrada, nunca afirma
+  que la persona cotizará ni presume lo que comprendió.
+  **Auditoría posterior a la primera implementación — dos defectos encontrados y
+  corregidos** (verificados empíricamente antes de corregir): `confirmacion` ausente (prop
+  no pasada, `undefined` en vez de `null` explícito) producía
+  `TypeError: Cannot read properties of undefined (reading 'confirmado')`; `onConfirmar`
+  ausente producía `TypeError: onConfirmar is not a function` al hacer clic. Corregido con
+  `confirmacion != null` (mismo criterio ya aplicado en E5.4/E6.3) y
+  `onConfirmar = () => {}` por defecto. Cuatro pruebas de regresión agregadas.
+  Dependencias nuevas (únicas autorizadas para este checkpoint): `@testing-library/react`,
+  `@testing-library/user-event`, `jsdom` — sin `@testing-library/jest-dom`.
+  **Resultado final:** 14/14 pruebas específicas; suite completa 77 archivos / 1586 pruebas
+  en verde; lint sin hallazgos; build exitoso, bundle sin cambio (423.62 kB), confirma cero
+  consumidor real. Detalle completo en PL-260 §9.10.
+  **Decisión de invalidación documentada para E6.5** (Carlos/Atlas): cambiar edad objetivo,
+  sexo, régimen actual o fecha de nacimiento invalidará la confirmación una vez conectada al
+  estado de `App.jsx`; cambiar objetivo económico, IBC, límite de esfuerzo o historia de
+  cotización no la invalidará.
+  **E6.5 (primer consumidor visible de Contrato F; conexión real del estado de confirmación
+  a `App.jsx` con su invalidación) es el siguiente checkpoint del plan vigente — no
+  iniciado, pendiente de autorización explícita y separada.**

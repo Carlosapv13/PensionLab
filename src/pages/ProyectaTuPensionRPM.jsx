@@ -112,6 +112,7 @@ import { explicarCaminos } from '../ia/explicarCaminos.js'
 import { construirTodosLosHechos } from '../transparency/construirHechosEscenario.js'
 import { construirTextoExplicacion } from '../ia/construirTextoExplicacion.js'
 import { crearAdaptadorExplicacionViaServidor } from '../ia/adaptadores/AdaptadorExplicacionViaServidor.js'
+import { construirCadenaVisualEjercicioRPM } from './construirCadenaVisualEjercicioRPM.js'
 import { useRestaurarFocoAlMontar } from '../hooks/useRestaurarFocoAlMontar.js'
 import { useCampoMonetario } from '../hooks/useCampoMonetario.js'
 import { formatearPesos } from '../format/formatearDinero.js'
@@ -162,6 +163,19 @@ const CAMINO_MAS_ALINEADO_TEXTO = 'Camino más alineado con tu objetivo y las co
 // tokens sin resolver visibles al usuario bajo ese modo). Revertir esta decisión es cambiar
 // este único valor a true.
 const IA_EXPUESTA_EN_MVP = false
+
+// E6.3 (PL-260 §9.3/§9.6) — integración real pero DORMIDA de la cadena visual determinista
+// (evaluarPoliticasEjercicioRPM → construirEjercicioResueltoRPM →
+// construirModeloVisualEjercicioRPM, vía construirCadenaVisualEjercicioRPM.js), aprobada por
+// Carlos/Atlas. Mismo patrón exacto que IA_EXPUESTA_EN_MVP, arriba: un solo interruptor local
+// a esta pantalla, en `false` siempre. Con el interruptor apagado, `cadenaVisualDormida` (más
+// abajo) nunca se calcula — cero llamadas a las tres funciones. Ningún JSX de este checkpoint
+// consume su resultado: a diferencia de S4-007 (que ya tiene UI condicional oculta),
+// E6.3 no agrega ningún elemento visual nuevo, ni siquiera oculto — `cadenaVisualDormida`
+// queda disponible como variable local para que un checkpoint posterior (E6.5, primer
+// consumidor visible de Contrato F, ver PL-260 §9.6) la conecte a un componente real. No
+// confundir con `IA_EXPUESTA_EN_MVP`: esta cadena nunca invoca IA, `src/ia/` ni `api/`.
+const MODELO_VISUAL_EJERCICIO_ACTIVO = false
 
 function hoyISO() {
   return new Date().toISOString().slice(0, 10)
@@ -418,6 +432,21 @@ function ProyectaTuPensionRPM({
           fecha,
         })
       : null
+
+  // E6.3 (PL-260 §9.3) — cadena visual determinista, dormida: solo se calcula si
+  // MODELO_VISUAL_EJERCICIO_ACTIVO está en true (nunca en este checkpoint — ver la constante,
+  // arriba). Reutiliza literalmente `resultado` (justo arriba) — nunca vuelve a invocar
+  // generarCaminosRPM. `confirmacionesSupuestos: []` es un valor fijo hasta que E6.4
+  // introduzca el gate real de confirmación de continuidad (PL-260 §9.4) — este componente
+  // nunca inventa una confirmación por su cuenta. Sin consumidor todavía: ningún JSX de este
+  // checkpoint la usa — queda disponible como variable local para que E6.5 (primer
+  // consumidor visible de Contrato F, PL-260 §9.6) la conecte a un componente real.
+  const cadenaVisualDormida = MODELO_VISUAL_EJERCICIO_ACTIVO
+    ? construirCadenaVisualEjercicioRPM({ resultado, sexo, edadJubilacionDeseada: edadValida, confirmacionesSupuestos: [] })
+    : null
+  // Deliberadamente sin consumidor hasta E6.5 — `void` explícito en vez de fingir un uso en
+  // JSX que no existe todavía (nunca console, nunca un elemento oculto).
+  void cadenaVisualDormida
 
   // S4-004: separa, una sola vez, las limitaciones presentes en TODOS los caminos viables
   // (comunes — se muestran una vez, debajo de la comparación) de las que solo aparecen en

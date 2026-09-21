@@ -1474,3 +1474,44 @@ checkpoints E3-E5.1 documentados en detalle allí (§6-§8).
   **E6.3 (integración real dormida en `ProyectaTuPensionRPM.jsx`, tras un interruptor) es
   el siguiente checkpoint del plan vigente — no iniciado, pendiente de diseño y
   autorización explícita y separada.**
+- **E6.3 — integración real pero completamente dormida, implementada, auditada y cerrada
+  (2026-09-20) — cierre registrado en este mismo cambio.** Encadena las tres
+  etapas ya cerradas de E6.1/E6.2 (`evaluarPoliticasEjercicioRPM` →
+  `construirEjercicioResueltoRPM` → `construirModeloVisualEjercicioRPM`) sobre el único
+  `resultado` de `generarCaminosRPM(...)` que `ProyectaTuPensionRPM.jsx` ya calculaba —
+  nunca lo recalcula ni vuelve a invocar `generarCaminosRPM` (verificado: una sola
+  ocurrencia en toda la página). Archivos: `src/pages/construirCadenaVisualEjercicioRPM.js`
+  (orquestador puro) + `src/pages/construirCadenaVisualEjercicioRPM.test.js` (18 pruebas);
+  modificación **dormida** de `src/pages/ProyectaTuPensionRPM.jsx` (29 líneas: un `import`,
+  la constante del interruptor y el bloque de cálculo condicional — **cero líneas del
+  `return`/JSX tocadas**, verificado línea por línea).
+  **Contrato del orquestador:** `resultado` ausente (`null`/`undefined`) → único caso que
+  devuelve `null`; cualquier otro caso siempre devuelve un objeto cerrado — éxito
+  `CADENA_VISUAL_CONSTRUIDA` o fallo explícito `CADENA_VISUAL_NO_CONSTRUIDA` con `etapa`
+  (`POLITICAS`/`EJERCICIO`/`MODELO_VISUAL`) y `detalle` (la salida original de la etapa que
+  falló, literal, nunca reinterpretada) — nunca continúa a la etapa siguiente cuando la
+  anterior no alcanzó su estado exitoso esperado.
+  **Integración dormida:** `MODELO_VISUAL_EJERCICIO_ACTIVO = false` (mismo patrón que
+  `IA_EXPUESTA_EN_MVP`), una única llamada de producción al orquestador dentro de esa rama
+  condicional, ningún JSX nuevo ni modificado, la salida (`cadenaVisualDormida`) permanece
+  sin ningún consumidor visible. IA y S4-007 siguen sin activarse. E6.4 y E6.5 no se
+  iniciaron.
+  **Auditoría posterior a la primera implementación — defecto encontrado y corregido:** el
+  segundo parámetro del orquestador (`overridesSoloParaPruebas`, inyección de dependencias
+  exclusiva de pruebas) usaba `= {}` por defecto — ese default de JavaScript solo se activa
+  con `undefined`, nunca con un `null` explícito, que producía un `TypeError` — mismo patrón
+  de fallo exacto ya corregido en E5.4 (`fechaAplicacionRegla`). Verificado empíricamente.
+  Corregido con `const overrides = overridesSoloParaPruebas ?? {}`. Se agregaron cuatro
+  pruebas: regresión del `null` explícito, inyección parcial conserva las dependencias
+  reales no sustituidas (nunca las deja `undefined`), y dos pruebas que confirman
+  explícitamente que una etapa fallida impide ejecutar las siguientes.
+  **Resultado final:** 18/18 pruebas específicas del orquestador; 117/117 pruebas de
+  `ProyectaTuPensionRPM`; suite completa 76 archivos / 1572 pruebas en verde; lint sin
+  hallazgos; build exitoso; ninguna dependencia nueva. **Bundle: de 422.27 kB a 423.62 kB**
+  — el `import` estático incorpora el código al bundle aunque el interruptor sea `false`
+  (Rollup no puede eliminarlo por árbol de dependencias, porque el import sí se usa dentro
+  de la rama condicional); "dormido" significa no ejecutado y no visible al usuario, **no**
+  ausente del bundle. **Cero cambios visuales** — confirmado por comparación línea por línea
+  del `return`/JSX. Detalle completo en PL-260 §9.9.
+  **E6.4 (gate de confirmación de continuidad, aislado) es el siguiente checkpoint del plan
+  vigente — no iniciado, pendiente de diseño y autorización explícita y separada.**

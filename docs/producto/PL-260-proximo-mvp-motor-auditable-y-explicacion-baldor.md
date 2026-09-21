@@ -252,7 +252,7 @@ lectura de la norma), no como algo que la ley ya autoriza.
 | **E3** | Piso de pensión mínima y Contrato D (ajustes legales). | Creadas en E3: piso mayor/igual/menor al resultado matemático; objetivo mayor/igual/menor al piso; ningún aporte cuando el base ajustado ya alcanza el objetivo. | **Bloqueado por Carril 2** (ancla de incremento mujer, si el caso cae en el rango divergente) y por el cierre de E1 (fuente del piso). | **Cerrado** — ver §6.1 para los 5 commits | Prohibido |
 | **E4** | Caminos, búsqueda inversa, barrido — reconstruidos sobre D, no sobre C. Nueva demostración de monotonicidad con piso incluido. | Creadas en E4: curva plana durante el piso y creciente después; coherencia entre camino base/alternativo tras el piso. | Depende de E3. | **Cerrado** — commit `aabf01d2ca8cf0bf900bcd8da5a1ac21ffadefce` (implementación) + `5a4e545d3f9e08f87f88cfb0b73643179d2c9c53` (corrección correctiva E4-C1, ver §7) | Prohibido |
 | **E5** | Contrato `EjercicioResueltoRPM` (F) con invariantes I1-I8 como tests. | Creadas en E5: los 8 invariantes, ejecutados sobre los fixtures de E2-E4. | Ninguna adicional a las de E3/E4. | **Cerrado** — E5.1 (diseño), E5.2, E5.3, E5.4-A y E5.4 (implementación completa) — ver §8.6. | Prohibido |
-| **E6** | Experiencia visual — dos niveles (Nivel esencial y Nivel completo, ver §9), contrato visual determinista definido en E6.1. **Depende obligatoriamente de E3, E4 y E5** — no empieza antes. | Creadas en E6: accesibilidad (teclado, lectores de pantalla), coherencia visual tarjeta/gráfica/Nivel completo. | Las mismas de E3-E5, heredadas. | **E6.1 (diseño del contrato visual) aprobado, sin código — ver §9.** E6.2 (adaptador visual puro y dormido) implementado, auditado y cerrado. Implementación visible (E6.3 en adelante) sigue **prohibida hasta autorización explícita**. | Prohibido |
+| **E6** | Experiencia visual — dos niveles (Nivel esencial y Nivel completo, ver §9), contrato visual determinista definido en E6.1. **Depende obligatoriamente de E3, E4 y E5** — no empieza antes. | Creadas en E6: accesibilidad (teclado, lectores de pantalla), coherencia visual tarjeta/gráfica/Nivel completo. | Las mismas de E3-E5, heredadas. | **E6.1 (diseño del contrato visual) aprobado, sin código — ver §9.** E6.2 (adaptador visual puro y dormido) implementado, auditado y cerrado. E6.3 (integración real pero dormida) implementado, auditado y cerrado. Implementación visible (E6.5 en adelante) sigue **prohibida hasta autorización explícita**. | Prohibido |
 | **E7** | Auditoría y ampliación adversarial — no el momento inicial de escribir pruebas. Combina casos de E2-E6, busca huecos, agrega pruebas de propiedades/límites/combinaciones no cubiertas individualmente. | Ampliación, no creación desde cero. | Ninguna adicional. | Prohibido | Prohibido |
 | **E8** | Preview y validación manual. **Depende del cierre de todas las reglas jurídicas necesarias para los casos que se muestren** — ningún caso con una política `NO_RESUELTA` involucrada se exhibe como resultado confiable en Preview. | Checklist manual firmado por Carlos. | Total, específica a cada caso mostrado. | Prohibido | Permitido solo a Preview, y solo para lo ya jurídicamente cerrado |
 | **E9** | Prueba final de Oscar. **Misma dependencia jurídica que E8** — los 3 casos originales de Oscar solo se muestran con cifra final si su piso/ancla ya están resueltos; si no, se muestra el estado intermedio honesto (elegibilidad confirmada, cuantía pendiente de regla jurídica). | Los 4 fixtures de Oscar, ejecutados también manualmente en Preview. | Total. | Prohibido | Permitido solo a Preview |
@@ -325,9 +325,11 @@ comparador) y E5.4 (`evaluarPoliticasEjercicioRPM.js`, adaptador jurídico con d
 implementados y cerrados — ver §8.6. **E5 queda completo.** Siguiente paso operativo del
 plan vigente: **E6** (experiencia visual, dos niveles — Nivel esencial y Nivel completo, ver
 §9), cuyo diseño (E6.1) ya está aprobado y cerrado sin código. **E6.2 (adaptador visual puro
-y dormido) implementado, auditado y cerrado — cierre registrado en este mismo cambio, ver
-§9.6.** La implementación de E6.3 en adelante requiere autorización explícita, independiente
-y separada — no iniciada.**
+y dormido) implementado, auditado y cerrado.** **E6.3 (integración real pero dormida de la
+cadena visual en `ProyectaTuPensionRPM.jsx`) implementado, auditado y cerrado — cierre
+registrado en este mismo cambio, ver §9.9.** La implementación de E6.4 en adelante requiere
+autorización explícita,
+independiente y separada — no iniciada.**
 
 ### 8.1 Contratos A-E (reconstruidos desde el código, evidencia exacta)
 
@@ -587,8 +589,8 @@ Híbrida (Carlos/Atlas):
 | Checkpoint | Alcance | Dormido/visible | Autorización |
 |---|---|---|---|
 | **E6.2** | `construirModeloVisualEjercicioRPM` — adaptador puro, con pruebas Vitest exhaustivas. **Implementado, auditado y cerrado — cierre registrado en este mismo cambio, ver §9.8.** | Dormido — cero consumidor | Ejecutado y cerrado |
-| **E6.3** | Integración real dormida — la página invoca los pasos 1-4 de §9.3 tras un interruptor (mismo patrón `IA_EXPUESTA_EN_MVP`), sin cambiar nada visible. **No iniciado.** | Dormido (interruptor apagado) | Propia, explícita — **siguiente checkpoint operativo, sigue sin autorizarse** |
-| **E6.4** | Gate de confirmación de continuidad (§9.4), aislado — primeras pruebas de componente reales, aquí se solicita la dependencia de RTL. | Real, tras activar E6.5 | Propia, explícita — incluye aprobar la dependencia nueva |
+| **E6.3** | Integración real dormida — la página invoca los pasos 1-4 de §9.3 tras un interruptor (mismo patrón `IA_EXPUESTA_EN_MVP`), sin cambiar nada visible. **Implementado, auditado y cerrado — ver §9.9.** | Dormido (interruptor apagado) | Ejecutado y cerrado |
+| **E6.4** | Gate de confirmación de continuidad (§9.4), aislado — primeras pruebas de componente reales, aquí se solicita la dependencia de RTL. **No iniciado.** | Real, tras activar E6.5 | Propia, explícita — incluye aprobar la dependencia nueva — **siguiente checkpoint operativo, sigue sin autorizarse** |
 | **E6.5** | Nivel esencial visual real — primer consumidor visible de F; disclosure de política `NO_RESUELTA`/`completo`/`publicable`. | **Real — primer consumidor visible de F** | Propia, explícita |
 | **E6.6** | Nivel completo — acordeón por camino, pasos auditables en orden de Contrato F. | Real | Propia, explícita |
 | **E6.7** | Accesibilidad transversal (teclado, lector de pantalla) + coherencia visual resumen↔gráfica↔Nivel completo. | Real | Propia, explícita |
@@ -628,3 +630,66 @@ cada una con su propio re-shaping (`construirHechosEscenario.js` para IA;
 - Cero consumidores reales del nuevo módulo (verificado por búsqueda de importaciones).
 
 **E6.3 no se inició** — requiere autorización explícita y separada, igual que cada checkpoint anterior de este plan.
+
+### 9.9 E6.3 — implementado, auditado y cerrado
+
+**Estado: implementado; cierre registrado en este mismo cambio (2026-09-20).** Integración real
+pero completamente dormida — cero cambios visuales, Contrato F, S4-007 e IA sin activar en
+la aplicación real.
+
+**Archivos:**
+- `src/pages/construirCadenaVisualEjercicioRPM.js` — orquestador puro que encadena las tres
+  etapas ya cerradas de E6.1/E6.2 (`evaluarPoliticasEjercicioRPM` →
+  `construirEjercicioResueltoRPM` → `construirModeloVisualEjercicioRPM`) sobre el único
+  `resultado` de `generarCaminosRPM(...)` que la página ya calcula — nunca lo recalcula ni
+  vuelve a invocar `generarCaminosRPM`.
+- `src/pages/construirCadenaVisualEjercicioRPM.test.js` — 18 pruebas.
+- `src/pages/ProyectaTuPensionRPM.jsx` — **modificación dormida**, exactamente 29 líneas
+  agregadas (un `import`, la constante del interruptor, y el bloque de cálculo condicional):
+  un solo `import` nuevo, ningún JSX nuevo ni modificado.
+
+**Contrato del orquestador:** `resultado` ausente (`null`/`undefined`) → `null` — único caso
+que devuelve `null`. Cualquier otro caso siempre devuelve un objeto cerrado: éxito
+`{estado: 'CADENA_VISUAL_CONSTRUIDA', politicasInvolucradas, ejercicioResuelto, modeloVisual}`,
+o fallo explícito `{estado: 'CADENA_VISUAL_NO_CONSTRUIDA', etapa: 'POLITICAS'|'EJERCICIO'|
+'MODELO_VISUAL', detalle}` — `detalle` conserva literalmente la salida original de la etapa
+que falló, nunca reinterpretada; nunca continúa a la etapa siguiente cuando la anterior no
+alcanzó su estado exitoso esperado.
+
+**Integración dormida en `ProyectaTuPensionRPM.jsx`:** `MODELO_VISUAL_EJERCICIO_ACTIVO =
+false` (mismo patrón que `IA_EXPUESTA_EN_MVP`), una única llamada de producción al
+orquestador, dentro de la rama condicional que ese interruptor controla. La salida
+(`cadenaVisualDormida`) permanece sin ningún consumidor visible — queda disponible para que
+E6.5 (primer consumidor visible de Contrato F, ver §9.6) la conecte a un componente real. IA
+y S4-007 siguen sin activarse. E6.4 y E6.5 no se iniciaron.
+
+**Auditoría posterior a la primera implementación — defecto encontrado y corregido:** el
+segundo parámetro del orquestador (`overridesSoloParaPruebas`, mecanismo de inyección de
+dependencias exclusivo de pruebas) usaba `= {}` como valor por defecto — ese default de
+JavaScript solo se activa cuando el argumento recibido es exactamente `undefined`, nunca con
+un `null` explícito. Un `null` explícito producía un `TypeError` al leer sus propiedades,
+violando la garantía propia del módulo de nunca lanzar — mismo patrón de fallo exacto ya
+corregido en E5.4 (`fechaAplicacionRegla`). Verificado empíricamente. Corregido con
+normalización explícita `const overrides = overridesSoloParaPruebas ?? {}`. Se agregaron
+cuatro pruebas: regresión del `null` explícito, confirmación de que una inyección parcial
+conserva las dependencias reales no sustituidas (nunca las deja `undefined`), y dos pruebas
+que confirman explícitamente que una etapa fallida impide ejecutar las siguientes (espías que
+envuelven las funciones reales, nunca reimplementan su lógica).
+
+**Resultado final:**
+- 18/18 pruebas específicas del orquestador en verde.
+- 117/117 pruebas relacionadas con `ProyectaTuPensionRPM` en verde.
+- Suite completa: 76 archivos / 1572 pruebas en verde.
+- Lint sin hallazgos; build exitoso.
+- Una sola llamada a `generarCaminosRPM` en toda la página (verificado por búsqueda).
+- Cero líneas del `return`/JSX de `ProyectaTuPensionRPM.jsx` modificadas.
+- Ninguna dependencia nueva agregada.
+- Bundle de producción: de 422.27 kB a 423.62 kB. El `import` estático del orquestador (y
+  transitivamente de `evaluarPoliticasEjercicioRPM.js`/`construirEjercicioResueltoRPM.js`)
+  incorpora ese código al bundle aunque `MODELO_VISUAL_EJERCICIO_ACTIVO` sea `false` — Rollup
+  no puede eliminarlo por árbol de dependencias porque el import sí se usa (dentro de la rama
+  condicional), solo que esa rama nunca se ejecuta en runtime. **"Dormido" significa no
+  ejecutado y no visible al usuario, no ausente del bundle.**
+
+**E6.4 no se inició** — requiere autorización explícita y separada, igual que cada checkpoint
+anterior de este plan.

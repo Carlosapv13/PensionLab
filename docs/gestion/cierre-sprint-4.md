@@ -1592,3 +1592,31 @@ checkpoints E3-E5.1 documentados en detalle allí (§6-§8).
   siguen pendientes; las dos políticas jurídicas de PL-260 §2 siguen `NO_RESUELTA`, sin
   cambio. **E8 (Preview y validación manual) y E9 (prueba final de Oscar) siguen sin
   iniciarse** — dependen, sin excepción, del cierre de esas políticas (PL-260 §0 punto 2).
+- **Corrección posterior acotada sobre el commit `465e045`, solicitada por Carlos/Atlas tras
+  revisarlo — cerrada en la misma rama.** Detalle completo en PL-260 §9.15. El commit
+  `465e045` retuvo la cuantía en disputa en la tarjeta (Nivel esencial) y en el gráfico, pero
+  el Nivel completo seguía exponiendo el valor calculado de `RESULTADO_FINAL` (y, auditando
+  el resto, también de `TASA_REEMPLAZO`/`RESULTADO_MATEMATICO`/`AJUSTE_LEGAL`/
+  `COMPARACION_OBJETIVO` — los 5 pasos que dependen de la tasa de reemplazo en disputa) sin
+  ninguna advertencia propia — la misma cifra silenciosa que PL-260 §0 punto 6 prohíbe, un
+  nivel más abajo. `DATOS_UTILIZADOS` e `IBL` (datos de entrada, no el resultado en disputa)
+  quedan fuera de esta corrección, sin cambio.
+  Auditando además "todo lugar visible" (pedido explícito): se encontraron y suprimieron tres
+  conclusiones más derivadas de la misma cuantía en disputa — el badge "Camino más alineado",
+  el bloque "Qué podrías explorar ahora" (cada mensaje posible afirma si el objetivo se
+  alcanza) y el subtítulo final tras la grilla (`resultado.orientacion.razon`).
+  Corrección: nuevo `pasoDependeDePoliticaJuridica`/`mensajePasoPendienteDePolitica`
+  (`nivelCompletoAuditable.helpers.js`) y prop `pendiente` en `DetallePasoAuditable.jsx` — el
+  paso afectado sigue apareciendo (título visible, nunca omitido, PL-260 §8), pero su valor
+  calculado se reemplaza por el mensaje de qué política lo bloquea, sin nombrar ni elegir
+  ninguna interpretación jurídica. Verificado que un ejercicio jurídicamente resuelto no
+  cambia de comportamiento (regresión dedicada, sus 7 pasos siguen con cifras reales).
+  **Resultado final consolidado de toda la sesión (E6.5+E6.6+E6.7+E7+esta corrección):** 108
+  pruebas propias de este trabajo (`ProyectaTuPensionRPM.test.jsx` 22,
+  `nivelCompletoAuditable.helpers.test.js` 24, `DetallePasoAuditable.test.jsx` 9,
+  `PoliticasJuridicasInvolucradas.test.jsx` 5, `GraficoEsfuerzoResultado.test.jsx` 5,
+  `GraficoEsfuerzoResultado.helpers.test.js` 43); suite completa 82 archivos / 1657 pruebas en
+  verde (línea base E6.4: 77/1586 — 71 pruebas netas nuevas en toda la sesión); lint sin
+  hallazgos; build exitoso; `git diff --check` sin errores de espacio en blanco. Sin
+  verificación visual real ni validación jurídica — ambas siguen pendientes, sin cambio de
+  estado en las dos políticas jurídicas de PL-260 §2.

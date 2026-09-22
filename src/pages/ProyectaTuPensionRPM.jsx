@@ -121,6 +121,7 @@ import GraficoEsfuerzoResultado from '../components/GraficoEsfuerzoResultado.jsx
 import ConfirmacionContinuidadCotizacion from '../components/ConfirmacionContinuidadCotizacion.jsx'
 import DetallePasoAuditable from '../components/DetallePasoAuditable.jsx'
 import PoliticasJuridicasInvolucradas from '../components/PoliticasJuridicasInvolucradas.jsx'
+import { pasoDependeDePoliticaJuridica, mensajePasoPendienteDePolitica } from './nivelCompletoAuditable.helpers.js'
 import {
   textoEsfuerzoAdicional,
   textoAjusteIBC,
@@ -485,17 +486,34 @@ function ProyectaTuPensionRPM({
   // intermedio honesto (elegibilidad confirmada, cuantía pendiente de regla jurídica)" — sin
   // cifra. Esta pantalla NUNCA decide cuál interpretación jurídica es correcta (eso sigue sin
   // resolverse en `data/legal`/`compararAnclaIncrementoRPM.js`, fuera de este checkpoint) —
-  // solo decide NO mostrar un número que dependería en silencio de una de las dos. El Nivel
-  // completo (más abajo) sigue mostrando el valor crudo que Contrato F ya calculó, porque ahí
-  // la incertidumbre queda explícita junto al dato (sección "Políticas jurídicas de este
-  // ejercicio", en la misma tarjeta) — nunca silenciosa. Evaluado a nivel de EJERCICIO (no
-  // por camino), igual que la propia política (evaluarPoliticasEjercicioRPM.js: "a nivel de
-  // EJERCICIO, no por camino").
+  // solo decide NO mostrar un número que dependería en silencio de una de las dos. Evaluado a
+  // nivel de EJERCICIO (no por camino), igual que la propia política
+  // (evaluarPoliticasEjercicioRPM.js: "a nivel de EJERCICIO, no por camino").
+  //
+  // Corrección posterior (2026-09-23, revisión de Carlos/Atlas sobre el commit 465e045): la
+  // primera versión de este checkpoint retenía la cifra en el Nivel esencial y en la gráfica,
+  // pero el Nivel completo seguía exponiendo el valor crudo de RESULTADO_FINAL (y de los
+  // demás pasos que dependen de la misma tasa de reemplazo en disputa) sin ninguna
+  // advertencia — la misma "cifra silenciosa" que §0 punto 6 prohíbe, solo un nivel más
+  // abajo. Corregido: `pasoDependeDePoliticaJuridica` (nivelCompletoAuditable.helpers.js)
+  // decide, paso por paso, cuáles de los 7 dependen de la tasa de reemplazo en disputa
+  // (TASA_REEMPLAZO en adelante) — esos pasos siguen apareciendo (nunca se omiten, PL-260
+  // §8), pero su valor se reemplaza por `mensajePasoPendienteDePolitica` (más abajo, junto al
+  // `.map` de pasos). DATOS_UTILIZADOS e IBL (datos de entrada, no el resultado en disputa)
+  // siguen mostrando su valor real completo.
   const politicaJuridicaNoResuelta =
     cadenaVisual?.estado === 'CADENA_VISUAL_CONSTRUIDA' &&
     cadenaVisual.modeloVisual.estadoEjercicio.razonesIncompleto.some(
       (razon) => razon.codigo === 'POLITICA_JURIDICA_NO_RESUELTA'
     )
+
+  // Lista de políticas NO_RESUELTA (nunca las RESUELTA/aplicaAEsteEjercicio:false, que no
+  // bloquean nada) — se usa exclusivamente para nombrar, en el Nivel completo, cuál política
+  // impide cerrar un paso, sin afirmar cuál interpretación es correcta.
+  const politicasNoResueltas =
+    cadenaVisual?.estado === 'CADENA_VISUAL_CONSTRUIDA'
+      ? cadenaVisual.modeloVisual.politicasJuridicas.filter((p) => p.estado === 'NO_RESUELTA')
+      : []
 
   // S4-004: separa, una sola vez, las limitaciones presentes en TODOS los caminos viables
   // (comunes — se muestran una vez, debajo de la comparación) de las que solo aparecen en
@@ -1036,7 +1054,12 @@ function ProyectaTuPensionRPM({
               // objetivo es legal/estructuralmente inalcanzable (ni en el tope), la cercanía
               // matemática de caminoMasAlineadoId deja de convertirse en distinción visual —
               // el dato sigue existiendo en resultado.orientacion, solo no se pinta aquí.
+              // E7 corrección (2026-09-23): "Camino más alineado" es una conclusión derivada
+              // de comparar distanciaObjetivo entre caminos — la misma cuantía en disputa
+              // bajo una política jurídica NO_RESUELTA. Nunca se afirma esa comparación en
+              // ese estado (mismo criterio que la cifra/gráfica, arriba).
               const esMasAlineado =
+                !politicaJuridicaNoResuelta &&
                 resultado.orientacion.caminoMasAlineadoId === escenario.id &&
                 !resultado.orientacion.objetivoLegalmenteInalcanzable
               const notasEspecificas = limitacionesEspecificas(escenario, limitacionesComunes)
@@ -1179,8 +1202,23 @@ function ProyectaTuPensionRPM({
                           <summary aria-label={`Ver el detalle auditable completo del camino: ${escenario.decision}`}>
                             Ver el detalle auditable completo de este camino
                           </summary>
+                          {/* E7 corrección (2026-09-23): un paso que depende de la tasa de
+                              reemplazo en disputa (TASA_REEMPLAZO en adelante — ver
+                              pasoDependeDePoliticaJuridica, nivelCompletoAuditable.helpers.js)
+                              nunca expone su valor calculado bajo una política jurídica
+                              NO_RESUELTA — sigue apareciendo (nunca se omite en silencio),
+                              pero con el mensaje de qué política lo bloquea en vez de `datos`. */}
                           {Object.entries(caminoVisual.pasos).map(([codigoPaso, datosPaso]) => (
-                            <DetallePasoAuditable codigo={codigoPaso} datos={datosPaso} key={codigoPaso} />
+                            <DetallePasoAuditable
+                              codigo={codigoPaso}
+                              datos={datosPaso}
+                              pendiente={
+                                politicaJuridicaNoResuelta && pasoDependeDePoliticaJuridica(codigoPaso)
+                                  ? mensajePasoPendienteDePolitica(politicasNoResueltas)
+                                  : null
+                              }
+                              key={codigoPaso}
+                            />
                           ))}
                         </details>
                       )}
@@ -1305,8 +1343,15 @@ function ProyectaTuPensionRPM({
               nunca renderiza su propio botón aquí porque ese control original, inmediatamente
               debajo, ya resuelve la misma acción con el mismo handler — un solo control
               visible, nunca dos para lo mismo. AJUSTAR_DATOS_BASE sí conserva su botón: no
-              existe ningún control equivalente cerca de esta zona de la pantalla. */}
-          {orientacionExploracion && textoOrientacionActual && (
+              existe ningún control equivalente cerca de esta zona de la pantalla.
+
+              E7 corrección (2026-09-23): cada mensaje de TEXTO_ORIENTACION (helpers.js)
+              afirma algo sobre si el objetivo se alcanza ("Mantener tu situación actual ya
+              alcanza tu objetivo...", "Más de un camino evaluado alcanza tu objetivo...") —
+              una conclusión derivada de la misma cuantía en disputa bajo una política
+              jurídica NO_RESUELTA. Se suprime todo el bloque en ese estado (el aviso de
+              cuantía pendiente, arriba, ya cubre lo que hay que decir). */}
+          {!politicaJuridicaNoResuelta && orientacionExploracion && textoOrientacionActual && (
             <div className="orientacion-exploracion">
               <p className="orientacion-exploracion__titulo">Qué podrías explorar ahora</p>
               <p className="orientacion-exploracion__mensaje">{textoOrientacionActual}</p>
@@ -1441,7 +1486,12 @@ function ProyectaTuPensionRPM({
               VARIOS_CAMINOS_CUMPLEN_FALTA_PRIORIDAD arriba. Para cualquier otro código que
               en el futuro también produjera caminoMasAlineadoId === null, esta condición
               deja de excluirlo automáticamente — el bloque no se elimina, solo se acota. */}
-          {resultado.orientacion.caminoMasAlineadoId === null &&
+          {/* E7 corrección (2026-09-23): resultado.orientacion.razon (ej. "Es el único camino
+              evaluado que alcanza tu objetivo.") es otra conclusión derivada de la cuantía en
+              disputa — mismo criterio que "Qué podrías explorar ahora" y "Camino más
+              alineado", arriba: nunca se afirma bajo una política jurídica NO_RESUELTA. */}
+          {!politicaJuridicaNoResuelta &&
+            resultado.orientacion.caminoMasAlineadoId === null &&
             orientacionExploracion?.codigo !== 'VARIOS_CAMINOS_CUMPLEN_FALTA_PRIORIDAD' && (
               <p className="screen__subtitle">{resultado.orientacion.razon}</p>
             )}

@@ -10,6 +10,14 @@
 // Presentacional puro: no decide si debe mostrarse (eso lo decide el llamador, típicamente
 // dentro de un `<details>` — ver ProyectaTuPensionRPM.jsx), no recibe ni dispara ningún
 // evento, no depende de estado propio.
+//
+// E7 corrección (2026-09-23, PL-260 §0 punto 6/§8/§9) — prop `pendiente`: cuando el llamador
+// determina que ESTE paso depende de una política jurídica NO_RESUELTA
+// (`pasoDependeDePoliticaJuridica`, nivelCompletoAuditable.helpers.js), pasa aquí el mensaje
+// ya compuesto por `mensajePasoPendienteDePolitica` en vez de `datos` — el paso SIGUE
+// apareciendo (nunca se omite en silencio, PL-260 §8), pero su valor calculado se reemplaza
+// por la explicación de qué política lo bloquea. Este componente no decide cuáles pasos
+// están afectados ni redacta el mensaje — solo lo muestra tal cual, en vez de `datos`.
 
 import { ETIQUETAS_PASO, etiquetaCampo, tipoDeValor, formatearValorEscalar } from '../pages/nivelCompletoAuditable.helpers.js'
 
@@ -59,22 +67,30 @@ function ValorAuditable({ clave, valor }) {
  * @param {Object} props
  * @param {('DATOS_UTILIZADOS'|'IBL'|'TASA_REEMPLAZO'|'RESULTADO_MATEMATICO'|'AJUSTE_LEGAL'|'RESULTADO_FINAL'|'COMPARACION_OBJETIVO')} props.codigo
  * @param {Object} props.datos - literal de `camino.pasos[codigo]` (modeloVisual, E6.2) — nunca
- *   recalculado ni completado por este componente.
+ *   recalculado ni completado por este componente. Ignorado cuando `pendiente` está presente.
+ * @param {string|null} [props.pendiente] - mensaje de "paso pendiente" (ver nota de cabecera)
+ *   — cuando está presente, reemplaza la tabla de `datos` sin ocultar el paso mismo.
  */
-export default function DetallePasoAuditable({ codigo, datos }) {
+export default function DetallePasoAuditable({ codigo, datos, pendiente = null }) {
   return (
     <div className="detalle-paso">
       <p className="camino-celda__nota detalle-paso__titulo">{ETIQUETAS_PASO[codigo] ?? codigo}</p>
-      <dl className="detalle-paso__campos">
-        {Object.entries(datos ?? {}).map(([clave, valor]) => (
-          <div className="detalle-paso__fila" key={clave}>
-            <dt>{etiquetaCampo(clave)}</dt>
-            <dd>
-              <ValorAuditable clave={clave} valor={valor} />
-            </dd>
-          </div>
-        ))}
-      </dl>
+      {pendiente ? (
+        <p className="detalle-paso__pendiente" role="note">
+          {pendiente}
+        </p>
+      ) : (
+        <dl className="detalle-paso__campos">
+          {Object.entries(datos ?? {}).map(([clave, valor]) => (
+            <div className="detalle-paso__fila" key={clave}>
+              <dt>{etiquetaCampo(clave)}</dt>
+              <dd>
+                <ValorAuditable clave={clave} valor={valor} />
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
     </div>
   )
 }

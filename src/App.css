@@ -1010,6 +1010,17 @@
   color: var(--text-h);
 }
 
+/* E7 corrección (2026-09-23) — mensaje de "paso pendiente" cuando el valor depende de una
+   política jurídica NO_RESUELTA (ver DetallePasoAuditable.jsx). Mismo tono que
+   .camino-celda__nota--no-publicable (var(--accent), itálica) — nunca se confunde con un
+   valor calculado normal (.detalle-paso__valor, sin color de acento). */
+.detalle-paso__pendiente {
+  margin: 0;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--accent);
+}
+
 /* E6.6 — políticas jurídicas involucradas, sección propia a nivel de ejercicio (nunca por
    camino). Mismo tono neutral que .orientacion-exploracion (no es un aviso de IA ni de
    bloqueo — es información jurídica estructural). */

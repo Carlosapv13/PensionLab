@@ -96,6 +96,47 @@ export const ETIQUETAS_PASO = {
   COMPARACION_OBJETIVO: 'Comparación contra tu objetivo',
 }
 
+// E7 corrección (2026-09-23, PL-260 §0 punto 6/§8/§9) — de los 7 PasoAuditable, solo
+// `TASA_REEMPLAZO` en adelante depende de la interpretación jurídica en disputa
+// (`PoliticaAnclaIncrementoMujer`, Art. 34: el "ancla" decide `bloquesAdicionales` →
+// `incrementoPorSemanas` → `tasaFinalAplicada`, y todo lo que sigue en cadena —
+// `RESULTADO_MATEMATICO` aplica esa tasa, `AJUSTE_LEGAL` clampa ese resultado disputado,
+// `RESULTADO_FINAL` lo reexpone, `COMPARACION_OBJETIVO` compara ese mismo valor contra el
+// objetivo). `DATOS_UTILIZADOS` (IBC declarado/aplicado) e `IBL` (promedio histórico de IBC)
+// son datos de ENTRADA — se calculan antes de aplicar cualquier tasa de reemplazo y no
+// cambian entre las dos interpretaciones en disputa, así que se excluyen deliberadamente de
+// este conjunto y se siguen mostrando completos.
+export const PASOS_DEPENDIENTES_DE_TASA_REEMPLAZO = new Set([
+  'TASA_REEMPLAZO',
+  'RESULTADO_MATEMATICO',
+  'AJUSTE_LEGAL',
+  'RESULTADO_FINAL',
+  'COMPARACION_OBJETIVO',
+])
+
+/**
+ * @param {string} codigoPaso
+ * @returns {boolean}
+ */
+export function pasoDependeDePoliticaJuridica(codigoPaso) {
+  return PASOS_DEPENDIENTES_DE_TASA_REEMPLAZO.has(codigoPaso)
+}
+
+/**
+ * Mensaje de "paso pendiente" para un PasoAuditable cuyo valor depende de una política
+ * jurídica NO_RESUELTA — nunca afirma cuál interpretación es correcta, solo nombra la(s)
+ * política(s) que impide(n) cerrarlo. `politicasNoResueltas` ya viene filtrado por el
+ * llamador (`estado === 'NO_RESUELTA'`) — esta función solo compone el texto, nunca decide
+ * cuáles políticas aplican.
+ *
+ * @param {Array<{nombre: string}>} politicasNoResueltas
+ * @returns {string}
+ */
+export function mensajePasoPendienteDePolitica(politicasNoResueltas) {
+  const nombres = politicasNoResueltas.map((p) => `"${p.nombre}"`).join(' y ')
+  return `Pendiente: depende de la política jurídica ${nombres}, todavía sin resolver — ver "Políticas jurídicas de este ejercicio", abajo.`
+}
+
 /**
  * camelCase → "Camel Case" — fallback mecánico, nunca una traducción inventada, para
  * cualquier campo sin entrada en ETIQUETAS_CAMPO (incluidos campos futuros de Contrato F que

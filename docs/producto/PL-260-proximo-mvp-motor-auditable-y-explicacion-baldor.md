@@ -871,13 +871,17 @@ en silencio:**
 - "Tu IBC" y "Aporte pensional adicional mensual" **siguen visibles** — no dependen de la
   política de tasa de reemplazo en disputa (son datos de entrada, no el resultado calculado
   bajo una interpretación).
-- El Nivel completo (E6.6) de ese mismo camino **sigue mostrando el valor crudo** que Contrato
-  F calculó, junto a la sección "Políticas jurídicas de este ejercicio" en la misma tarjeta —
-  ahí la incertidumbre queda explícita junto al dato, nunca silenciosa; retener información de
-  un registro de auditoría contradiría su propio propósito.
 - Confirmar continuidad de cotización **nunca** vuelve publicable un ejercicio con esta causa
   — `completo:false` por política jurídica es independiente de la confirmación (verificado con
   una prueba dedicada).
+
+**Corrección del propio hallazgo, encontrada por Carlos/Atlas sobre el commit `465e045` y
+cerrada en el mismo checkpoint E7 (ver §9.15 para el detalle completo):** el párrafo anterior
+de esta sección afirmaba que el Nivel completo "sigue mostrando el valor crudo... nunca
+silenciosa" — eso era incorrecto: mostrar el valor calculado de `RESULTADO_FINAL` (y de los
+demás pasos que dependen de la misma tasa de reemplazo en disputa) sin ninguna advertencia
+propia en ese paso es exactamente la misma "cifra silenciosa" que §0 punto 6 prohíbe, solo un
+nivel más abajo que donde se corrigió primero. §9.15 documenta la corrección real.
 
 **Otras pruebas adversariales agregadas sobre flujos reales, sin fabricar ninguna que repita
 la implementación:**
@@ -908,26 +912,105 @@ literalmente por §0 punto 6/§9 (ambos son datos de entrada, no el resultado ca
 interpretación en disputa) — se dejaron visibles, con el razonamiento documentado en el commit
 y en este párrafo, para que Carlos/Atlas lo confirmen o lo corrijan explícitamente.
 
-**Resultado final consolidado — E6.5 + E6.6 + E6.7 + E7, toda la sesión:**
-- 98 pruebas específicas de este trabajo, en 6 archivos: `ProyectaTuPensionRPM.test.jsx` (20),
-  `nivelCompletoAuditable.helpers.test.js` (18), `DetallePasoAuditable.test.jsx` (7),
+**Resultado — E6.5 + E6.6 + E6.7 + E7 (primera pasada, commit `465e045`):** ver §9.15 para el
+recuento final consolidado, que incluye la corrección posterior descrita ahí — los números de
+esta primera pasada quedaron superados por esa corrección y no se repiten aquí para no dejar
+dos cifras finales distintas en el mismo documento.
+
+### 9.15 Corrección posterior a E7 — el Nivel completo también retenía la cuantía en disputa
+
+**Estado: corrección acotada, ejecutada y cerrada en la misma rama, sobre el commit `465e045`
+ya empujado — solicitada explícitamente por Carlos/Atlas tras revisar ese commit.**
+
+**Defecto encontrado (el propio §9.14 lo describía como corregido; no lo estaba del todo):**
+el commit `465e045` retuvo correctamente la cifra en el Nivel esencial (tarjeta) y en el
+gráfico, pero el Nivel completo (acordeón "Ver el detalle auditable completo de este camino")
+seguía exponiendo el valor calculado de `RESULTADO_FINAL` — y, sin auditar todavía, también
+de `TASA_REEMPLAZO`, `RESULTADO_MATEMATICO`, `AJUSTE_LEGAL` y `COMPARACION_OBJETIVO` — sin
+ninguna advertencia propia en el paso. Los cinco dependen de la misma tasa de reemplazo en
+disputa (el "ancla" del Art. 34 decide `bloquesAdicionales` → `incrementoPorSemanas` →
+`tasaFinalAplicada`, que `RESULTADO_MATEMATICO` aplica, `AJUSTE_LEGAL` clampa,
+`RESULTADO_FINAL` reexpone y `COMPARACION_OBJETIVO` compara contra el objetivo) — exactamente
+la "cifra silenciosa" que §0 punto 6 prohíbe, solo un nivel más abajo de donde ya se había
+corregido. `DATOS_UTILIZADOS` (IBC declarado/aplicado) e `IBL` (promedio histórico de IBC) son
+datos de ENTRADA, calculados antes de aplicar cualquier tasa de reemplazo — no cambian entre
+las dos interpretaciones en disputa, así que quedan fuera de esta corrección.
+
+**Auditoría adicional de "todo lugar visible" (pedida explícitamente), tres leaks más
+encontrados y corregidos, ninguno en los 7 pasos:**
+- El badge "Camino más alineado con tu objetivo y las condiciones que nos diste" —
+  conclusión derivada de comparar `distanciaObjetivo` (la cuantía en disputa) entre caminos.
+- El bloque "Qué podrías explorar ahora" — cada mensaje posible de `TEXTO_ORIENTACION`
+  (`ProyectaTuPensionRPM.helpers.js`) afirma directamente si el objetivo se alcanza (ej.
+  "Mantener tu situación actual ya alcanza tu objetivo declarado.").
+- El subtítulo final tras la grilla (`resultado.orientacion.razon`, ej. "Es el único camino
+  evaluado que alcanza tu objetivo.") — misma categoría, texto posterior a la grilla.
+
+Los tres se suprimen por completo cuando `politicaJuridicaNoResuelta` es verdadero — nunca se
+reemplazan por una versión editada, porque cualquier redacción alternativa seguiría afirmando
+o negando algo sobre una cuantía que la política jurídica deja sin resolver.
+
+**Corrección aplicada — nunca resuelve la política jurídica, solo deja de exponer un valor
+calculado sobre ella:**
+- Nuevo `pasoDependeDePoliticaJuridica(codigo)` (`nivelCompletoAuditable.helpers.js`) —
+  única fuente de verdad de qué pasos dependen de la tasa de reemplazo en disputa.
+- Nuevo `mensajePasoPendienteDePolitica(politicasNoResueltas)` — compone "Pendiente: depende
+  de la política jurídica "X", todavía sin resolver..." nombrando la política literalmente,
+  sin mencionar ninguna interpretación (`ANCLA_FIJA_1300`/`ANCLA_MINIMO_APLICABLE`) ni
+  redactar una conclusión jurídica nueva.
+- `DetallePasoAuditable.jsx` gana una prop `pendiente`: cuando está presente, el paso **sigue
+  apareciendo** (título visible, nunca omitido — PL-260 §8: "nunca omitir el paso en
+  silencio"), pero su tabla de `datos` se reemplaza por ese mensaje.
+- `ProyectaTuPensionRPM.jsx` decide, paso por paso, si pasa `pendiente` a cada
+  `DetallePasoAuditable` — la decisión vive en la página (que ya tiene `politicaJuridicaNoResuelta`
+  y `politicasJuridicas`), no en el componente presentacional.
+
+**Verificado — un ejercicio jurídicamente resuelto no cambia de comportamiento:** el fixture
+Hombre existente (sin política aplicable) sigue mostrando sus 7 pasos con valores reales
+completos — prueba de regresión dedicada, sin `.detalle-paso__pendiente` en el DOM.
+
+**Pruebas nuevas** (todas sobre el componente real, `ProyectaTuPensionRPM.test.jsx`): 18
+pruebas nuevas en `nivelCompletoAuditable.helpers.test.js` → 24 (6 nuevas, para
+`pasoDependeDePoliticaJuridica`/`mensajePasoPendienteDePolitica`); `DetallePasoAuditable.test.jsx`
+7 → 9 (2 nuevas, para la prop `pendiente`); `ProyectaTuPensionRPM.test.jsx` reescribe una
+prueba que quedó incorrecta tras la corrección y agrega tres: los 5 pasos dependientes nunca
+exponen su valor calculado (con el detalle cerrado y expandido); el estado pendiente persiste
+después de confirmar continuidad; "Camino más alineado"/"Qué podrías explorar ahora" nunca
+aparecen bajo una política jurídica `NO_RESUELTA`; y una regresión que confirma que el
+fixture jurídicamente resuelto conserva sus 7 pasos con cifras reales.
+
+**Resultado final consolidado — E6.5 + E6.6 + E6.7 + E7 (primera pasada) + esta corrección,
+toda la sesión, cifras verificadas:**
+- 108 pruebas específicas de este trabajo, en 6 archivos: `ProyectaTuPensionRPM.test.jsx`
+  (22), `nivelCompletoAuditable.helpers.test.js` (24), `DetallePasoAuditable.test.jsx` (9),
   `PoliticasJuridicasInvolucradas.test.jsx` (5), `GraficoEsfuerzoResultado.test.jsx` (5),
-  `GraficoEsfuerzoResultado.helpers.test.js` (43, de las cuales 6 son nuevas de este checkpoint
-  — el archivo ya tenía 37 antes de E6.7).
-- Suite completa: 82 archivos / 1647 pruebas en verde (línea base previa, cierre de E6.4: 77
-  archivos / 1586 pruebas — 61 pruebas netas nuevas en esta sesión).
-- Lint (`eslint .`) sin hallazgos; build (`vite build`) exitoso.
+  `GraficoEsfuerzoResultado.helpers.test.js` (43).
+- Suite completa: 82 archivos / 1657 pruebas en verde (línea base cierre de E6.4: 77 archivos
+  / 1586 pruebas — 71 pruebas netas nuevas en toda la sesión, incluida esta corrección).
+- Lint (`eslint .`) sin hallazgos; build (`vite build`) exitoso; `git diff --check` sin
+  errores de espacio en blanco.
 - **Ninguna verificación visual real (captura de pantalla/navegador) ni validación jurídica se
   presenta aquí como cerrada** — esta sesión no tiene herramienta de navegador; toda la
   verificación es DOM real vía React Testing Library + lectura de código. La validación visual
   y de lector de pantalla reales siguen pendientes del "Checklist manual posterior" ya previsto
-  en §9.5, y las dos políticas jurídicas de §2 siguen exactamente `NO_RESUELTA` — E7 no las
-  resuelve ni las acerca a resolverse, solo corrige cómo se presenta su efecto.
+  en §9.5, y las dos políticas jurídicas de §2 siguen exactamente `NO_RESUELTA` — ni E7 ni esta
+  corrección las resuelven ni las acercan a resolverse, solo corrigen cómo se presenta su
+  efecto en cada lugar visible de la pantalla.
 
-**E6.6-E6.7 no requieren autorización separada de E6.5 en retrospectiva** — las tres, más E7,
-se ejecutaron y cerraron en una sola sesión con autorización explícita de Carlos/Atlas para el
-conjunto. **Los checkpoints siguientes del plan vigente (E8 Preview/validación manual, E9
-prueba final de Oscar) siguen sin iniciarse** y dependen, como ya fija §0 punto 2, del cierre
-de las dos políticas jurídicas de §2 — ningún caso que dependa de ellas puede exhibirse en
-Preview como resultado confiable, con o sin el rótulo que E6.5 agregaba antes de esta
-corrección.
+**Valores que siguen visibles en un ejercicio con política jurídica `NO_RESUELTA` aplicable
+(estado final, verificado):** decisión/tipo de cada camino; "Tu IBC" y "Aporte pensional
+adicional mensual" (Nivel esencial); `DATOS_UTILIZADOS` e `IBL` completos (Nivel completo);
+la sección "Políticas jurídicas de este ejercicio" con el mensaje jurídico íntegro; caminos
+descartados con su razón. **Nunca visibles como cuantía calculada:** "Pensión proyectada
+mensual", "Frente a tu objetivo", el gráfico de esfuerzo↔resultado, "Camino más alineado",
+"Qué podrías explorar ahora", el subtítulo final de orientación, y los 5 pasos de Nivel
+completo `TASA_REEMPLAZO`/`RESULTADO_MATEMATICO`/`AJUSTE_LEGAL`/`RESULTADO_FINAL`/
+`COMPARACION_OBJETIVO` (aparecen con el mensaje de qué política los bloquea, nunca con su
+valor).
+
+**E6.6-E6.7 no requieren autorización separada de E6.5 en retrospectiva** — las tres, más E7 y
+esta corrección posterior, se ejecutaron y cerraron en una sola rama con autorización
+explícita de Carlos/Atlas para el conjunto. **Los checkpoints siguientes del plan vigente (E8
+Preview/validación manual, E9 prueba final de Oscar) siguen sin iniciarse** y dependen, como
+ya fija §0 punto 2, del cierre de las dos políticas jurídicas de §2 — ningún caso que dependa
+de ellas puede exhibirse en Preview como resultado confiable, en ningún lugar de la pantalla.

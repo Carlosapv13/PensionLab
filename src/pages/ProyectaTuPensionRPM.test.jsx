@@ -276,17 +276,100 @@ describe('ProyectaTuPensionRPM — caso jurídico no publicable (E6.5/E7, PL-260
     expect(screen.getAllByText('Pendiente de la misma cuantía.').length).toBeGreaterThan(0)
   })
 
-  it('E7: el Nivel completo de ese mismo camino SÍ muestra el valor crudo que Contrato F calculó, junto a la política que lo hace incierto — ahí deja de ser silencioso', async () => {
+  // E7 corrección posterior (2026-09-23, sobre el commit 465e045): la primera versión de
+  // esta corrección retenía la cifra en la tarjeta/gráfica pero el Nivel completo seguía
+  // exponiendo el valor crudo de RESULTADO_FINAL (y los demás pasos derivados de la tasa de
+  // reemplazo en disputa) sin ninguna advertencia — la misma cifra silenciosa que PL-260 §0
+  // punto 6 prohíbe, un nivel más abajo. Esta prueba verifica la corrección: los 5 pasos que
+  // dependen de la tasa de reemplazo en disputa (TASA_REEMPLAZO en adelante) NUNCA exponen
+  // su valor calculado — el paso sigue apareciendo (nunca se omite en silencio, PL-260 §8),
+  // pero con el mensaje de qué política lo bloquea. DATOS_UTILIZADOS e IBL, en cambio, son
+  // datos de entrada (no el resultado en disputa) y siguen mostrando su valor real completo.
+  it('E7: el Nivel completo NUNCA expone el valor calculado de los 5 pasos que dependen de la tasa de reemplazo en disputa — el paso aparece con el mensaje de qué política lo bloquea, nunca se omite', async () => {
     const user = userEvent.setup()
     render(<ProyectaTuPensionRPM {...propsMujerJuridicoNoPublicable()} confirmacionContinuidad={null} />)
 
     await user.click(screen.getAllByText('Ver el detalle auditable completo de este camino')[0])
-    expect(screen.getByText('Resultado final')).toBeTruthy()
-    // El paso RESULTADO_FINAL trae el mismo campo `valor` que la tarjeta ya no muestra como
-    // cifra — aquí sí aparece, formateado en pesos, porque va acompañado de la política
-    // jurídica que lo hace incierto (sección propia, misma tarjeta expandida).
+
+    // Los 7 pasos siguen apareciendo — nunca se omite ninguno en silencio.
+    for (const titulo of [
+      'Datos utilizados',
+      'Cálculo del IBL',
+      'Tasa de reemplazo',
+      'Resultado matemático (antes del ajuste legal)',
+      'Ajuste legal (piso y techo)',
+      'Resultado final',
+      'Comparación contra tu objetivo',
+    ]) {
+      expect(screen.getAllByText(titulo).length).toBeGreaterThan(0)
+    }
+
+    // Los 5 pasos dependientes muestran el mensaje de "pendiente" — nunca su valor calculado.
+    const mensajesPendientes = screen.getAllByText(
+      'Pendiente: depende de la política jurídica "PoliticaAnclaIncrementoMujer", todavía sin resolver — ver "Políticas jurídicas de este ejercicio", abajo.'
+    )
+    expect(mensajesPendientes.length).toBe(5)
+    // Ninguna cifra en pesos dentro de un bloque .detalle-paso__pendiente.
+    document.querySelectorAll('.detalle-paso__pendiente').forEach((bloque) => {
+      expect(bloque.textContent).not.toMatch(/\$[\d.]+/)
+    })
+
+    // DATOS_UTILIZADOS e IBL (datos de entrada, no el resultado en disputa) SÍ muestran su
+    // valor real — verificado con un campo conocido de cada uno.
+    expect(screen.getByText('IBC declarado')).toBeTruthy()
+    expect(screen.getByText('IBL aplicable')).toBeTruthy()
     expect(document.querySelectorAll('.detalle-paso__valor').length).toBeGreaterThan(0)
+
     expect(screen.getByText('Políticas jurídicas de este ejercicio')).toBeTruthy()
+  })
+
+  it('E7: el mensaje de "paso pendiente" sigue presente tanto con el detalle cerrado como expandido, y después de confirmar continuidad', async () => {
+    const user = userEvent.setup()
+    const onConfirmarContinuidad = vi.fn()
+    render(
+      <ProyectaTuPensionRPM
+        {...propsMujerJuridicoNoPublicable()}
+        confirmacionContinuidad={null}
+        onConfirmarContinuidad={onConfirmarContinuidad}
+      />
+    )
+
+    // Con el detalle cerrado, el <details> sigue montado (oculto por el navegador, no por
+    // React) — el mensaje ya está en el DOM antes de expandir.
+    expect(
+      screen.getAllByText(
+        'Pendiente: depende de la política jurídica "PoliticaAnclaIncrementoMujer", todavía sin resolver — ver "Políticas jurídicas de este ejercicio", abajo.'
+      ).length
+    ).toBe(5)
+
+    await user.click(screen.getAllByText('Ver el detalle auditable completo de este camino')[0])
+    expect(
+      screen.getAllByText(
+        'Pendiente: depende de la política jurídica "PoliticaAnclaIncrementoMujer", todavía sin resolver — ver "Políticas jurídicas de este ejercicio", abajo.'
+      ).length
+    ).toBe(5)
+
+    await user.click(screen.getByRole('button', { name: TEXTO_BOTON_CONFIRMAR_CONTINUIDAD }))
+    const confirmacionEmitida = onConfirmarContinuidad.mock.calls[0][0]
+    cleanup()
+    render(<ProyectaTuPensionRPM {...propsMujerJuridicoNoPublicable()} confirmacionContinuidad={confirmacionEmitida} />)
+
+    // Confirmar continuidad nunca resuelve la política jurídica — los 5 pasos siguen
+    // pendientes exactamente igual.
+    expect(
+      screen.getAllByText(
+        'Pendiente: depende de la política jurídica "PoliticaAnclaIncrementoMujer", todavía sin resolver — ver "Políticas jurídicas de este ejercicio", abajo.'
+      ).length
+    ).toBe(5)
+  })
+
+  // E7 corrección: "Camino más alineado", "Qué podrías explorar ahora" y el subtítulo final
+  // de orientación son conclusiones derivadas de comparar la cuantía en disputa entre
+  // caminos — nunca deben afirmarse bajo una política jurídica NO_RESUELTA.
+  it('E7: "Camino más alineado" y "Qué podrías explorar ahora" nunca aparecen cuando hay una política jurídica NO_RESUELTA aplicable', () => {
+    render(<ProyectaTuPensionRPM {...propsMujerJuridicoNoPublicable()} confirmacionContinuidad={null} />)
+    expect(screen.queryByText('Camino más alineado con tu objetivo y las condiciones que nos diste.')).toBeNull()
+    expect(screen.queryByText('Qué podrías explorar ahora')).toBeNull()
   })
 
   it('E7: el gráfico de esfuerzo↔resultado tampoco se dibuja — traza la misma cuantía pendiente (coherencia resumen↔gráfica)', () => {
@@ -390,6 +473,12 @@ describe('ProyectaTuPensionRPM — Nivel completo conectado (E6.6, PL-260 §9.1/
     // El resumen (Nivel esencial de ese mismo camino) sigue visible tras expandir — nunca se
     // pierde el contexto al pasar al detalle.
     expect(screen.getAllByText('Pensión proyectada mensual (pesos de hoy)').length).toBeGreaterThan(0)
+
+    // E7 corrección (regresión): un ejercicio SIN política jurídica NO_RESUELTA (este
+    // fixture, sexo Hombre) nunca muestra el mensaje de "paso pendiente" — sus 7 pasos
+    // exponen su valor calculado real, sin excepción.
+    expect(document.querySelectorAll('.detalle-paso__pendiente').length).toBe(0)
+    expect(document.querySelectorAll('.detalle-paso__valor').length).toBeGreaterThan(0)
   })
 
   it('un camino descartado nunca ofrece un control de Nivel completo — I7 garantiza que no tiene pasos que mostrar', () => {

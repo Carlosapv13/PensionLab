@@ -8,6 +8,8 @@ import {
   tipoDeValor,
   formatearValorEscalar,
   ETIQUETAS_PASO,
+  pasoDependeDePoliticaJuridica,
+  mensajePasoPendienteDePolitica,
 } from './nivelCompletoAuditable.helpers.js'
 
 describe('humanizarClave — traducción mecánica camelCase → "Con espacios", nunca inventa significado', () => {
@@ -111,5 +113,45 @@ describe('ETIQUETAS_PASO — los 7 códigos de Contrato F, cada uno con un títu
       'RESULTADO_FINAL',
       'COMPARACION_OBJETIVO',
     ])
+  })
+})
+
+// E7 corrección (2026-09-23, PL-260 §0 punto 6/§8/§9) — qué pasos de Contrato F dependen de
+// la interpretación jurídica en disputa (PoliticaAnclaIncrementoMujer, Art. 34).
+describe('pasoDependeDePoliticaJuridica — exactamente los 5 pasos que la tasa de reemplazo en disputa afecta', () => {
+  it('DATOS_UTILIZADOS e IBL son datos de entrada — nunca dependen de la política', () => {
+    expect(pasoDependeDePoliticaJuridica('DATOS_UTILIZADOS')).toBe(false)
+    expect(pasoDependeDePoliticaJuridica('IBL')).toBe(false)
+  })
+
+  it('TASA_REEMPLAZO, RESULTADO_MATEMATICO, AJUSTE_LEGAL, RESULTADO_FINAL y COMPARACION_OBJETIVO sí dependen', () => {
+    expect(pasoDependeDePoliticaJuridica('TASA_REEMPLAZO')).toBe(true)
+    expect(pasoDependeDePoliticaJuridica('RESULTADO_MATEMATICO')).toBe(true)
+    expect(pasoDependeDePoliticaJuridica('AJUSTE_LEGAL')).toBe(true)
+    expect(pasoDependeDePoliticaJuridica('RESULTADO_FINAL')).toBe(true)
+    expect(pasoDependeDePoliticaJuridica('COMPARACION_OBJETIVO')).toBe(true)
+  })
+
+  it('un código de paso desconocido nunca se trata como dependiente por accidente', () => {
+    expect(pasoDependeDePoliticaJuridica('PASO_FUTURO_DESCONOCIDO')).toBe(false)
+  })
+})
+
+describe('mensajePasoPendienteDePolitica — nunca elige una interpretación, solo nombra la política pendiente', () => {
+  it('con una sola política NO_RESUELTA, la nombra literalmente entre comillas', () => {
+    const mensaje = mensajePasoPendienteDePolitica([{ nombre: 'PoliticaAnclaIncrementoMujer' }])
+    expect(mensaje).toBe(
+      'Pendiente: depende de la política jurídica "PoliticaAnclaIncrementoMujer", todavía sin resolver — ver "Políticas jurídicas de este ejercicio", abajo.'
+    )
+  })
+
+  it('con varias políticas NO_RESUELTA, las une con "y" — nunca omite ninguna', () => {
+    const mensaje = mensajePasoPendienteDePolitica([{ nombre: 'PoliticaA' }, { nombre: 'PoliticaB' }])
+    expect(mensaje).toContain('"PoliticaA" y "PoliticaB"')
+  })
+
+  it('nunca menciona ANCLA_FIJA_1300 ni ANCLA_MINIMO_APLICABLE ni ninguna interpretación — solo el nombre de la política', () => {
+    const mensaje = mensajePasoPendienteDePolitica([{ nombre: 'PoliticaAnclaIncrementoMujer' }])
+    expect(mensaje).not.toMatch(/ANCLA_FIJA|ANCLA_MINIMO|fija en 1.300|dinámica/)
   })
 })

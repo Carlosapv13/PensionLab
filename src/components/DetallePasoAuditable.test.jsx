@@ -115,3 +115,32 @@ describe('DetallePasoAuditable — auditoría: ninguna prop ausente causa una ex
     expect(screen.getByText('Resultado final')).toBeTruthy()
   })
 })
+
+// E7 corrección (2026-09-23, PL-260 §0 punto 6/§8/§9) — prop `pendiente`: el paso sigue
+// apareciendo (título visible), pero su valor calculado se reemplaza por la explicación de
+// qué política lo bloquea, nunca se omite en silencio.
+describe('DetallePasoAuditable — prop pendiente (E7): el paso nunca se omite, pero su valor calculado se retiene', () => {
+  it('con pendiente, el título del paso sigue visible pero ningún campo de `datos` se renderiza', () => {
+    render(
+      <DetallePasoAuditable
+        codigo="RESULTADO_FINAL"
+        datos={{ valor: 1750905 }}
+        pendiente='Pendiente: depende de la política jurídica "PoliticaAnclaIncrementoMujer", todavía sin resolver — ver "Políticas jurídicas de este ejercicio", abajo.'
+      />
+    )
+    expect(screen.getByText('Resultado final')).toBeTruthy()
+    expect(
+      screen.getByText(
+        'Pendiente: depende de la política jurídica "PoliticaAnclaIncrementoMujer", todavía sin resolver — ver "Políticas jurídicas de este ejercicio", abajo.'
+      )
+    ).toBeTruthy()
+    // El valor crudo (1.750.905, formateado o no) nunca aparece cuando el paso está pendiente.
+    expect(screen.queryByText('$1.750.905')).toBeNull()
+    expect(screen.queryByText('1750905')).toBeNull()
+  })
+
+  it('sin pendiente (o null explícito), se comporta exactamente igual que antes — muestra `datos` normalmente', () => {
+    render(<DetallePasoAuditable codigo="RESULTADO_FINAL" datos={{ valor: 1750905 }} pendiente={null} />)
+    expect(screen.getByText('$1.750.905')).toBeTruthy()
+  })
+})

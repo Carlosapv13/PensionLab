@@ -21,6 +21,7 @@ import {
   textoFuenteSemanas,
   calcularLimitacionesComunes,
   limitacionesEspecificas,
+  filtrarLimitacionesPorPoliticaJuridica,
   debeOcultarRestriccion,
   validarEsfuerzoAdicionalMensualDeseado,
   ordenarCaminosParaPresentacion,
@@ -60,6 +61,36 @@ describe('debeOcultarRestriccion — EVIDENCIA: solo se oculta cuando el resulta
 
   it('resultado sin orientacion (forma inesperada) → false, no lanza', () => {
     expect(debeOcultarRestriccion({})).toBe(false)
+  })
+})
+
+// E7 corrección posterior (2026-09-23, PL-260 §0 punto 6/§8/§9) — hallazgo de la auditoría de
+// "todo lugar visible donde pueda aparecer un dato derivado" de la cuantía en disputa:
+// RESTRICCION_COSTO_LIMITA_RESULTADO (generarCaminosRPM.js) afirma "tu objetivo sí sería
+// alcanzable [sin la restricción]" — una conclusión derivada de distanciaObjetivo.cumple, la
+// misma cuantía en disputa bajo una política jurídica NO_RESUELTA.
+describe('filtrarLimitacionesPorPoliticaJuridica', () => {
+  const limitacionRestriccion = {
+    codigo: 'RESTRICCION_COSTO_LIMITA_RESULTADO',
+    mensaje:
+      'El límite que declaraste para tu aporte pensional adicional impidió alcanzar tu objetivo — sin esa ' +
+      'restricción, tu objetivo sí sería alcanzable dentro del tope legal.',
+  }
+  const limitacionGenerica = { codigo: 'NO_ES_TU_PENSION_FINAL', mensaje: 'Esta es una proyección bajo un escenario...' }
+
+  it('sin política jurídica NO_RESUELTA, es la identidad — nunca filtra nada', () => {
+    const limitaciones = [limitacionGenerica, limitacionRestriccion]
+    expect(filtrarLimitacionesPorPoliticaJuridica(limitaciones, false)).toEqual(limitaciones)
+  })
+
+  it('con política jurídica NO_RESUELTA, quita RESTRICCION_COSTO_LIMITA_RESULTADO — nunca las demás limitaciones (disclaimers genéricos, independientes de la interpretación en disputa)', () => {
+    const limitaciones = [limitacionGenerica, limitacionRestriccion]
+    expect(filtrarLimitacionesPorPoliticaJuridica(limitaciones, true)).toEqual([limitacionGenerica])
+  })
+
+  it('sin la limitación en disputa presente, no cambia nada (arreglo vacío o solo genéricas)', () => {
+    expect(filtrarLimitacionesPorPoliticaJuridica([], true)).toEqual([])
+    expect(filtrarLimitacionesPorPoliticaJuridica([limitacionGenerica], true)).toEqual([limitacionGenerica])
   })
 })
 

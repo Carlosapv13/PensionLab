@@ -272,6 +272,33 @@ export function limitacionesEspecificas(escenario, limitacionesComunes) {
   return escenario.limitaciones.filter((l) => !codigosComunes.has(l.codigo))
 }
 
+// E7 corrección posterior (2026-09-23, PL-260 §0 punto 6/§8/§9 — hallazgo de la auditoría de
+// "todo lugar visible donde pueda aparecer... un dato derivado" de la cuantía en disputa):
+// `RESTRICCION_COSTO_LIMITA_RESULTADO` (generarCaminosRPM.js) afirma directamente "tu
+// objetivo sí sería alcanzable" — una conclusión derivada de `distanciaObjetivo.cumple`, la
+// misma cuantía en disputa bajo una política jurídica NO_RESUELTA. Es la única limitación de
+// generarCaminosRPM.js que compara contra el objetivo (las demás —
+// NO_ES_TU_PENSION_FINAL/PARAMETROS_LEGALES_CONGELADOS_A_FECHA_CALCULO/
+// CONTINUIDAD_FUTURA_ASUMIDA_SIN_HUECOS/AJUSTE_LEGAL_NO_SOLICITADO/
+// PROYECCION_CONDICIONADA_A_SEMANAS_DECLARADAS— son disclaimers genéricos, independientes de
+// la interpretación jurídica en disputa, y se conservan sin cambios).
+const CODIGOS_LIMITACION_DEPENDIENTES_DE_POLITICA_JURIDICA = new Set(['RESTRICCION_COSTO_LIMITA_RESULTADO'])
+
+/**
+ * Filtra, de un arreglo de `limitaciones` ya calculado por dominio, las que dependen de la
+ * cuantía en disputa bajo una política jurídica NO_RESUELTA — nunca modifica el arreglo
+ * original ni la limitación misma, solo decide cuáles no se muestran en ese estado. Sin
+ * política aplicable, es la identidad (mismo arreglo, sin filtrar).
+ *
+ * @param {Array<{codigo: string, mensaje: string}>} limitaciones
+ * @param {boolean} politicaJuridicaNoResuelta
+ * @returns {Array<{codigo: string, mensaje: string}>}
+ */
+export function filtrarLimitacionesPorPoliticaJuridica(limitaciones, politicaJuridicaNoResuelta) {
+  if (!politicaJuridicaNoResuelta) return limitaciones
+  return limitaciones.filter((l) => !CODIGOS_LIMITACION_DEPENDIENTES_DE_POLITICA_JURIDICA.has(l.codigo))
+}
+
 /**
  * Validación UX del borrador del camino personalizado — "no permitas confirmar: vacío,
  * 0, negativo, no numérico". No duplica ninguna regla legal: la única regla es "monto

@@ -134,6 +134,7 @@ import {
   textoFuenteSemanas,
   calcularLimitacionesComunes,
   limitacionesEspecificas,
+  filtrarLimitacionesPorPoliticaJuridica,
   debeOcultarRestriccion,
   validarEsfuerzoAdicionalMensualDeseado,
   ordenarCaminosParaPresentacion,
@@ -520,7 +521,18 @@ function ProyectaTuPensionRPM({
   // algunos (específicas — se quedan junto a su camino). Mismo patrón ya usado por
   // ExploraTuProyeccion.jsx (RAIS). Los datos en sí no cambian, solo dónde se renderizan.
   const escenariosViables = resultado ? resultado.escenarios.filter((e) => e.estado === 'viable') : []
-  const limitacionesComunes = calcularLimitacionesComunes(escenariosViables)
+  // E7 corrección posterior (2026-09-23) — RESTRICCION_COSTO_LIMITA_RESULTADO afirma "tu
+  // objetivo sí sería alcanzable [sin la restricción]", una conclusión derivada de la misma
+  // cuantía en disputa (ver filtrarLimitacionesPorPoliticaJuridica, helpers.js). Se filtra
+  // ANTES de separar comunes/específicas — nunca modifica `escenariosViables` en sí (usado
+  // también por `construirTodosLosHechos`, más abajo, para S4-007/IA, ajena a esta
+  // corrección), solo la vista que entra a calcularLimitacionesComunes.
+  const limitacionesComunes = calcularLimitacionesComunes(
+    escenariosViables.map((e) => ({
+      ...e,
+      limitaciones: filtrarLimitacionesPorPoliticaJuridica(e.limitaciones, politicaJuridicaNoResuelta),
+    }))
+  )
 
   // "Qué podrías explorar ahora" (decisión de producto, 2026-08-24) — determinístico, sin
   // IA: determinarOrientacionExploracion (domain/) decide QUÉ situación existe y qué
@@ -1062,7 +1074,13 @@ function ProyectaTuPensionRPM({
                 !politicaJuridicaNoResuelta &&
                 resultado.orientacion.caminoMasAlineadoId === escenario.id &&
                 !resultado.orientacion.objetivoLegalmenteInalcanzable
-              const notasEspecificas = limitacionesEspecificas(escenario, limitacionesComunes)
+              // E7 corrección posterior (2026-09-23): mismo filtro que limitacionesComunes,
+              // arriba — RESTRICCION_COSTO_LIMITA_RESULTADO nunca aparece como nota
+              // específica de un camino bajo una política jurídica NO_RESUELTA tampoco.
+              const notasEspecificas = limitacionesEspecificas(
+                { limitaciones: filtrarLimitacionesPorPoliticaJuridica(escenario.limitaciones, politicaJuridicaNoResuelta) },
+                limitacionesComunes
+              )
               const textoDiferencia = textoDiferenciaFrenteABase(escenario.diferenciaFrenteABase)
               const textoPorcentaje = escenario.estado === 'descartado' ? null : textoPorcentajeObjetivo(escenario)
               // checkpoint E4-C1, Decisión 3: revelación progresiva del valor matemático

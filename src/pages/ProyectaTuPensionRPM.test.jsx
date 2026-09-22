@@ -114,6 +114,23 @@ function propsMujerJuridicoNoPublicable(overrides = {}) {
   })
 }
 
+// --- Fixture Mujer, jurídico NO_RESUELTA + RESTRICCION_COSTO_LIMITA_RESULTADO (verificado
+// empíricamente, 2026-09-23, corrección posterior de auditoría "todo lugar visible"): mismo
+// perfil que propsMujerJuridicoNoPublicable, con un objetivo muy alto (fuerza bisección →
+// camino 'aumentar-ibc-futuro') y una restricción de costo baja (50000, más estricta que el
+// tope legal) — produce el camino alternativo con la limitación
+// RESTRICCION_COSTO_LIMITA_RESULTADO ("...tu objetivo sí sería alcanzable dentro del tope
+// legal"), una conclusión derivada de la misma cuantía en disputa que la política jurídica
+// NO_RESUELTA de este mismo ejercicio deja sin resolver.
+function propsMujerJuridicoConRestriccion(overrides = {}) {
+  const smlv = obtenerSmlv(hoyISO()).valor
+  return propsMujerJuridicoNoPublicable({
+    objetivoPensionMensual: String(smlv * 5),
+    restriccionCostoPensionalAdicionalMaximoMensual: '50000',
+    ...overrides,
+  })
+}
+
 // --- Fixture Hombre con un camino descartado (verificado empíricamente, 2026-09-22): mismo
 // perfil que propsHombreCompleto, con un objetivo tan alto que ni el tope legal lo alcanza —
 // produce un camino 'base' viable Y un camino 'aumentar-ibc-futuro' descartado
@@ -384,6 +401,44 @@ describe('ProyectaTuPensionRPM — caso jurídico no publicable (E6.5/E7, PL-260
     render(<ProyectaTuPensionRPM {...propsMujerJuridicoNoPublicable()} confirmacionContinuidad={null} />)
     expect(screen.getAllByText('Tu IBC').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Aporte pensional adicional mensual').length).toBeGreaterThan(0)
+  })
+
+  // Corrección posterior (2026-09-23) — hallazgo de la auditoría "todo lugar visible donde
+  // pueda aparecer un dato derivado" pedida explícitamente por Carlos/Atlas:
+  // RESTRICCION_COSTO_LIMITA_RESULTADO ("...tu objetivo sí sería alcanzable dentro del tope
+  // legal") es una conclusión derivada de la misma cuantía en disputa, y aparecía sin filtrar
+  // como nota específica de un camino. Este fixture combina, con datos reales, la política
+  // jurídica NO_RESUELTA con una restricción de costo que dispara esa limitación.
+  it('corrección: RESTRICCION_COSTO_LIMITA_RESULTADO ("tu objetivo sí sería alcanzable...") nunca aparece bajo una política jurídica NO_RESUELTA — ni como nota común ni como nota específica de un camino', () => {
+    render(<ProyectaTuPensionRPM {...propsMujerJuridicoConRestriccion()} confirmacionContinuidad={null} />)
+
+    // Confirma que este fixture realmente combina ambas condiciones — si dejara de hacerlo
+    // (ej. por un cambio futuro en generarCaminosRPM.js), esta prueba debe fallar de forma
+    // visible, nunca pasar vacía sin haber ejercitado el caso real.
+    expect(screen.getByText('Este resultado todavía no es una cifra confiable para publicar')).toBeTruthy()
+
+    expect(
+      screen.queryByText(
+        'El límite que declaraste para tu aporte pensional adicional impidió alcanzar tu objetivo — sin esa restricción, tu objetivo sí sería alcanzable dentro del tope legal.'
+      )
+    ).toBeNull()
+  })
+
+  it('regresión: sin política jurídica NO_RESUELTA, la misma limitación de restricción de costo SÍ se muestra — la corrección no la oculta siempre', () => {
+    render(
+      <ProyectaTuPensionRPM
+        {...propsHombreCompleto({
+          objetivoPensionMensual: '5000000',
+          restriccionCostoPensionalAdicionalMaximoMensual: '50000',
+        })}
+        confirmacionContinuidad={null}
+      />
+    )
+    expect(
+      screen.getByText(
+        'El límite que declaraste para tu aporte pensional adicional impidió alcanzar tu objetivo — sin esa restricción, tu objetivo sí sería alcanzable dentro del tope legal.'
+      )
+    ).toBeTruthy()
   })
 
   it('confirmar continuidad en el caso jurídico NO_RESUELTA nunca alcanza para volverlo publicable (completo:false es independiente de la confirmación), y la cifra sigue retenida', async () => {

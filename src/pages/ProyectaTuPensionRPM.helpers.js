@@ -179,6 +179,32 @@ export function textoOrientacion(codigo) {
   return TEXTO_ORIENTACION[codigo] ?? null
 }
 
+// Corrección de auditoría visual (2026-09-24, hallazgo de revisión con capturas de Carlos):
+// el hint bajo "Ver qué ocurriría con otro esfuerzo" afirmaba incondicionalmente "no es
+// necesaria para alcanzar tu objetivo" — cierto únicamente cuando el objetivo YA se alcanza
+// sin ningún esfuerzo adicional (HOY_YA_ALCANZA_OBJETIVO, el caso que motivó ese texto en
+// E4-C1, punto 2). En cualquier otro estado donde este panel se ofrece (ej.
+// SIN_CAMINO_PERSONALIZADO_OBJETIVO_ALCANZABLE: "Tu objetivo es alcanzable con un esfuerzo
+// adicional mensual"), esa misma afirmación contradice directamente lo que "Qué podrías
+// explorar ahora" ya dijo en la misma pantalla — verificado con un caso real (RPM, objetivo
+// solo alcanzable vía el camino 'aumentar-ibc-futuro', 2026-09-24). Nunca decide un caso
+// nuevo de dominio: solo distingue el único código para el que la frase original es exacta
+// de todos los demás, que reciben una frase igual de cierta en cualquier estado.
+const TEXTO_HINT_EXPLORACION_ESFUERZO_OBJETIVO_YA_ALCANZADO =
+  'Es una simulación opcional — no es necesaria para alcanzar tu objetivo ni una recomendación de aportar más.'
+const TEXTO_HINT_EXPLORACION_ESFUERZO_GENERICO =
+  'Es una simulación opcional, independiente de los caminos ya comparados arriba — nunca una recomendación de aportar más.'
+
+/**
+ * @param {string|null|undefined} codigoOrientacionExploracion - `orientacionExploracion?.codigo`
+ * @returns {string}
+ */
+export function textoHintExploracionEsfuerzo(codigoOrientacionExploracion) {
+  return codigoOrientacionExploracion === 'HOY_YA_ALCANZA_OBJETIVO'
+    ? TEXTO_HINT_EXPLORACION_ESFUERZO_OBJETIVO_YA_ALCANZADO
+    : TEXTO_HINT_EXPLORACION_ESFUERZO_GENERICO
+}
+
 // Duplicada a propósito de ExploraTuProyeccion.helpers.js (RAIS) — mismo criterio de
 // duplicación ya usado entre generarCaminosRAIS.js/generarCaminosRPM.js para no acoplar
 // la pantalla de un régimen al archivo de helpers del otro. Regla data-driven, no

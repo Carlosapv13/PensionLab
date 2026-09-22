@@ -130,6 +130,7 @@ import {
   textoPorcentajeObjetivo,
   textoDiferenciaFrenteABase,
   textoOrientacion,
+  textoHintExploracionEsfuerzo,
   textoHorizonte,
   textoFuenteSemanas,
   calcularLimitacionesComunes,
@@ -1019,8 +1020,21 @@ function ProyectaTuPensionRPM({
               la grilla de abajo NUNCA se ocultan aquí (siguen siendo útiles para explorar el
               escenario) — lo que este bloque agrega es la advertencia explícita de que, si el
               ejercicio no es publicable, esa cifra todavía no es un resultado confiable. */}
+          {/* Corrección visual (2026-09-24, hallazgo de revisión con capturas de Carlos):
+              esta sección envolvía ConfirmacionContinuidadCotizacion.jsx (que YA renderiza su
+              propio <div className="insight"> de nivel superior — E6.4, cerrado, sin tocar)
+              en OTRO <div className="insight">, anidando dos cajas con el mismo borde/fondo
+              una dentro de otra — el aviso de "no publicable" quedaba como hijo flex de ese
+              wrapper con solo 6px de separación (.insight { gap: 6px }) respecto a una caja ya
+              doblemente bordeada, en vez de los 12px que .insight + .insight (App.css) ya
+              preveía exactamente para "dos bloques .insight uno junto al otro" — de ahí la
+              superposición visual reportada. Corregido quitando el wrapper: ahora son dos
+              bloques .insight HERMANOS (Fragment, no <div> propio), cada uno con su caja
+              completa — el aviso gana la clase `insight` además de
+              `comparacion-caminos__supuestos` (que ya aportaba el layout interno, sin caja
+              propia) para tener su propia caja igual de completa. */}
           {cadenaVisual && cadenaVisual.estado === 'CADENA_VISUAL_CONSTRUIDA' && (
-            <div className="insight">
+            <>
               <ConfirmacionContinuidadCotizacion
                 confirmacion={confirmacionContinuidad}
                 edadJubilacionDeseada={edadValida}
@@ -1033,7 +1047,7 @@ function ProyectaTuPensionRPM({
                 // que un lector de pantalla anuncie el estado vigente sin exigir que la
                 // persona vuelva a navegar hasta aquí — mismo criterio ya usado en
                 // ConfirmacionContinuidadCotizacion.jsx para su propio mensaje de vigencia.
-                <div className="comparacion-caminos__supuestos" role="status">
+                <div className="insight comparacion-caminos__supuestos" role="status">
                   <p className="insight__label">
                     Este resultado todavía no es una cifra confiable para publicar
                   </p>
@@ -1048,7 +1062,7 @@ function ProyectaTuPensionRPM({
                   </ul>
                 </div>
               )}
-            </div>
+            </>
           )}
 
           {cadenaVisual && cadenaVisual.estado === 'CADENA_VISUAL_NO_CONSTRUIDA' && (
@@ -1404,10 +1418,15 @@ function ProyectaTuPensionRPM({
                       ? 'Editar el esfuerzo que quieres explorar'
                       : 'Ver qué ocurriría con otro esfuerzo'}
                   </button>
-                  <p className="option__hint">
-                    Es una simulación opcional — no es necesaria para alcanzar tu objetivo ni una recomendación de
-                    aportar más.
-                  </p>
+                  {/* Corrección de auditoría visual (2026-09-24): este hint era un texto fijo
+                      — "no es necesaria para alcanzar tu objetivo" solo es cierto cuando el
+                      objetivo ya se alcanza sin ningún esfuerzo adicional
+                      (HOY_YA_ALCANZA_OBJETIVO, el caso que motivó este texto en E4-C1). En
+                      cualquier otro estado (ej. el objetivo solo es alcanzable vía el camino
+                      "Aumentar tu IBC futuro..."), esa frase contradecía directamente lo que
+                      "Qué podrías explorar ahora" ya decía arriba — ver
+                      textoHintExploracionEsfuerzo, helpers.js. */}
+                  <p className="option__hint">{textoHintExploracionEsfuerzo(orientacionExploracion?.codigo)}</p>
                 </>
               )}
 

@@ -17,6 +17,7 @@ import {
   textoPorcentajeObjetivo,
   textoDiferenciaFrenteABase,
   textoOrientacion,
+  textoHintExploracionEsfuerzo,
   textoHorizonte,
   textoFuenteSemanas,
   calcularLimitacionesComunes,
@@ -337,6 +338,48 @@ describe('textoOrientacion — mapeo código → copy de "Qué podrías explorar
       expect(texto).not.toMatch(/mejor|recomend|deber[ií]as|te conviene|asequible|rentab/)
       expect(texto).not.toMatch(/\d/)
     }
+  })
+})
+
+// Corrección de auditoría visual (2026-09-24, hallazgo de revisión con capturas de Carlos):
+// el hint bajo "Ver qué ocurriría con otro esfuerzo" afirmaba incondicionalmente "no es
+// necesaria para alcanzar tu objetivo" — cierto solo cuando HOY_YA_ALCANZA_OBJETIVO. Para
+// SIN_CAMINO_PERSONALIZADO_OBJETIVO_ALCANZABLE ("Tu objetivo es alcanzable con un esfuerzo
+// adicional mensual"), la misma frase se contradecía a sí misma en la misma pantalla — caso
+// real verificado con la fixture del dev panel "RPM — empleado — Proyecta tu pensión,
+// objetivo alcanzable mediante bisección (S4-003)".
+describe('textoHintExploracionEsfuerzo — corrección: "no es necesaria" solo cuando es cierto', () => {
+  it('HOY_YA_ALCANZA_OBJETIVO: mantiene el texto original exacto (caso que lo motivó, E4-C1)', () => {
+    expect(textoHintExploracionEsfuerzo('HOY_YA_ALCANZA_OBJETIVO')).toBe(
+      'Es una simulación opcional — no es necesaria para alcanzar tu objetivo ni una recomendación de aportar más.'
+    )
+  })
+
+  it.each([
+    'SIN_CAMINO_PERSONALIZADO_OBJETIVO_ALCANZABLE',
+    'VARIOS_CAMINOS_CUMPLEN_FALTA_PRIORIDAD',
+    'ELECCION_YA_ALCANZA_OBJETIVO',
+    'ELECCION_NO_ALCANZA_PERO_OBJETIVO_ES_ALCANZABLE',
+    'RESTRICCION_COSTO_IMPIDE_OBJETIVO',
+  ])('%s: nunca afirma "no es necesaria para alcanzar tu objetivo" — usa el texto genérico', (codigo) => {
+    const texto = textoHintExploracionEsfuerzo(codigo)
+    expect(texto).not.toMatch(/no es necesaria para alcanzar tu objetivo/)
+    expect(texto).toBe(
+      'Es una simulación opcional, independiente de los caminos ya comparados arriba — nunca una recomendación de aportar más.'
+    )
+  })
+
+  it('código ausente/null/desconocido: usa el texto genérico, nunca lanza', () => {
+    expect(textoHintExploracionEsfuerzo(null)).not.toMatch(/no es necesaria para alcanzar tu objetivo/)
+    expect(textoHintExploracionEsfuerzo(undefined)).not.toMatch(/no es necesaria para alcanzar tu objetivo/)
+    expect(textoHintExploracionEsfuerzo('CODIGO_INVENTADO')).not.toMatch(/no es necesaria para alcanzar tu objetivo/)
+  })
+
+  it('ambas variantes siguen siendo ciertas en todo estado: nunca una recomendación de aportar más', () => {
+    expect(textoHintExploracionEsfuerzo('HOY_YA_ALCANZA_OBJETIVO')).toMatch(/recomendación de aportar más/)
+    expect(textoHintExploracionEsfuerzo('SIN_CAMINO_PERSONALIZADO_OBJETIVO_ALCANZABLE')).toMatch(
+      /recomendación de aportar más/
+    )
   })
 })
 

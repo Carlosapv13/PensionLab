@@ -141,6 +141,45 @@ function propsHombreConCaminoDescartado(overrides = {}) {
   return propsHombreCompleto({ objetivoPensionMensual: '6000000', ...overrides })
 }
 
+// --- "Caso A": reproducción exacta del fixture real del panel de desarrollo "RPM — empleado
+// — Proyecta tu pensión, objetivo alcanzable mediante bisección (S4-003)" (src/dev/fixtures.js)
+// — el mismo que revisó Carlos por captura de pantalla (2026-09-24). Verificado
+// empíricamente: el camino 'base' NO alcanza el objetivo por sí solo; solo
+// 'aumentar-ibc-futuro' lo alcanza — orientacionExploracion.codigo ===
+// 'SIN_CAMINO_PERSONALIZADO_OBJETIVO_ALCANZABLE' ("Tu objetivo es alcanzable con un esfuerzo
+// adicional mensual"), sin política jurídica involucrada (sexo Hombre).
+function propsCasoA(overrides = {}) {
+  return {
+    historiaCotizacion: [
+      { fechaDesde: '2016-01-01', fechaHasta: '2019-06-30', ibc: 2100000, diasCotizados: 1277 },
+      { fechaDesde: '2020-01-01', fechaHasta: '2026-08-10', ibc: 2900000, diasCotizados: 2414 },
+    ],
+    regimenActual: 'RPM',
+    sexo: 'Hombre',
+    fechaNacimiento: '1978-02-11',
+    certezaBaseCotizacion: 'conocido',
+    valorBaseCotizacionDeclarado: '2900000',
+    tipoCotizante: 'empleado',
+    lugarCotizacion: 'colombia',
+    salarioParaEstimarBase: '',
+    nivelConocimientoSemanas: 'aproximado',
+    semanasCotizadas: '527',
+    onEditarFechaNacimiento: NOOP,
+    onEditarRegimenActual: NOOP,
+    onEditarSemanasDeclaradas: NOOP,
+    onEditarTraslado: NOOP,
+    onProfundizarHistoria: NOOP,
+    edadJubilacionDeseada: '65',
+    onCambiarEdadJubilacionDeseada: NOOP,
+    objetivoPensionMensual: '3500000',
+    onCambiarObjetivoPensionMensual: NOOP,
+    restriccionCostoPensionalAdicionalMaximoMensual: '',
+    onCambiarRestriccionCostoPensionalAdicionalMaximoMensual: NOOP,
+    onVolver: NOOP,
+    ...overrides,
+  }
+}
+
 describe('ProyectaTuPensionRPM — Nivel esencial conectado (E6.5, PL-260 §9.5/§9.6)', () => {
   it('sin confirmación: muestra el disclosure, el botón de confirmar, y advierte que la cifra todavía no es publicable — sin ocultar la cifra', () => {
     render(<ProyectaTuPensionRPM {...propsHombreCompleto()} confirmacionContinuidad={null} />)
@@ -648,5 +687,119 @@ describe('ProyectaTuPensionRPM — E7 (auditoría adversarial): cadena visual no
     expect(screen.queryByText('Este resultado todavía no es una cifra confiable para publicar')).toBeNull()
     expect(screen.queryByText('No pudimos construir el resultado auditable de este ejercicio en este momento.')).toBeNull()
     expect(document.querySelectorAll('.camino-columna').length).toBe(0)
+  })
+})
+
+describe('ProyectaTuPensionRPM — corrección de auditoría visual sobre capturas de Carlos (2026-09-24, "Caso A")', () => {
+  // Hallazgo 1: ConfirmacionContinuidadCotizacion.jsx ya renderiza su propio <div
+  // className="insight"> de nivel superior — envolverlo en OTRO <div className="insight">
+  // anidaba dos cajas (mismo borde/fondo) una dentro de otra, con solo 6px de separación
+  // (.insight { gap: 6px }) hacia el aviso de "no publicable", en vez de los 12px que
+  // .insight + .insight (App.css) ya preveía para dos bloques .insight hermanos.
+  it('corrección: ConfirmacionContinuidadCotizacion y el aviso de "no publicable" son bloques .insight HERMANOS, nunca uno anidado dentro del otro', () => {
+    render(<ProyectaTuPensionRPM {...propsCasoA()} confirmacionContinuidad={null} />)
+
+    // Nunca un .insight dentro de otro .insight — la causa raíz de la superposición reportada.
+    expect(document.querySelectorAll('.insight .insight').length).toBe(0)
+
+    // El disclosure (de ConfirmacionContinuidadCotizacion) y el aviso de "no publicable" son
+    // ambos elementos .insight, hermanos entre sí.
+    const cajasInsight = document.querySelectorAll('.insight')
+    expect(cajasInsight.length).toBeGreaterThanOrEqual(2)
+    expect(screen.getByText('Esta proyección supone que cotizas continuamente desde hoy hasta la edad elegida').closest('.insight')).toBeTruthy()
+    const cajaAviso = screen.getByText('Este resultado todavía no es una cifra confiable para publicar').closest('.insight')
+    expect(cajaAviso).toBeTruthy()
+    expect(cajaAviso.getAttribute('role')).toBe('status')
+  })
+
+  it('al confirmar continuidad, la caja completa del aviso de "no publicable" desaparece del DOM (no solo su texto)', async () => {
+    const user = userEvent.setup()
+    const onConfirmarContinuidad = vi.fn()
+    render(<ProyectaTuPensionRPM {...propsCasoA()} confirmacionContinuidad={null} onConfirmarContinuidad={onConfirmarContinuidad} />)
+
+    expect(document.querySelector('.comparacion-caminos__supuestos[role="status"]')).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: TEXTO_BOTON_CONFIRMAR_CONTINUIDAD }))
+    expect(onConfirmarContinuidad).toHaveBeenCalledTimes(1)
+
+    // Componente controlado: confirmar solo emite el evento — App.jsx (aquí, el test) es
+    // quien vuelve a renderizar con la confirmación ya aplicada, mismo patrón que el resto
+    // de este archivo.
+    const confirmacionEmitida = onConfirmarContinuidad.mock.calls[0][0]
+    cleanup()
+    render(<ProyectaTuPensionRPM {...propsCasoA()} confirmacionContinuidad={confirmacionEmitida} />)
+
+    // Este fixture (Caso A) es jurídicamente resuelto y completo — confirmar continuidad
+    // basta para volverlo publicable, así que el aviso desaparece por completo.
+    expect(screen.queryByText('Este resultado todavía no es una cifra confiable para publicar')).toBeNull()
+    expect(document.querySelector('.comparacion-caminos__supuestos[role="status"]')).toBeNull()
+  })
+
+  // Hallazgo 2: el hint bajo "Ver qué ocurriría con otro esfuerzo" afirmaba
+  // incondicionalmente "no es necesaria para alcanzar tu objetivo" — en el Caso A, el
+  // objetivo SOLO es alcanzable vía el camino "Aumentar tu IBC futuro para alcanzar tu
+  // objetivo.", así que esa frase contradecía directamente lo que "Qué podrías explorar
+  // ahora" ya decía en la misma pantalla ("Tu objetivo es alcanzable con un esfuerzo
+  // adicional mensual").
+  it('corrección: el hint de "Ver qué ocurriría con otro esfuerzo" nunca contradice "Qué podrías explorar ahora" en el Caso A', () => {
+    render(<ProyectaTuPensionRPM {...propsCasoA()} confirmacionContinuidad={null} />)
+
+    // Confirma que este fixture realmente reproduce el estado reportado — si dejara de
+    // hacerlo, esta prueba debe fallar de forma visible, nunca pasar vacía.
+    expect(screen.getByText('Tu objetivo es alcanzable con un esfuerzo adicional mensual. Puedes explorar un nivel de esfuerzo que sea relevante para ti.')).toBeTruthy()
+
+    // La contradicción reportada nunca vuelve a aparecer.
+    expect(screen.queryByText(/no es necesaria para alcanzar tu objetivo/)).toBeNull()
+    expect(
+      screen.getByText('Es una simulación opcional, independiente de los caminos ya comparados arriba — nunca una recomendación de aportar más.')
+    ).toBeTruthy()
+  })
+
+  it('regresión: con el objetivo ya alcanzado hoy (sin ningún esfuerzo adicional), el hint original ("no es necesaria...") se mantiene sin cambios', () => {
+    // Verificado empíricamente (2026-09-24): con este mismo fixture, un objetivo de
+    // $2.000.000 ya lo alcanza el camino 'base' por sí solo (resultado ≈ $2.081.006) —
+    // orientacionExploracion.codigo === 'HOY_YA_ALCANZA_OBJETIVO'.
+    render(<ProyectaTuPensionRPM {...propsCasoA({ objetivoPensionMensual: '2000000' })} confirmacionContinuidad={null} />)
+    expect(
+      screen.getByText('Es una simulación opcional — no es necesaria para alcanzar tu objetivo ni una recomendación de aportar más.')
+    ).toBeTruthy()
+  })
+
+  // Pedido explícito de revisión: los DOS caminos del Caso A (base y aumentar-ibc-futuro)
+  // siguen mostrando sus 7 pasos auditables completos, con cifras reales — la corrección de
+  // esta ronda no tocó Nivel completo ni la política jurídica (aquí, inexistente).
+  it('los dos caminos del Caso A (base y aumentar-ibc-futuro) muestran, cada uno, sus 7 pasos auditables con cifras reales al expandir', async () => {
+    const user = userEvent.setup()
+    render(<ProyectaTuPensionRPM {...propsCasoA()} confirmacionContinuidad={null} />)
+
+    const columnas = document.querySelectorAll('.camino-columna')
+    expect(columnas.length).toBe(2)
+
+    for (const columna of columnas) {
+      const detalleCompleto = Array.from(columna.querySelectorAll('.legal-detail')).find((d) =>
+        d.querySelector('summary').textContent.includes('detalle auditable completo')
+      )
+      expect(detalleCompleto).toBeTruthy()
+      await user.click(detalleCompleto.querySelector('summary'))
+
+      for (const titulo of [
+        'Datos utilizados',
+        'Cálculo del IBL',
+        'Tasa de reemplazo',
+        'Resultado matemático (antes del ajuste legal)',
+        'Ajuste legal (piso y techo)',
+        'Resultado final',
+        'Comparación contra tu objetivo',
+      ]) {
+        expect(columna.querySelectorAll('.detalle-paso').length).toBeGreaterThan(0)
+        const bloque = Array.from(columna.querySelectorAll('.detalle-paso')).find(
+          (b) => b.querySelector('.detalle-paso__titulo')?.textContent === titulo
+        )
+        expect(bloque).toBeTruthy()
+      }
+
+      // Sin política jurídica NO_RESUELTA en este fixture — ningún paso queda "pendiente".
+      expect(columna.querySelectorAll('.detalle-paso__pendiente').length).toBe(0)
+    }
   })
 })

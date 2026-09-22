@@ -1547,3 +1547,48 @@ checkpoints E3-E5.1 documentados en detalle allí (§6-§8).
   **E6.5 (primer consumidor visible de Contrato F; conexión real del estado de confirmación
   a `App.jsx` con su invalidación) es el siguiente checkpoint del plan vigente — no
   iniciado, pendiente de autorización explícita y separada.**
+- **E6.5 + E6.6 + E6.7 + E7 — implementados, auditados y cerrados en una sola sesión continua
+  (2026-09-22/23), con autorización explícita de Carlos/Atlas para el conjunto.** Detalle
+  completo, defectos encontrados/corregidos y recuento final de pruebas en PL-260
+  §9.11-§9.14 — este bullet resume solo lo esencial para no duplicar ese detalle.
+  **E6.5:** primer consumidor visible de Contrato F. `App.jsx` gana `confirmacionContinuidad`
+  + invalidación por edad objetivo/sexo/régimen actual/fecha de nacimiento (nunca por
+  objetivo económico/IBC/límite de esfuerzo/historia); `ProyectaTuPensionRPM.jsx` retira el
+  interruptor dormido `MODELO_VISUAL_EJERCICIO_ACTIVO` y monta el Nivel esencial real.
+  **E6.6:** Nivel completo — acordeón por camino con los 7 `PasoAuditable` en el orden de
+  Contrato F (`src/pages/nivelCompletoAuditable.helpers.js`,
+  `src/components/DetallePasoAuditable.jsx`,
+  `src/components/PoliticasJuridicasInvolucradas.jsx`), sin recalcular ni reinterpretar
+  ningún dato; caminos descartados nunca ofrecen un acordeón vacío (I7).
+  **E6.7:** `role="status"` en el aviso de no publicable; `aria-label` distintivo en los
+  controles de Nivel completo cuando hay más de un camino; `aria-describedby` +
+  `descripcionAccesibleGrafico` (texto equivalente oculto) para el gráfico, cuyo
+  `role="img"` ocultaba todas sus cifras internas de la accesibilidad.
+  **E7 — defecto real de contrato encontrado y corregido (hallazgo principal):** la
+  implementación original de E6.5 mostraba la cifra de un ejercicio con política jurídica
+  `NO_RESUELTA` con solo un rótulo adjunto — viola PL-260 §0 punto 6 ("ninguna cifra que
+  dependa silenciosamente de haber elegido una interpretación no autorizada") y §9 fila E9
+  ("estado intermedio honesto — cuantía pendiente de regla jurídica"). Corregido: la cifra
+  ("Pensión proyectada mensual", "Frente a tu objetivo") y el gráfico se reemplazan por un
+  estado pendiente explícito cuando aplica una política jurídica `NO_RESUELTA` — nunca
+  resolviendo esa política. El Nivel completo del mismo camino sigue mostrando el valor
+  crudo, junto a la política que lo hace incierto (ahí deja de ser silencioso); IBC y
+  aporte adicional (datos de entrada, no el resultado en disputa) siguen visibles — lectura
+  razonable, documentada como no resuelta formalmente por E7, pendiente de confirmación de
+  Carlos/Atlas. Verificado empíricamente (no solo por comentario heredado) que
+  `CADENA_VISUAL_NO_CONSTRUIDA` es estructuralmente inalcanzable desde props reales — no se
+  fabricó una prueba sintética para ese caso.
+  Dos defectos adicionales de auditoría propia (self-review, antes de E7): el rótulo de "no
+  publicable" solo aparecía una vez antes de la grilla (corregido con un rótulo repetido
+  junto a cada cifra); el panel de desarrollo no invalidaba `confirmacionContinuidad` al
+  editar sexo/fecha de nacimiento/edad objetivo (corregido en `construirSettersEdicion`).
+  **Resultado final:** 98 pruebas propias de este trabajo (`ProyectaTuPensionRPM.test.jsx`
+  20, `nivelCompletoAuditable.helpers.test.js` 18, `DetallePasoAuditable.test.jsx` 7,
+  `PoliticasJuridicasInvolucradas.test.jsx` 5, `GraficoEsfuerzoResultado.test.jsx` 5,
+  `GraficoEsfuerzoResultado.helpers.test.js` +6 sobre sus 37 previas); suite completa 82
+  archivos / 1647 pruebas en verde (línea base del cierre de E6.4: 77 archivos / 1586
+  pruebas — 61 pruebas netas nuevas); lint sin hallazgos; build exitoso. **Sin verificación
+  visual real (sin herramienta de navegador en esta sesión) ni validación jurídica** — ambas
+  siguen pendientes; las dos políticas jurídicas de PL-260 §2 siguen `NO_RESUELTA`, sin
+  cambio. **E8 (Preview y validación manual) y E9 (prueba final de Oscar) siguen sin
+  iniciarse** — dependen, sin excepción, del cierre de esas políticas (PL-260 §0 punto 2).

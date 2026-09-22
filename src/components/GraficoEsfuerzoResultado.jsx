@@ -38,6 +38,7 @@
 // en el mismo píxel — se documenta ese solapamiento (ver test correspondiente), no se
 // inventa un desplazamiento ni una regla de desempate no pedida.
 
+import { useId } from 'react'
 import {
   ANCHO_SVG,
   ALTO_SVG,
@@ -50,6 +51,7 @@ import {
   calcularYObjetivo,
   textoEtiquetaEleccion,
   etiquetaEleccionVaDebajo,
+  descripcionAccesibleGrafico,
 } from './GraficoEsfuerzoResultado.helpers.js'
 import { formatearPesos } from '../format/formatearDinero.js'
 
@@ -112,6 +114,8 @@ const ALTO_LINEA_ETIQUETA = 13
  *   camino descartado no trae `esfuerzo`/`resultado` utilizables).
  */
 function GraficoEsfuerzoResultado({ barrido, objetivoValorMensual, escenarioPersonalizado = null }) {
+  const idDescripcion = useId()
+
   if (!barrido) return null
 
   if (barrido.estado === 'objetivo_ya_alcanzado' || barrido.estado === 'sin_margen') {
@@ -126,6 +130,12 @@ function GraficoEsfuerzoResultado({ barrido, objetivoValorMensual, escenarioPers
   const extremo = puntos[puntos.length - 1]
 
   const puntoPersonalizado = escenarioPersonalizado?.estado === 'viable' ? escenarioPersonalizado : null
+
+  // E6.7 (PL-260 §9.6) — ver nota de diseño junto a descripcionAccesibleGrafico (helpers.js):
+  // role="img" en el <svg> de más abajo oculta todo su contenido interno de la accesibilidad,
+  // incluidas las cifras en <text> — este resumen es la única forma en que un lector de
+  // pantalla accede a esas cifras.
+  const descripcionGrafico = descripcionAccesibleGrafico({ puntos, puntoObjetivo, objetivoValorMensual, puntoPersonalizado })
 
   const valoresX = puntos.map((p) => p.esfuerzo.costoPensionalAdicionalMensual)
   if (puntoObjetivo) valoresX.push(puntoObjetivo.esfuerzo.costoPensionalAdicionalMensual)
@@ -179,6 +189,7 @@ function GraficoEsfuerzoResultado({ barrido, objetivoValorMensual, escenarioPers
         viewBox={`0 0 ${ANCHO_SVG} ${ALTO_SVG}`}
         role="img"
         aria-label="Gráfico de esfuerzo mensual adicional contra pensión mensual proyectada"
+        aria-describedby={idDescripcion}
       >
         {/* Ejes */}
         <line
@@ -348,6 +359,12 @@ function GraficoEsfuerzoResultado({ barrido, objetivoValorMensual, escenarioPers
           Esfuerzo adicional mensual →
         </text>
       </svg>
+
+      {/* E6.7 — texto equivalente para lectores de pantalla (ver aria-describedby, arriba) —
+          nunca visible para una persona vidente (el gráfico ya le muestra lo mismo). */}
+      <p id={idDescripcion} className="visually-hidden">
+        {descripcionGrafico}
+      </p>
 
       {mostrarNotaRestriccion && (
         <p className="grafico-esfuerzo-resultado__nota">

@@ -10,6 +10,7 @@ import {
   calcularYObjetivo,
   textoEtiquetaEleccion,
   etiquetaEleccionVaDebajo,
+  descripcionAccesibleGrafico,
 } from './GraficoEsfuerzoResultado.helpers.js'
 import { formatearPesos } from '../format/formatearDinero.js'
 
@@ -356,5 +357,78 @@ describe('etiquetaEleccionVaDebajo — arriba/abajo de "Tu elección" según la 
     const puntoObjetivoSvg = { x: 999999, y: 50 } // muy arriba, X irrelevante
     const puntoPersonalizadoSvg = { x: -999999, y: 200 } // muy abajo, X irrelevante
     expect(etiquetaEleccionVaDebajo(puntoPersonalizadoSvg, puntoObjetivoSvg)).toBe(true)
+  })
+})
+
+// E6.7 (PL-260 §9.6) — texto equivalente para lectores de pantalla, ya que role="img" en el
+// <svg> del componente oculta todo su contenido interno (incluidas las cifras en <text>) de
+// la accesibilidad. Mismos valores que ya dibuja el gráfico — nunca recalculados.
+describe('descripcionAccesibleGrafico — texto equivalente del gráfico para lectores de pantalla', () => {
+  const puntoActual = { posicion: 'actual', esfuerzo: { costoPensionalAdicionalMensual: 0 }, resultado: { valor: 1500000 } }
+  const puntoIntermedio = { posicion: 'intermedio', esfuerzo: { costoPensionalAdicionalMensual: 200000 }, resultado: { valor: 1800000 } }
+  const puntoExtremo = { posicion: 'extremo_superior', esfuerzo: { costoPensionalAdicionalMensual: 500000 }, resultado: { valor: 2100000 } }
+
+  it('siempre incluye el punto "Hoy" (esfuerzo 0) y el extremo explorado, con las mismas cifras que el gráfico', () => {
+    const texto = descripcionAccesibleGrafico({
+      puntos: [puntoActual, puntoIntermedio, puntoExtremo],
+      puntoObjetivo: null,
+      objetivoValorMensual: null,
+      puntoPersonalizado: null,
+    })
+    expect(texto).toContain('Hoy: sin aporte adicional, pensión proyectada $1.500.000.')
+    expect(texto).toContain('$500.000 de aporte adicional mensual explorado')
+    expect(texto).toContain('$2.100.000')
+  })
+
+  it('encuentra el punto "Hoy" por su posicion, no por el índice — el orden de puntos no altera el resultado', () => {
+    const texto = descripcionAccesibleGrafico({
+      puntos: [puntoIntermedio, puntoActual, puntoExtremo],
+      puntoObjetivo: null,
+      objetivoValorMensual: null,
+      puntoPersonalizado: null,
+    })
+    expect(texto).toContain('Hoy: sin aporte adicional, pensión proyectada $1.500.000.')
+  })
+
+  it('agrega "Tu objetivo" solo cuando puntoObjetivo existe, con la cifra exacta del objetivo declarado', () => {
+    const puntoObjetivo = { esfuerzo: { costoPensionalAdicionalMensual: 300000 }, resultado: { valor: 1900000 } }
+    const texto = descripcionAccesibleGrafico({
+      puntos: [puntoActual, puntoExtremo],
+      puntoObjetivo,
+      objetivoValorMensual: 1900000,
+      puntoPersonalizado: null,
+    })
+    expect(texto).toContain('Tu objetivo ($1.900.000) se alcanza con $300.000 de aporte adicional mensual.')
+  })
+
+  it('sin puntoObjetivo, nunca menciona "Tu objetivo"', () => {
+    const texto = descripcionAccesibleGrafico({
+      puntos: [puntoActual, puntoExtremo],
+      puntoObjetivo: null,
+      objetivoValorMensual: 1900000,
+      puntoPersonalizado: null,
+    })
+    expect(texto).not.toContain('Tu objetivo')
+  })
+
+  it('agrega "Tu elección" solo cuando puntoPersonalizado existe', () => {
+    const puntoPersonalizado = { esfuerzo: { costoPensionalAdicionalMensual: 400000 }, resultado: { valor: 2000000 } }
+    const texto = descripcionAccesibleGrafico({
+      puntos: [puntoActual, puntoExtremo],
+      puntoObjetivo: null,
+      objetivoValorMensual: null,
+      puntoPersonalizado,
+    })
+    expect(texto).toContain('Tu elección: $400.000 de aporte adicional mensual, pensión proyectada $2.000.000.')
+  })
+
+  it('sin puntoPersonalizado, nunca menciona "Tu elección"', () => {
+    const texto = descripcionAccesibleGrafico({
+      puntos: [puntoActual, puntoExtremo],
+      puntoObjetivo: null,
+      objetivoValorMensual: null,
+      puntoPersonalizado: null,
+    })
+    expect(texto).not.toContain('Tu elección')
   })
 })

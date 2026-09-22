@@ -923,6 +923,131 @@
   font-size: 14px;
 }
 
+/* E6.5 (revisión de auditoría, 2026-09-22): rótulo adjunto a la cifra misma cuando el
+   ejercicio no es publicable — nunca la oculta, solo aclara que todavía no es un resultado
+   confiable. Mismo tono que .field__warning (var(--accent), sin fondo propio: vive dentro de
+   la celda, no es un bloque independiente). display:block para que quede en su propia línea,
+   inmediatamente bajo la cifra. */
+.camino-celda__nota--no-publicable {
+  display: block;
+  margin-top: 4px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* E7 (auditoría adversarial, 2026-09-23) — "estado intermedio honesto" (PL-260 §9, E9) para
+   una cuantía pendiente de una política jurídica sin resolver: reemplaza la cifra, nunca la
+   acompaña (a diferencia de .camino-celda__nota--no-publicable, que sí convive con un número
+   visible). Tamaño de fuente normal (16px, no 20px como .camino-celda__valor--enfasis): esto
+   no es una cifra que deba competir visualmente por atención, es la ausencia de una. */
+.camino-celda__valor--pendiente {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--accent);
+  font-style: italic;
+}
+
+/* E6.6 (PL-260 §9.1/§9.6) — Nivel completo: los 7 PasoAuditable de un camino, dentro de su
+   propio <details> (.legal-detail, sin cambios). Cada paso es un bloque propio, separado por
+   un borde sutil superior (excepto el primero) para distinguir dónde empieza cada uno sin
+   agregar jerarquía de encabezados nueva a la página (ver nota de diseño en
+   DetallePasoAuditable.jsx). */
+.detalle-paso {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.detalle-paso:first-child {
+  margin-top: 6px;
+  padding-top: 0;
+  border-top: none;
+}
+
+.detalle-paso__titulo {
+  margin: 0 0 4px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.detalle-paso__campos,
+.detalle-paso__anidado {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.detalle-paso__fila {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-size: 13px;
+}
+
+.detalle-paso__fila dt {
+  color: var(--text);
+}
+
+.detalle-paso__fila dd {
+  margin: 0;
+  color: var(--text-h);
+  font-weight: 500;
+}
+
+.detalle-paso__anidado {
+  margin: 2px 0 2px 12px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
+}
+
+.detalle-paso__lista {
+  margin: 0;
+  padding-left: 16px;
+}
+
+.detalle-paso__valor {
+  color: var(--text-h);
+}
+
+/* E6.6 — políticas jurídicas involucradas, sección propia a nivel de ejercicio (nunca por
+   camino). Mismo tono neutral que .orientacion-exploracion (no es un aviso de IA ni de
+   bloqueo — es información jurídica estructural). */
+.politicas-juridicas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.politicas-juridicas__lista {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.politicas-juridicas__item + .politicas-juridicas__item {
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.politicas-juridicas__nombre {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.politicas-juridicas__estado {
+  font-weight: 400;
+  color: var(--text);
+}
+
 .summary {
   width: 100%;
   display: flex;

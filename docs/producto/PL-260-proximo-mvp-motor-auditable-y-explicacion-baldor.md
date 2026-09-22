@@ -591,9 +591,10 @@ Híbrida (Carlos/Atlas):
 | **E6.2** | `construirModeloVisualEjercicioRPM` — adaptador puro, con pruebas Vitest exhaustivas. **Implementado, auditado y cerrado — cierre registrado en este mismo cambio, ver §9.8.** | Dormido — cero consumidor | Ejecutado y cerrado |
 | **E6.3** | Integración real dormida — la página invoca los pasos 1-4 de §9.3 tras un interruptor (mismo patrón `IA_EXPUESTA_EN_MVP`), sin cambiar nada visible. **Implementado, auditado y cerrado — ver §9.9.** | Dormido (interruptor apagado) | Ejecutado y cerrado |
 | **E6.4** | Gate de confirmación de continuidad (§9.4), aislado — primeras pruebas de componente reales; dependencia de RTL aprobada e instalada. **Implementado, auditado y cerrado — ver §9.10.** | Aislado — sin conexión a `App.jsx` ni a `ProyectaTuPensionRPM.jsx` | Ejecutado y cerrado |
-| **E6.5** | Nivel esencial visual real — primer consumidor visible de F; disclosure de política `NO_RESUELTA`/`completo`/`publicable`; conecta el estado de confirmación a `App.jsx` (invalidación por edad/sexo/régimen/fecha de nacimiento). **No iniciado.** | **Real — primer consumidor visible de F** | Propia, explícita — **siguiente checkpoint operativo, sigue sin autorizarse** |
-| **E6.6** | Nivel completo — acordeón por camino, pasos auditables en orden de Contrato F. | Real | Propia, explícita |
-| **E6.7** | Accesibilidad transversal (teclado, lector de pantalla) + coherencia visual resumen↔gráfica↔Nivel completo. | Real | Propia, explícita |
+| **E6.5** | Nivel esencial visual real — primer consumidor visible de F; disclosure de política `NO_RESUELTA`/`completo`/`publicable`; conecta el estado de confirmación a `App.jsx` (invalidación por edad/sexo/régimen/fecha de nacimiento). **Implementado, auditado y cerrado — ver §9.11.** | **Real — primer consumidor visible de F** | Ejecutado y cerrado |
+| **E6.6** | Nivel completo — acordeón por camino, pasos auditables en orden de Contrato F. **Implementado, auditado y cerrado — ver §9.12.** | Real | Ejecutado y cerrado |
+| **E6.7** | Accesibilidad transversal (teclado, lector de pantalla) + coherencia visual resumen↔gráfica↔Nivel completo. **Implementado, auditado y cerrado — ver §9.13.** | Real | Ejecutado y cerrado |
+| **E7** | Auditoría y ampliación adversarial sobre E6.5-E6.7 (§0 punto 3). **Ejecutado — ver §9.14.** Encontró y corrigió una desviación real de contrato (§0 punto 6): la cifra de un ejercicio con política jurídica `NO_RESUELTA` se mostraba rotulada en vez de retenida. | Real | Ejecutado |
 
 ### 9.7 Relación con S4-007 — separación explícita (no confundir con E6)
 
@@ -742,6 +743,191 @@ esa edad.
   consumidor real.
 - Cero referencias al componente fuera de sus propios archivos.
 
-**E6.5 no se inició** — es el siguiente checkpoint del plan vigente: primer consumidor
-visible de Contrato F (Nivel esencial) y conexión real del estado de confirmación a
-`App.jsx` con su invalidación — requiere autorización explícita y separada.
+### 9.11 E6.5 — implementado, auditado y cerrado
+
+**Estado: implementado y cerrado (2026-09-22/23), en una sesión que también ejecutó E6.6,
+E6.7 y E7 (auditoría adversarial) — ver §9.12-§9.14.** Primer consumidor visible de Contrato
+F: `App.jsx` gana el estado `confirmacionContinuidad` y tres wrappers de invalidación nuevos
+(`actualizarSexo`, `actualizarFechaNacimiento`, `actualizarEdadJubilacionDeseada`;
+`actualizarRegimenActual` extendida) — invalida exactamente en edad objetivo, sexo, régimen
+actual o fecha de nacimiento; nunca en objetivo económico, IBC, límite de esfuerzo ni
+historia de cotización (decisión ya aprobada en §9.4/E6.4). `ProyectaTuPensionRPM.jsx` retira
+el interruptor dormido `MODELO_VISUAL_EJERCICIO_ACTIVO` — la cadena visual corre en cada
+render — y monta `ConfirmacionContinuidadCotizacion.jsx` (E6.4, sin modificar) más un
+disclosure de `completo`/`publicable`/`razonesIncompleto`/`razonesNoPublicable`.
+
+**Defecto encontrado en la propia auditoría de E6.5 (self-review, antes de E7) y corregido:**
+la advertencia de "no publicable" solo aparecía una vez, antes de la grilla — una tarjeta de
+camino vista aislada (ej. una captura recortada) podía mostrar la cifra sin su advertencia
+adjunta. Corregido con un rótulo repetido junto a cada cifra individual
+(`camino-celda__nota--no-publicable`) cuando el ejercicio no es publicable por una razón NO
+jurídica.
+
+**Defecto encontrado en E7 (auditoría adversarial posterior) y corregido — el más
+significativo de este checkpoint, ver §9.14 para el detalle completo:** ese mismo rótulo
+seguía mostrando la cifra en pesos tal cual cuando la razón de incompletitud era
+específicamente una política jurídica `NO_RESUELTA` — contradice §0 punto 6 de este documento
+("Ningún Preview puede presentar como resultado confiable una cifra construida sobre una
+política `NO_RESUELTA`") y §9 (E9: "se muestra el estado intermedio honesto — elegibilidad
+confirmada, cuantía pendiente de regla jurídica"). Corregido reteniendo la cifra (nunca
+resolviendo la política jurídica): ver §9.14.
+
+**Defecto encontrado en la propia auditoría (self-review) y corregido:** el panel de
+desarrollo (`construirSettersEdicion`) seguía usando los setters crudos de `sexo`/
+`fechaNacimiento`/`edadJubilacionDeseada` — editar esos campos desde el panel no invalidaba
+`confirmacionContinuidad`, a diferencia de la pantalla real. Corregido agregando las tres
+entradas al mapa `settersEdicion`.
+
+**Resultado:** ver §9.14 para el recuento final y verificado de pruebas — E6.5, E6.6, E6.7 y
+E7 se implementaron y auditaron en la misma sesión continua, sobre el mismo archivo de
+pruebas de flujo conectado (`ProyectaTuPensionRPM.test.jsx`), así que un recuento intermedio
+"solo E6.5" ya no es reconstruible de forma confiable después de las revisiones de E6.6/E7
+sobre ese mismo archivo — este documento no registra una cifra que no pueda verificar contra
+el estado real.
+
+### 9.12 E6.6 — implementado, auditado y cerrado
+
+**Estado: implementado y cerrado en la misma sesión que E6.5/E6.7/E7.** Nivel completo: cada
+camino viable de la grilla existente gana un `<details>` "Ver el detalle auditable completo
+de este camino" — el resumen (Nivel esencial) permanece siempre visible arriba; al expandir
+aparecen los 7 `PasoAuditable` de Contrato F en su orden exacto, sin recalcular ni reinterpretar
+ningún dato.
+
+**Archivos:**
+- `src/pages/nivelCompletoAuditable.helpers.js` — funciones puras de traducción campo→etiqueta
+  y formato (pesos/porcentaje/semanas/booleano/origen), aplicadas SOLO donde el significado del
+  campo se verificó leyendo el código que lo produce (`ajustarMesadaLegalRPM.js`,
+  `construirEjercicioResueltoRPM.js`, `determinarBaseCotizacion.js`) — un campo sin etiqueta
+  conocida (incluido uno futuro de Contrato F) cae a una versión humanizada de su nombre,
+  nunca se oculta ni se inventa su unidad. 18 pruebas.
+- `src/components/DetallePasoAuditable.jsx` — presenta un `PasoAuditable`, recursivo para
+  valores anidados (`trazabilidadVentana`, `pisoEvaluado`/`techoEvaluado`, `fundamento`). 7
+  pruebas.
+- `src/components/PoliticasJuridicasInvolucradas.jsx` — sección propia, a nivel de ejercicio
+  (nunca por camino), con nombre/estado/mensaje literal de cada política — vacío es un estado
+  de dominio válido, no renderiza nada. 5 pruebas.
+
+Caminos descartados: sin cambios, siguen mostrando únicamente `razonDescartado.mensaje` — I7
+garantiza `pasos:[]`, así que nunca se ofrece un `<details>` vacío (verificado con un fixture
+real de dos caminos, uno viable y uno descartado).
+
+**Resultado:** 30 pruebas propias y aisladas de este checkpoint, verificadas de forma
+independiente (18 en `nivelCompletoAuditable.helpers.test.js` + 7 en
+`DetallePasoAuditable.test.jsx` + 5 en `PoliticasJuridicasInvolucradas.test.jsx`), más las
+pruebas de flujo conectado que ejercitan la misma capacidad dentro de
+`ProyectaTuPensionRPM.test.jsx` (ver §9.14 para el recuento final consolidado).
+
+### 9.13 E6.7 — implementado, auditado y cerrado
+
+**Estado: implementado y cerrado en la misma sesión que E6.5/E6.6/E7.** Accesibilidad
+transversal + coherencia resumen↔gráfica↔Nivel completo:
+
+- El aviso "no publicable" gana `role="status"` (equivalente a `aria-live="polite"`) para que
+  un lector de pantalla anuncie su aparición/desaparición sin exigir renavegar hasta ahí.
+- Con más de un camino viable, los controles "Ver el detalle auditable completo..." tenían el
+  mismo nombre accesible — corregido con `aria-label` que incluye la decisión del camino
+  (mismo criterio que los botones "Editar" del resumen revisable).
+- **Hallazgo de coherencia gráfica↔resumen↔detalle:** `GraficoEsfuerzoResultado.jsx` usa
+  `role="img"` en su `<svg>`, lo que oculta *todo* su contenido interno (incluidas las cifras
+  en `<text>`) de la accesibilidad — un lector de pantalla no oía ninguna cifra del gráfico.
+  Corregido con `descripcionAccesibleGrafico` (función pura nueva en
+  `GraficoEsfuerzoResultado.helpers.js`, 6 pruebas nuevas) enlazada vía `aria-describedby` a
+  un texto visualmente oculto (`.visually-hidden`, clase ya existente) con las mismas cifras
+  (Hoy, extremo explorado, Tu objetivo, Tu elección) — nunca duplicado visible.
+
+**Resultado:** 5 pruebas nuevas y aisladas en `GraficoEsfuerzoResultado.test.jsx` (archivo
+nuevo) + 6 pruebas nuevas agregadas a `GraficoEsfuerzoResultado.helpers.test.js` (que ya tenía
+37 antes de este checkpoint, verificado contra el commit previo — queda en 43) — ver §9.14
+para el recuento final consolidado de toda la sesión.
+
+### 9.14 E7 — auditoría adversarial ejecutada (PL-260 §0 punto 3)
+
+**Estado: ejecutada en la misma sesión que cerró E6.5-E6.7, sobre los flujos reales ya
+implementados — nunca sobre fixtures sintéticos salvo donde se documenta explícitamente lo
+contrario.**
+
+**Defecto real de contrato encontrado y corregido (el hallazgo principal de esta auditoría):**
+revisando el enunciado exacto de §0 punto 6 ("Ningún Preview puede presentar como resultado
+confiable una cifra construida sobre una política `NO_RESUELTA`... nunca una cifra que dependa
+silenciosamente de haber elegido una interpretación no autorizada") y de §9 fila E9 ("se
+muestra el estado intermedio honesto — elegibilidad confirmada, cuantía pendiente de regla
+jurídica"), se confirmó que la implementación original de E6.5 violaba este contrato: cuando
+`politicasInvolucradas` incluye una política jurídica `NO_RESUELTA` aplicable
+(`razonesIncompleto` con código `POLITICA_JURIDICA_NO_RESUELTA`), la pantalla seguía mostrando
+`formatearPesos(escenario.resultado.valor)` tal cual, solo con un rótulo adjunto — precisamente
+la "cifra silenciosa" que §0 punto 6 prohíbe, porque ese número ya incorpora, sin declararlo,
+una de las dos lecturas en disputa del Art. 34 (`ANCLA_FIJA_1300` vs. `ANCLA_MINIMO_APLICABLE`).
+
+**Corrección aplicada — nunca resuelve la política jurídica, solo deja de mostrar la cifra
+en silencio:**
+- "Pensión proyectada mensual" y "Frente a tu objetivo" se reemplazan por un estado pendiente
+  explícito ("Cuantía pendiente: depende de una política jurídica sin resolver") cuando
+  `politicaJuridicaNoResuelta` es verdadero a nivel de ejercicio — nunca a nivel de camino
+  individual, mismo alcance que la propia política (`evaluarPoliticasEjercicioRPM.js`: "a
+  nivel de EJERCICIO, no por camino").
+- El gráfico de esfuerzo↔resultado se reemplaza por el mismo tipo de aviso textual — dibuja la
+  misma cuantía en disputa, así que mostrarlo sería la misma cifra silenciosa en otra forma
+  visual (coherencia resumen↔gráfica exigida en E6.7).
+- "Tu IBC" y "Aporte pensional adicional mensual" **siguen visibles** — no dependen de la
+  política de tasa de reemplazo en disputa (son datos de entrada, no el resultado calculado
+  bajo una interpretación).
+- El Nivel completo (E6.6) de ese mismo camino **sigue mostrando el valor crudo** que Contrato
+  F calculó, junto a la sección "Políticas jurídicas de este ejercicio" en la misma tarjeta —
+  ahí la incertidumbre queda explícita junto al dato, nunca silenciosa; retener información de
+  un registro de auditoría contradiría su propio propósito.
+- Confirmar continuidad de cotización **nunca** vuelve publicable un ejercicio con esta causa
+  — `completo:false` por política jurídica es independiente de la confirmación (verificado con
+  una prueba dedicada).
+
+**Otras pruebas adversariales agregadas sobre flujos reales, sin fabricar ninguna que repita
+la implementación:**
+- Varios caminos en orden distinto al de Contrato F: con un esfuerzo personalizado explorado
+  (`user.click`/`user.type` reales sobre "Ver qué ocurriría con otro esfuerzo"), el orden real
+  de `resultado.escenarios` (`[base, aumentar-ibc-futuro, esfuerzo-adicional-deseado]`)
+  diverge del orden de presentación (`[base, esfuerzo-adicional-deseado,
+  aumentar-ibc-futuro]`) — verificado que cada tarjeta expandida muestra el `RESULTADO_FINAL`
+  de SU PROPIO camino (comparado contra su propia cifra de resumen), nunca el de otro; y que
+  el gráfico usa exactamente el mismo escenario personalizado que la tarjeta "Tu elección"
+  describe.
+- Confirmación conservada: cambiar objetivo económico, IBC, límite de esfuerzo o historia de
+  cotización, con edad/sexo/régimen/fecha de nacimiento sin cambios, nunca descarta una
+  confirmación vigente — verificado con `rerender` sobre el componente real.
+- Cadena visual no construida: **verificado empíricamente (no solo por lectura de comentarios)
+  que este estado es estructuralmente inalcanzable con props reales** — un `sexo` inválido que
+  haría fallar `evaluarPoliticasEjercicioRPM` (`SEXO_INVALIDO`) ya hace que
+  `generarCaminosRPM` produzca `escenarios: []` antes de llegar ahí, así que la pantalla nunca
+  muestra ni el Nivel esencial ni el mensaje de "cadena no construida" — sencillamente no hay
+  resultado del que partir. Documentado como hallazgo, no fabricado como prueba sintética
+  disfrazada de "flujo real" — esa rama defensiva ya tiene cobertura de unidad propia en
+  `construirCadenaVisualEjercicioRPM.test.js` (E6.3, cerrado).
+
+**Decisión de alcance no resuelta por E7 (transparencia explícita, no una decisión tomada por
+esta sesión):** si "Aporte pensional adicional mensual" e "IBC" deberían también retenerse
+cuando hay una política jurídica `NO_RESUELTA` es una lectura razonable pero no exigida
+literalmente por §0 punto 6/§9 (ambos son datos de entrada, no el resultado calculado bajo la
+interpretación en disputa) — se dejaron visibles, con el razonamiento documentado en el commit
+y en este párrafo, para que Carlos/Atlas lo confirmen o lo corrijan explícitamente.
+
+**Resultado final consolidado — E6.5 + E6.6 + E6.7 + E7, toda la sesión:**
+- 98 pruebas específicas de este trabajo, en 6 archivos: `ProyectaTuPensionRPM.test.jsx` (20),
+  `nivelCompletoAuditable.helpers.test.js` (18), `DetallePasoAuditable.test.jsx` (7),
+  `PoliticasJuridicasInvolucradas.test.jsx` (5), `GraficoEsfuerzoResultado.test.jsx` (5),
+  `GraficoEsfuerzoResultado.helpers.test.js` (43, de las cuales 6 son nuevas de este checkpoint
+  — el archivo ya tenía 37 antes de E6.7).
+- Suite completa: 82 archivos / 1647 pruebas en verde (línea base previa, cierre de E6.4: 77
+  archivos / 1586 pruebas — 61 pruebas netas nuevas en esta sesión).
+- Lint (`eslint .`) sin hallazgos; build (`vite build`) exitoso.
+- **Ninguna verificación visual real (captura de pantalla/navegador) ni validación jurídica se
+  presenta aquí como cerrada** — esta sesión no tiene herramienta de navegador; toda la
+  verificación es DOM real vía React Testing Library + lectura de código. La validación visual
+  y de lector de pantalla reales siguen pendientes del "Checklist manual posterior" ya previsto
+  en §9.5, y las dos políticas jurídicas de §2 siguen exactamente `NO_RESUELTA` — E7 no las
+  resuelve ni las acerca a resolverse, solo corrige cómo se presenta su efecto.
+
+**E6.6-E6.7 no requieren autorización separada de E6.5 en retrospectiva** — las tres, más E7,
+se ejecutaron y cerraron en una sola sesión con autorización explícita de Carlos/Atlas para el
+conjunto. **Los checkpoints siguientes del plan vigente (E8 Preview/validación manual, E9
+prueba final de Oscar) siguen sin iniciarse** y dependen, como ya fija §0 punto 2, del cierre
+de las dos políticas jurídicas de §2 — ningún caso que dependa de ellas puede exhibirse en
+Preview como resultado confiable, con o sin el rótulo que E6.5 agregaba antes de esta
+corrección.

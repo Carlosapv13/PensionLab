@@ -76,6 +76,15 @@ function App() {
   const [salarioParaEstimarBase, setSalarioParaEstimarBase] = useState('')
   const [declaracionLibre, setDeclaracionLibre] = useState(null)
   const [edadJubilacionDeseada, setEdadJubilacionDeseada] = useState('')
+  // E6.5 (PL-260 §9.4/§9.5) — confirmación del supuesto de continuidad de cotización
+  // (Contrato F: un elemento de `confirmacionesSupuestos`, o `null` si todavía no se dio).
+  // Vive aquí, no en ProyectaTuPensionRPM.jsx, para poder invalidarla desde los wrappers
+  // `actualizar*` de los datos de los que depende semánticamente (ver esos wrappers, más
+  // abajo) — mismo criterio ya usado para trasladoRegimen/detalleTraslado respecto de
+  // regimenActual. Deliberadamente fuera de estadoEditableDev/CLAVES_ESTADO_EDITABLE: no es
+  // un dato del expediente, es estado de interacción — mismo criterio ya aplicado a
+  // regresarAProyeccionTrasHistoria/regresarAProyeccionTrasEdicionResumen.
+  const [confirmacionContinuidad, setConfirmacionContinuidad] = useState(null)
   // Slice "Motor de caminos RAIS": saldo acumulado (mismo patrón de certeza ya
   // usado para la base de cotización), objetivo de pensión mensual y la
   // restricción opcional de esfuerzo máximo que el propio usuario declara.
@@ -169,11 +178,48 @@ function App() {
     // trasladoRegimen depende semánticamente de regimenActual (S3-009): la
     // opción "No" y su redacción están ancladas al régimen actual, así que
     // un cambio real de régimen invalida cualquier respuesta ya dada.
+    // E6.5 (PL-260 §9.4): regimenActual es también uno de los cuatro datos que invalidan la
+    // confirmación de continuidad de cotización ya dada (decisión Carlos/Atlas, cierre de
+    // E6.4) — un cambio real de régimen puede alterar por completo el ejercicio RPM que esa
+    // confirmación describía.
     if (valor !== regimenActual) {
       setTrasladoRegimen(null)
       setDetalleTraslado(null)
+      setConfirmacionContinuidad(null)
     }
     setRegimenActual(valor)
+  }
+
+  // E6.5 (PL-260 §9.4) — mismo criterio que actualizarRegimenActual: sexo es uno de los
+  // cuatro datos (edad objetivo, sexo, régimen actual, fecha de nacimiento) que invalidan la
+  // confirmación de continuidad ya dada, porque cualquiera de ellos puede cambiar el
+  // ejercicio RPM que esa confirmación describía. Objetivo económico, IBC, límite de
+  // esfuerzo e historia de cotización NO la invalidan (decisión ya aprobada, E6.4) — sus
+  // setters siguen siendo los crudos, sin wrapper nuevo.
+  function actualizarSexo(valor) {
+    if (valor !== sexo) {
+      setConfirmacionContinuidad(null)
+    }
+    setSexo(valor)
+  }
+
+  // E6.5 (PL-260 §9.4) — mismo criterio que actualizarSexo, para fecha de nacimiento.
+  function actualizarFechaNacimiento(valor) {
+    if (valor !== fechaNacimiento) {
+      setConfirmacionContinuidad(null)
+    }
+    setFechaNacimiento(valor)
+  }
+
+  // E6.5 (PL-260 §9.4) — mismo criterio que actualizarSexo, para la edad objetivo. Compara el
+  // valor crudo tal cual llega del campo (igual que edadJubilacionDeseada se guarda), nunca
+  // el validado (`edadValida` vive solo en ProyectaTuPensionRPM.jsx) — mismo criterio ya
+  // usado por actualizarRegimenActual/actualizarSexo con sus propios valores crudos.
+  function actualizarEdadJubilacionDeseada(valor) {
+    if (valor !== edadJubilacionDeseada) {
+      setConfirmacionContinuidad(null)
+    }
+    setEdadJubilacionDeseada(valor)
   }
 
   function actualizarTrasladoRegimen(valor) {
@@ -402,6 +448,16 @@ function App() {
             certezaBaseCotizacion: actualizarCertezaBaseCotizacion,
             certezaSaldoAcumulado: actualizarCertezaSaldoAcumulado,
             certezaFechaTraslado: actualizarCertezaFechaTraslado,
+            // E6.5 (revisión de auditoría, 2026-09-22): sin estas tres entradas, editar sexo/
+            // fechaNacimiento/edadJubilacionDeseada desde el panel de desarrollo usaba los
+            // setters crudos (construirSettersEdicion cae a settersCrudos cuando no hay
+            // entrada aquí) — nunca invalidaba confirmacionContinuidad, a diferencia de la
+            // pantalla real. Mismo criterio que el resto de este mapa: "usa la misma función
+            // actualizar* que esa pantalla ya usa cuando existe" (ver comentario de
+            // settersEdicion, más abajo).
+            sexo: actualizarSexo,
+            fechaNacimiento: actualizarFechaNacimiento,
+            edadJubilacionDeseada: actualizarEdadJubilacionDeseada,
           })}
           vistaActual={vista}
           onIrAVista={setVista}
@@ -425,9 +481,9 @@ function App() {
       {vista === 'datosIniciales' && (
         <DatosIniciales
           fechaNacimiento={fechaNacimiento}
-          onCambiarFechaNacimiento={setFechaNacimiento}
+          onCambiarFechaNacimiento={actualizarFechaNacimiento}
           sexo={sexo}
-          onCambiarSexo={setSexo}
+          onCambiarSexo={actualizarSexo}
           lugarResidencia={lugarResidencia}
           onCambiarLugarResidencia={setLugarResidencia}
           onContinuar={() => continuarTrasEdicionDesdeResumenRPM('situacionPensional')}
@@ -570,7 +626,7 @@ function App() {
           salarioParaEstimarBase={salarioParaEstimarBase}
           trasladoRegimen={trasladoRegimen}
           edadJubilacionDeseada={edadJubilacionDeseada}
-          onCambiarEdadJubilacionDeseada={setEdadJubilacionDeseada}
+          onCambiarEdadJubilacionDeseada={actualizarEdadJubilacionDeseada}
           certezaSaldoAcumulado={certezaSaldoAcumulado}
           onCambiarCertezaSaldoAcumulado={actualizarCertezaSaldoAcumulado}
           saldoAcumuladoDeclarado={saldoAcumuladoDeclarado}
@@ -695,13 +751,22 @@ function App() {
             setVista('historiaCotizacionRPM')
           }}
           edadJubilacionDeseada={edadJubilacionDeseada}
-          onCambiarEdadJubilacionDeseada={setEdadJubilacionDeseada}
+          onCambiarEdadJubilacionDeseada={actualizarEdadJubilacionDeseada}
           objetivoPensionMensual={objetivoPensionMensual}
           onCambiarObjetivoPensionMensual={setObjetivoPensionMensual}
           restriccionCostoPensionalAdicionalMaximoMensual={restriccionCostoPensionalAdicionalMaximoMensual}
           onCambiarRestriccionCostoPensionalAdicionalMaximoMensual={
             setRestriccionCostoPensionalAdicionalMaximoMensual
           }
+          // E6.5 (PL-260 §9.4/§9.5): estado de interacción vivo aquí (ver su declaración,
+          // arriba) — se invalida (vuelve a `null`) desde actualizarRegimenActual/
+          // actualizarSexo/actualizarFechaNacimiento/actualizarEdadJubilacionDeseada cuando
+          // cambia alguno de esos cuatro datos; onConfirmarContinuidad es el setter crudo
+          // porque confirmar nunca invalida nada — solo registra la elección ya validada por
+          // ConfirmacionContinuidadCotizacion.jsx (edad objetivo válida) y compuesta contra
+          // Contrato F.
+          confirmacionContinuidad={confirmacionContinuidad}
+          onConfirmarContinuidad={setConfirmacionContinuidad}
           // UX-RPM-01: única ruta real hoy hacia esta vista para RPM es directa desde
           // BaseCotizacion (ver siguienteVistaTrasBaseCotizacion) — Volver debe regresar
           // ahí, no a exploraTuProyeccionRPM, que ya no se recorrió.
@@ -730,7 +795,7 @@ function App() {
           objetivoPensionMensual={objetivoPensionMensual}
           onCambiarObjetivoPensionMensual={setObjetivoPensionMensual}
           edadJubilacionDeseada={edadJubilacionDeseada}
-          onCambiarEdadJubilacionDeseada={setEdadJubilacionDeseada}
+          onCambiarEdadJubilacionDeseada={actualizarEdadJubilacionDeseada}
           fechaNacimiento={fechaNacimiento}
           onCambiarRestriccionCostoPensionalAdicionalMaximoMensual={
             setRestriccionCostoPensionalAdicionalMaximoMensual

@@ -118,6 +118,9 @@ import { useCampoMonetario } from '../hooks/useCampoMonetario.js'
 import { formatearPesos } from '../format/formatearDinero.js'
 import CampoMonetario from '../components/CampoMonetario.jsx'
 import GraficoEsfuerzoResultado from '../components/GraficoEsfuerzoResultado.jsx'
+import ConfirmacionContinuidadCotizacion from '../components/ConfirmacionContinuidadCotizacion.jsx'
+import DetallePasoAuditable from '../components/DetallePasoAuditable.jsx'
+import PoliticasJuridicasInvolucradas from '../components/PoliticasJuridicasInvolucradas.jsx'
 import {
   textoEsfuerzoAdicional,
   textoAjusteIBC,
@@ -164,18 +167,13 @@ const CAMINO_MAS_ALINEADO_TEXTO = 'Camino más alineado con tu objetivo y las co
 // este único valor a true.
 const IA_EXPUESTA_EN_MVP = false
 
-// E6.3 (PL-260 §9.3/§9.6) — integración real pero DORMIDA de la cadena visual determinista
-// (evaluarPoliticasEjercicioRPM → construirEjercicioResueltoRPM →
-// construirModeloVisualEjercicioRPM, vía construirCadenaVisualEjercicioRPM.js), aprobada por
-// Carlos/Atlas. Mismo patrón exacto que IA_EXPUESTA_EN_MVP, arriba: un solo interruptor local
-// a esta pantalla, en `false` siempre. Con el interruptor apagado, `cadenaVisualDormida` (más
-// abajo) nunca se calcula — cero llamadas a las tres funciones. Ningún JSX de este checkpoint
-// consume su resultado: a diferencia de S4-007 (que ya tiene UI condicional oculta),
-// E6.3 no agrega ningún elemento visual nuevo, ni siquiera oculto — `cadenaVisualDormida`
-// queda disponible como variable local para que un checkpoint posterior (E6.5, primer
-// consumidor visible de Contrato F, ver PL-260 §9.6) la conecte a un componente real. No
-// confundir con `IA_EXPUESTA_EN_MVP`: esta cadena nunca invoca IA, `src/ia/` ni `api/`.
-const MODELO_VISUAL_EJERCICIO_ACTIVO = false
+// E6.5 (PL-260 §9.5/§9.6) — la cadena visual determinista (evaluarPoliticasEjercicioRPM →
+// construirEjercicioResueltoRPM → construirModeloVisualEjercicioRPM, vía
+// construirCadenaVisualEjercicioRPM.js) deja de estar dormida: se conecta al Nivel esencial
+// real, más abajo (ver bloque "Nivel esencial" en el JSX). Ya no existe un interruptor local
+// — a diferencia de IA_EXPUESTA_EN_MVP (arriba), esta cadena nunca invoca IA, `src/ia/` ni
+// `api/`; es determinista y ya auditada (E5.4/E6.1-E6.3), sin motivo de producto para
+// ocultarla condicionalmente como el interruptor dormido de E6.3 anticipaba.
 
 function hoyISO() {
   return new Date().toISOString().slice(0, 10)
@@ -293,6 +291,12 @@ function TextoExplicacionCamino({ texto }) {
  * @param {(valor: string) => void} props.onCambiarObjetivoPensionMensual
  * @param {string} props.restriccionCostoPensionalAdicionalMaximoMensual
  * @param {(valor: string) => void} props.onCambiarRestriccionCostoPensionalAdicionalMaximoMensual
+ * @param {{codigo: string, confirmado: boolean, textoAceptado: string, edadObjetivoConfirmada: number} | null} [props.confirmacionContinuidad] -
+ *   E6.5 (PL-260 §9.4/§9.5): confirmación ya dada del supuesto de continuidad de cotización,
+ *   o `null` si no existe todavía. Vive en App.jsx, que la invalida cuando cambia edad
+ *   objetivo, sexo, régimen actual o fecha de nacimiento (decisión ya aprobada, E6.4).
+ * @param {(confirmacionNueva: {codigo: string, confirmado: boolean, textoAceptado: string, edadObjetivoConfirmada: number}) => void} [props.onConfirmarContinuidad] -
+ *   registra la confirmación nueva en App.jsx — nunca invalida nada por sí mismo.
  * @param {() => void} props.onVolver
  * @param {{tipo: 'contenido', texto: string} | {tipo: 'ausencia'} | null} [props.declaracionLibre] -
  *   contexto lingüístico opcional de S4-006, usado únicamente para que "Entender este
@@ -328,6 +332,13 @@ function ProyectaTuPensionRPM({
   onCambiarObjetivoPensionMensual,
   restriccionCostoPensionalAdicionalMaximoMensual,
   onCambiarRestriccionCostoPensionalAdicionalMaximoMensual,
+  // E6.5 (PL-260 §9.4/§9.5) — confirmación del supuesto de continuidad de cotización
+  // (estado vive en App.jsx, ver su declaración ahí): `null` mientras no se confirma, o el
+  // objeto `{codigo, confirmado, textoAceptado, edadObjetivoConfirmada}` que Contrato F
+  // espera dentro de `confirmacionesSupuestos`. Default `null` para pantallas de prueba que
+  // todavía no la cablean (mismo criterio que trasladoRegimen/detalleTraslado, arriba).
+  confirmacionContinuidad = null,
+  onConfirmarContinuidad = () => {},
   onVolver,
   declaracionLibre = null,
   adaptadorExplicacion = adaptadorExplicacionProduccion,
@@ -433,20 +444,58 @@ function ProyectaTuPensionRPM({
         })
       : null
 
-  // E6.3 (PL-260 §9.3) — cadena visual determinista, dormida: solo se calcula si
-  // MODELO_VISUAL_EJERCICIO_ACTIVO está en true (nunca en este checkpoint — ver la constante,
-  // arriba). Reutiliza literalmente `resultado` (justo arriba) — nunca vuelve a invocar
-  // generarCaminosRPM. `confirmacionesSupuestos: []` es un valor fijo hasta que E6.4
-  // introduzca el gate real de confirmación de continuidad (PL-260 §9.4) — este componente
-  // nunca inventa una confirmación por su cuenta. Sin consumidor todavía: ningún JSX de este
-  // checkpoint la usa — queda disponible como variable local para que E6.5 (primer
-  // consumidor visible de Contrato F, PL-260 §9.6) la conecte a un componente real.
-  const cadenaVisualDormida = MODELO_VISUAL_EJERCICIO_ACTIVO
-    ? construirCadenaVisualEjercicioRPM({ resultado, sexo, edadJubilacionDeseada: edadValida, confirmacionesSupuestos: [] })
-    : null
-  // Deliberadamente sin consumidor hasta E6.5 — `void` explícito en vez de fingir un uso en
-  // JSX que no existe todavía (nunca console, nunca un elemento oculto).
-  void cadenaVisualDormida
+  // E6.5 (PL-260 §9.5) — cadena visual determinista, ahora real: reutiliza literalmente
+  // `resultado` (justo arriba) — nunca vuelve a invocar generarCaminosRPM. `edadValida` es el
+  // mismo valor ya validado que produjo `resultado` (nunca el texto crudo del campo) —
+  // requisito explícito de construirCadenaVisualEjercicioRPM.js.
+  // confirmacionesSupuestos: forma exacta que exige Contrato F — un arreglo con, a lo sumo,
+  // la única confirmación que App.jsx guarda (`confirmacionContinuidad`), o `[]` cuando
+  // todavía no existe. Nunca se inventa ni se completa aquí — se reexpone tal cual llega.
+  const confirmacionesSupuestos = confirmacionContinuidad ? [confirmacionContinuidad] : []
+  const cadenaVisual = construirCadenaVisualEjercicioRPM({
+    resultado,
+    sexo,
+    edadJubilacionDeseada: edadValida,
+    confirmacionesSupuestos,
+  })
+
+  // E6.6 (PL-260 §9.1/§9.6) — Nivel completo: la grilla de abajo recorre
+  // `ordenarCaminosParaPresentacion(resultado.escenarios)` (orden E, posiblemente reordenado
+  // para presentación — nunca el mismo orden que `cadenaVisual.modeloVisual.caminos`, que
+  // conserva el orden I6 original), así que cada tarjeta busca su camino visual por `id`, no
+  // por índice — único identificador estable entre ambas listas (mismo `id` en las dos, por
+  // construcción de Contrato F: `construirCaminoResuelto`/`construirCaminoVisual` nunca lo
+  // cambian). `Map` vacío cuando la cadena no se construyó (`cadenaVisual` null o
+  // `CADENA_VISUAL_NO_CONSTRUIDA`) — cada tarjeta entonces simplemente no ofrece Nivel
+  // completo, nunca lanza.
+  const caminosVisualesPorId =
+    cadenaVisual?.estado === 'CADENA_VISUAL_CONSTRUIDA'
+      ? new Map(cadenaVisual.modeloVisual.caminos.map((c) => [c.id, c]))
+      : new Map()
+
+  // E7 (auditoría adversarial, 2026-09-23) — corrección de contrato: PL-260 §0 punto 6 y §8
+  // ("Consecuencias mientras cualquiera de las dos políticas necesarias esté NO_RESUELTA")
+  // prohíben presentar una cifra que dependa silenciosamente de haber elegido una
+  // interpretación jurídica no autorizada — E6.5 originalmente solo agregaba un rótulo junto
+  // a la cifra (`cifraNoPublicable`, abajo), lo que sigue mostrando el número tal cual. Ese
+  // rótulo sigue siendo correcto para publicable:false por razones NO jurídicas (ej.
+  // CONFIRMACION_AUSENTE — §9.1 lo autoriza explícitamente: "Cifra visible, rotulada
+  // explícitamente como no definitiva"), pero cuando la razón de incompletitud es
+  // específicamente `POLITICA_JURIDICA_NO_RESUELTA`, PL-260 §9 (E9) exige "el estado
+  // intermedio honesto (elegibilidad confirmada, cuantía pendiente de regla jurídica)" — sin
+  // cifra. Esta pantalla NUNCA decide cuál interpretación jurídica es correcta (eso sigue sin
+  // resolverse en `data/legal`/`compararAnclaIncrementoRPM.js`, fuera de este checkpoint) —
+  // solo decide NO mostrar un número que dependería en silencio de una de las dos. El Nivel
+  // completo (más abajo) sigue mostrando el valor crudo que Contrato F ya calculó, porque ahí
+  // la incertidumbre queda explícita junto al dato (sección "Políticas jurídicas de este
+  // ejercicio", en la misma tarjeta) — nunca silenciosa. Evaluado a nivel de EJERCICIO (no
+  // por camino), igual que la propia política (evaluarPoliticasEjercicioRPM.js: "a nivel de
+  // EJERCICIO, no por camino").
+  const politicaJuridicaNoResuelta =
+    cadenaVisual?.estado === 'CADENA_VISUAL_CONSTRUIDA' &&
+    cadenaVisual.modeloVisual.estadoEjercicio.razonesIncompleto.some(
+      (razon) => razon.codigo === 'POLITICA_JURIDICA_NO_RESUELTA'
+    )
 
   // S4-004: separa, una sola vez, las limitaciones presentes en TODOS los caminos viables
   // (comunes — se muestran una vez, debajo de la comparación) de las que solo aparecen en
@@ -931,6 +980,53 @@ function ProyectaTuPensionRPM({
             Objetivo: {formatearPesos(objetivoValorMensual)} al mes, en pesos de hoy.
           </p>
 
+          {/* E6.5 (PL-260 §9.5/§9.6) — "Nivel esencial" real: disclosure + confirmación de
+              continuidad de cotización, y el estado completo/publicable del ejercicio, tal
+              cual lo produce Contrato F vía la cadena visual. `CADENA_VISUAL_NO_CONSTRUIDA`
+              es, por diseño, estructuralmente inalcanzable desde un `resultado` real (ver
+              cabecera de construirCadenaVisualEjercicioRPM.js) — se maneja de todos modos,
+              fail-closed, para nunca fallar en silencio si algún día ocurriera. Las cifras de
+              la grilla de abajo NUNCA se ocultan aquí (siguen siendo útiles para explorar el
+              escenario) — lo que este bloque agrega es la advertencia explícita de que, si el
+              ejercicio no es publicable, esa cifra todavía no es un resultado confiable. */}
+          {cadenaVisual && cadenaVisual.estado === 'CADENA_VISUAL_CONSTRUIDA' && (
+            <div className="insight">
+              <ConfirmacionContinuidadCotizacion
+                confirmacion={confirmacionContinuidad}
+                edadJubilacionDeseada={edadValida}
+                onConfirmar={onConfirmarContinuidad}
+              />
+              {!cadenaVisual.modeloVisual.estadoEjercicio.publicable && (
+                // E6.7 (PL-260 §9.6) — role="status" (equivalente a aria-live="polite"): al
+                // confirmar continuidad, este bloque puede desaparecer del DOM; role="status"
+                // en la versión que SIGUE apareciendo (ej. caso jurídico NO_RESUELTA) asegura
+                // que un lector de pantalla anuncie el estado vigente sin exigir que la
+                // persona vuelva a navegar hasta aquí — mismo criterio ya usado en
+                // ConfirmacionContinuidadCotizacion.jsx para su propio mensaje de vigencia.
+                <div className="comparacion-caminos__supuestos" role="status">
+                  <p className="insight__label">
+                    Este resultado todavía no es una cifra confiable para publicar
+                  </p>
+                  <ul className="comparacion-caminos__supuestos-lista">
+                    {cadenaVisual.modeloVisual.estadoEjercicio.razonesNoPublicable.map((razon) => (
+                      <li key={razon.codigo}>{razon.mensaje}</li>
+                    ))}
+                    {!cadenaVisual.modeloVisual.estadoEjercicio.completo &&
+                      cadenaVisual.modeloVisual.estadoEjercicio.razonesIncompleto.map((razon) => (
+                        <li key={razon.codigo}>{razon.mensaje}</li>
+                      ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          {cadenaVisual && cadenaVisual.estado === 'CADENA_VISUAL_NO_CONSTRUIDA' && (
+            <p className="insight__message" role="status">
+              No pudimos construir el resultado auditable de este ejercicio en este momento.
+            </p>
+          )}
+
           <div
             className="comparacion-caminos"
             style={{ '--comparacion-caminos-columnas': resultado.escenarios.length }}
@@ -950,6 +1046,23 @@ function ProyectaTuPensionRPM({
               // crudo — null en el caso normal (sin ajuste, o ajuste que no cambió el
               // resultado), así que no agrega ningún <details> vacío.
               const textoValorCrudo = escenario.estado === 'descartado' ? null : textoResultadoMatematicoPrevioAjuste(escenario)
+              // E6.6: Nivel completo, buscado por id (ver comentario junto a caminosVisualesPorId,
+              // arriba) — undefined cuando la cadena visual no se construyó o el camino es
+              // descartado (construirCaminoVisual nunca produce pasos para un descartado).
+              const caminoVisual = caminosVisualesPorId.get(escenario.id)
+              // E6.5 (revisión de auditoría, 2026-09-22): la cifra de este camino nunca debe
+              // leerse como un resultado confiable sin su advertencia adjunta — el aviso de
+              // arriba (antes de la grilla) ya lo dice una vez, pero una tarjeta vista aislada
+              // (ej. una captura de pantalla recortada) podría perder esa referencia. Se repite
+              // aquí, junto a la cifra misma, siempre que el ejercicio completo no sea
+              // publicable — nunca oculta la cifra, solo la rotula. E7: excluye el caso
+              // jurídico (`politicaJuridicaNoResuelta`, arriba) — ahí la cifra ya no se
+              // muestra en absoluto, así que este rótulo (pensado para acompañar un número
+              // visible) ya no aplica.
+              const cifraNoPublicable =
+                cadenaVisual?.estado === 'CADENA_VISUAL_CONSTRUIDA' &&
+                !cadenaVisual.modeloVisual.estadoEjercicio.publicable &&
+                !politicaJuridicaNoResuelta
 
               return (
                 <div
@@ -978,31 +1091,59 @@ function ProyectaTuPensionRPM({
                       </div>
                       <div className="camino-celda camino-celda--proyeccion">
                         <span className="camino-celda__etiqueta">Pensión proyectada mensual (pesos de hoy)</span>
-                        <span className="camino-celda__valor camino-celda__valor--enfasis">
-                          {formatearPesos(escenario.resultado.valor)}
-                        </span>
-                        {textoDiferencia && (
-                          <span className="camino-celda__valor camino-celda__valor--secundario">{textoDiferencia}</span>
-                        )}
-                        {/* checkpoint E4-C1, Decisión 3: el valor matemático previo al ajuste
-                            legal nunca compite visualmente con la cifra final — solo
-                            disponible bajo revelación progresiva, para trazabilidad. */}
-                        {textoValorCrudo && (
-                          <details className="legal-detail">
-                            <summary>Ver resultado matemático antes del ajuste legal</summary>
-                            <p>{textoValorCrudo}</p>
-                          </details>
+                        {politicaJuridicaNoResuelta ? (
+                          // E7 (PL-260 §0 punto 6, §9 E9): nunca un número que dependa en
+                          // silencio de una interpretación jurídica sin resolver — mismo
+                          // "estado intermedio honesto" que E9 exige (elegibilidad confirmada,
+                          // cuantía pendiente de regla jurídica), sin afirmar cuál
+                          // interpretación es correcta. El detalle completo de este camino
+                          // (más abajo) sí muestra el valor crudo, junto a la política que lo
+                          // hace incierto — ahí deja de ser silencioso.
+                          <span className="camino-celda__valor camino-celda__valor--pendiente" role="note">
+                            Cuantía pendiente: depende de una política jurídica sin resolver (ver Nivel completo).
+                          </span>
+                        ) : (
+                          <>
+                            <span className="camino-celda__valor camino-celda__valor--enfasis">
+                              {formatearPesos(escenario.resultado.valor)}
+                            </span>
+                            {textoDiferencia && (
+                              <span className="camino-celda__valor camino-celda__valor--secundario">{textoDiferencia}</span>
+                            )}
+                            {/* checkpoint E4-C1, Decisión 3: el valor matemático previo al
+                                ajuste legal nunca compite visualmente con la cifra final —
+                                solo disponible bajo revelación progresiva, para trazabilidad. */}
+                            {textoValorCrudo && (
+                              <details className="legal-detail">
+                                <summary>Ver resultado matemático antes del ajuste legal</summary>
+                                <p>{textoValorCrudo}</p>
+                              </details>
+                            )}
+                            {cifraNoPublicable && (
+                              <span className="camino-celda__nota camino-celda__nota--no-publicable" role="note">
+                                Todavía no es un resultado confiable para publicar — ver aviso arriba.
+                              </span>
+                            )}
+                          </>
                         )}
                       </div>
                       <div className="camino-celda camino-celda--objetivo">
                         <span className="camino-celda__etiqueta">Frente a tu objetivo</span>
-                        <span
-                          className={`camino-celda__valor${escenario.distanciaObjetivo.cumple ? ' camino-celda__valor--cumple' : ''}`}
-                        >
-                          {textoDistancia(escenario)}
-                        </span>
-                        {textoPorcentaje && (
-                          <span className="camino-celda__valor camino-celda__valor--secundario">{textoPorcentaje}</span>
+                        {politicaJuridicaNoResuelta ? (
+                          <span className="camino-celda__valor camino-celda__valor--pendiente">
+                            Pendiente de la misma cuantía.
+                          </span>
+                        ) : (
+                          <>
+                            <span
+                              className={`camino-celda__valor${escenario.distanciaObjetivo.cumple ? ' camino-celda__valor--cumple' : ''}`}
+                            >
+                              {textoDistancia(escenario)}
+                            </span>
+                            {textoPorcentaje && (
+                              <span className="camino-celda__valor camino-celda__valor--secundario">{textoPorcentaje}</span>
+                            )}
+                          </>
                         )}
                       </div>
                       {notasEspecificas.length > 0 && (
@@ -1013,6 +1154,35 @@ function ProyectaTuPensionRPM({
                             </p>
                           ))}
                         </div>
+                      )}
+
+                      {/* E6.6 (PL-260 §9.1/§9.6) — Nivel completo: el resumen de este camino
+                          (arriba) permanece siempre visible; al expandir, se agregan los 7
+                          pasos auditables en el orden exacto de Contrato F — nunca se
+                          recalcula nada, solo se reexpone `caminoVisual.pasos`
+                          (Object.entries conserva el orden de inserción, ya garantizado por
+                          construirModeloVisualEjercicioRPM.js). `caminoVisual?.pasos` es
+                          `undefined`/`null` cuando la cadena visual no se construyó — la
+                          tarjeta entonces no ofrece este control, nunca un <details> vacío
+                          (mismo criterio ya aplicado a textoValorCrudo, arriba). */}
+                      {caminoVisual?.pasos && (
+                        <details className="legal-detail">
+                          {/* E6.7 (PL-260 §9.6): con más de un camino viable, dos controles con
+                              el mismo texto visible ("Ver el detalle auditable completo de
+                              este camino") son indistinguibles para quien navega por lectores
+                              de pantalla listando controles fuera de su orden visual —
+                              aria-label agrega el nombre del camino (ya visible como título de
+                              esta misma tarjeta) al nombre accesible, sin alargar el texto que
+                              ve una persona vidente. Mismo criterio ya usado en esta pantalla
+                              para los botones "Editar" del resumen revisable
+                              (aria-label="Editar tu régimen actual", etc.). */}
+                          <summary aria-label={`Ver el detalle auditable completo del camino: ${escenario.decision}`}>
+                            Ver el detalle auditable completo de este camino
+                          </summary>
+                          {Object.entries(caminoVisual.pasos).map(([codigoPaso, datosPaso]) => (
+                            <DetallePasoAuditable codigo={codigoPaso} datos={datosPaso} key={codigoPaso} />
+                          ))}
+                        </details>
                       )}
 
                       {/* S4-007: bajo demanda, nunca automático — las cifras de arriba ya
@@ -1052,6 +1222,14 @@ function ProyectaTuPensionRPM({
               )
             })}
           </div>
+
+          {/* E6.6 (PL-260 §9.1/§9.6) — Nivel completo: sección propia, a nivel de ejercicio
+              (nunca por camino — una política jurídica involucrada aplica al ejercicio
+              completo, no a un camino en particular). Vacío (`[]`) es un estado de dominio
+              válido — el componente entonces no renderiza nada (ver su propio archivo). */}
+          {cadenaVisual?.estado === 'CADENA_VISUAL_CONSTRUIDA' && (
+            <PoliticasJuridicasInvolucradas politicas={cadenaVisual.modeloVisual.politicasJuridicas} />
+          )}
 
           {/* UX-RPM-02A: movidos aquí, después del resultado — antes precedían a la grilla.
               Ninguno cambió de contenido salvo la coordinación de mensajes de semanas
@@ -1201,11 +1379,23 @@ function ProyectaTuPensionRPM({
             </div>
           )}
 
-          <GraficoEsfuerzoResultado
-            barrido={resultado.barrido}
-            objetivoValorMensual={objetivoValorMensual}
-            escenarioPersonalizado={resultado.escenarios.find((e) => e.id === 'esfuerzo-adicional-deseado') ?? null}
-          />
+          {/* E7 (PL-260 §0 punto 6, §9 E9): el gráfico traza `resultado.valor` de cada punto
+              del barrido — la misma cuantía que las tarjetas de arriba ya dejan de mostrar
+              como número cuando hay una política jurídica NO_RESUELTA aplicable (coherencia
+              resumen↔gráfica exigida en E6.7). Mostrar la curva de todos modos sería la misma
+              "cifra silenciosa" que §0 punto 6 prohíbe, solo en otra forma visual. */}
+          {politicaJuridicaNoResuelta ? (
+            <p className="grafico-esfuerzo-resultado__mensaje-sin-margen">
+              No mostramos el gráfico de esfuerzo↔resultado: la cuantía que dibujaría depende de la misma política
+              jurídica sin resolver — ver el aviso arriba y el Nivel completo de cada camino.
+            </p>
+          ) : (
+            <GraficoEsfuerzoResultado
+              barrido={resultado.barrido}
+              objetivoValorMensual={objetivoValorMensual}
+              escenarioPersonalizado={resultado.escenarios.find((e) => e.id === 'esfuerzo-adicional-deseado') ?? null}
+            />
+          )}
 
           {resultado.escenarios.length > 1 && (
             <p className="comparacion-caminos__aclaracion">

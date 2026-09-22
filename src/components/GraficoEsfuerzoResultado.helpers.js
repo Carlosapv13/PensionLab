@@ -190,3 +190,48 @@ export function textoEtiquetaEleccion(puntoPersonalizado) {
 export function etiquetaEleccionVaDebajo(puntoPersonalizadoSvg, puntoObjetivoSvg) {
   return puntoObjetivoSvg !== null && puntoObjetivoSvg.y < puntoPersonalizadoSvg.y
 }
+
+// E6.7 (PL-260 §9.6) — "coherencia resumen↔gráfica↔Nivel completo": `role="img"` en el <svg>
+// (GraficoEsfuerzoResultado.jsx) colapsa todo su contenido — incluidos los <text> con las
+// cifras de cada punto — a un único nodo de accesibilidad con solo su aria-label. Sin esta
+// descripción, un lector de pantalla nunca oye ninguna de las cifras que el gráfico dibuja
+// (Hoy, Tu objetivo, Tu elección, extremo explorado) — información que hoy no existe en
+// ningún otro texto de la pantalla (a diferencia del camino elegido, que sí se repite en la
+// tarjeta y en el Nivel completo). Puro: solo reexpone los mismos valores ya calculados por
+// generarCaminosRPM.js (barrido.puntos/puntoObjetivo, escenarioPersonalizado), formateados
+// igual que el resto de esta misma pantalla (formatearPesos) — nunca calcula ni redondea de
+// forma distinta.
+/**
+ * @param {Object} params
+ * @param {Array<{posicion: string, esfuerzo: {costoPensionalAdicionalMensual: number}, resultado: {valor: number}}>} params.puntos
+ * @param {{esfuerzo: {costoPensionalAdicionalMensual: number}, resultado: {valor: number}}|null} params.puntoObjetivo
+ * @param {number|null} params.objetivoValorMensual
+ * @param {{esfuerzo: {costoPensionalAdicionalMensual: number}, resultado: {valor: number}}|null} params.puntoPersonalizado
+ * @returns {string}
+ */
+export function descripcionAccesibleGrafico({ puntos, puntoObjetivo, objetivoValorMensual, puntoPersonalizado }) {
+  const actual = puntos.find((p) => p.posicion === 'actual') ?? puntos[0]
+  const extremo = puntos[puntos.length - 1]
+
+  const partes = [
+    `Hoy: sin aporte adicional, pensión proyectada ${formatearPesos(actual.resultado.valor)}.`,
+    `Hasta ${formatearPesos(extremo.esfuerzo.costoPensionalAdicionalMensual)} de aporte adicional mensual explorado, ` +
+      `con una pensión proyectada de ${formatearPesos(extremo.resultado.valor)}.`,
+  ]
+
+  if (puntoObjetivo) {
+    partes.push(
+      `Tu objetivo (${formatearPesos(objetivoValorMensual)}) se alcanza con ` +
+        `${formatearPesos(puntoObjetivo.esfuerzo.costoPensionalAdicionalMensual)} de aporte adicional mensual.`
+    )
+  }
+
+  if (puntoPersonalizado) {
+    partes.push(
+      `Tu elección: ${formatearPesos(puntoPersonalizado.esfuerzo.costoPensionalAdicionalMensual)} de aporte adicional ` +
+        `mensual, pensión proyectada ${formatearPesos(puntoPersonalizado.resultado.valor)}.`
+    )
+  }
+
+  return partes.join(' ')
+}

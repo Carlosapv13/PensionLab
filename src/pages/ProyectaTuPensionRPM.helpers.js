@@ -252,9 +252,15 @@ export function textoFuenteSemanas(semanas) {
   if (!semanas || semanas.fuente !== 'declaracion_agregada') return null
 
   const prefijo = semanas.certeza === 'aproximado' ? 'aproximadamente ' : ''
+  // Corrección de auditoría visual (2026-09-25, ronda 2): `semanas.declaradas` es un entero
+  // (cantidad de semanas que la persona declaró) interpolado sin separador de miles — se veía
+  // "1039 semanas" en vez de "1.039 semanas". `toLocaleString('es-CO')` es el mismo formato ya
+  // usado en el resto de la pantalla para enteros sin unidad monetaria (ver
+  // formatearSemanasComoTexto, nivelCompletoAuditable.helpers.js) — nunca redondea (el valor
+  // ya es un entero declarado, no uno fraccionario que descomponer en días).
   return (
-    `Conocemos las ${prefijo}${semanas.declaradas} semanas que declaraste, pero todavía no conocemos el ` +
-    'detalle de los IBC de cada período de tu historia — por eso esta proyección parte de esa cifra ' +
+    `Conocemos las ${prefijo}${semanas.declaradas.toLocaleString('es-CO')} semanas que declaraste, pero todavía no conocemos ` +
+    'el detalle de los IBC de cada período de tu historia — por eso esta proyección parte de esa cifra ' +
     'declarada, no de una historia de cotización verificada. Completarla puede afinar el resultado.'
   )
 }
@@ -323,6 +329,121 @@ const CODIGOS_LIMITACION_DEPENDIENTES_DE_POLITICA_JURIDICA = new Set(['RESTRICCI
 export function filtrarLimitacionesPorPoliticaJuridica(limitaciones, politicaJuridicaNoResuelta) {
   if (!politicaJuridicaNoResuelta) return limitaciones
   return limitaciones.filter((l) => !CODIGOS_LIMITACION_DEPENDIENTES_DE_POLITICA_JURIDICA.has(l.codigo))
+}
+
+// Corrección de auditoría visual (2026-09-25, capturas reales de Carlos, Caso B) — dos
+// mensajes de `razonesNoPublicable`/`razonesIncompleto` (Contrato F,
+// construirEjercicioResueltoRPM.js — cerrado, sin tocar) resultaron inadecuados para mostrar
+// tal cual en el Nivel esencial:
+// - `EJERCICIO_NO_COMPLETO`: "El ejercicio no está completo — ver razonesIncompleto." — el
+//   nombre del campo (`razonesIncompleto`) es vocabulario interno de la API de Contrato F,
+//   nunca pensado para una persona usuaria. Además es puramente redundante: cuando aparece,
+//   `razonesIncompleto` SIEMPRE se muestra justo debajo, en la misma lista (evaluarPublicable
+//   solo agrega este código cuando `!completo`, que es exactamente cuando `razonesIncompleto`
+//   no está vacío) — se suprime (`null`), sin perder ninguna información real.
+// - `POLITICA_JURIDICA_NO_RESUELTA`: su mensaje interpola `politicaNoResuelta.nombre`
+//   (el identificador interno de código, ej. "PoliticaAnclaIncrementoMujer") a mitad de la
+//   oración — se reemplaza por un texto que nunca nombra ese identificador y señala hacia la
+//   sección "Políticas jurídicas de este ejercicio" (que sí desglosa cada política, con su
+//   nombre ya traducido — ver etiquetaNombrePolitica, PoliticasJuridicasInvolucradas.jsx),
+//   en vez de duplicar aquí el texto jurídico completo.
+// Ninguna otra razón conocida hoy (CONFIRMACION_AUSENTE, CONFIRMACION_EDAD_NO_COINCIDE,
+// SIN_CAMINOS_AUDITABLES, DISPONIBILIDAD_CUANTIA_INSUFICIENTE,
+// FECHA_BASE_MONETARIA_NO_DISPONIBLE) menciona vocabulario interno ni queda redundante con
+// otro texto ya visible — se reexponen tal cual, sin cambios.
+/**
+ * @param {{codigo: string, mensaje: string}} razon
+ * @returns {string|null} `null` cuando el mensaje no debe mostrarse (ver nota de cabecera)
+ */
+export function textoRazonVisible(razon) {
+  if (razon.codigo === 'EJERCICIO_NO_COMPLETO') return null
+  if (razon.codigo === 'POLITICA_JURIDICA_NO_RESUELTA') {
+    return 'Una política jurídica aplicable a este ejercicio no está resuelta — ver "Políticas jurídicas de este ejercicio", abajo.'
+  }
+  return razon.mensaje
+}
+
+// Corrección de auditoría visual (2026-09-25, capturas reales de Carlos, Caso B): la decisión
+// 'Aumentar tu IBC futuro para alcanzar tu objetivo.' (generarCaminosRPM.js — Contrato E,
+// cerrado, sin tocar) afirma alcanzar el objetivo — cierto bajo la interpretación con la que
+// el motor calculó, pero no confirmable mientras la política jurídica de tasa de reemplazo
+// siga NO_RESUELTA (misma cuantía en disputa que el resto de esta corrección ya retiene).
+// Es la ÚNICA decisión, de las tres que Contrato E produce hoy, que hace esa afirmación —
+// 'Mantener, en términos reales, tu base de cotización actual hasta tu jubilación.' y 'Con el
+// esfuerzo mensual que elegiste.' solo describen el escenario, nunca afirman resultado. Mapa
+// explícito (nunca una sustitución de texto genérica/regex sobre cualquier decisión) para que
+// un cambio futuro en Contrato E que agregue una decisión nueva nunca quede reescrito por
+// accidente — cae a la decisión original tal cual, sin filtrar, hasta que se audite también.
+const DECISIONES_QUE_AFIRMAN_ALCANZAR_OBJETIVO = new Map([
+  ['Aumentar tu IBC futuro para alcanzar tu objetivo.', 'Aumentar tu IBC futuro.'],
+])
+
+/**
+ * @param {string} decision - `escenario.decision`, literal de Contrato E.
+ * @param {boolean} politicaJuridicaNoResuelta
+ * @returns {string}
+ */
+export function textoDecisionCamino(decision, politicaJuridicaNoResuelta) {
+  if (!politicaJuridicaNoResuelta) return decision
+  return DECISIONES_QUE_AFIRMAN_ALCANZAR_OBJETIVO.get(decision) ?? decision
+}
+
+// Corrección de auditoría visual (2026-09-25, capturas reales de Carlos, Caso B) — hallazgo
+// posterior a los tres defectos anteriores: la tarjeta del camino 'aumentar-ibc-futuro' seguía
+// mostrando "Lleva tu IBC de $X a $Y" y "$Z adicionales de aporte pensional al mes" sin
+// condicionarlos a `politicaJuridicaNoResuelta`, a pesar de depender de la misma cuantía en
+// disputa. Trazabilidad verificada en el dominio (generarCaminosRPM.js — Contrato E, cerrado,
+// sin tocar): el IBC propuesto de ESTE camino no es un dato declarado, es la SALIDA de
+// `biseccionarEscenarioIbcFuturo`, que busca el IBC mínimo cuya `mesadaGobernante` (el valor
+// final ajustado — mismo tramo AJUSTE_LEGAL/RESULTADO_FINAL que ya depende de TASA_REEMPLAZO)
+// alcance `objetivoValorMensual`. `desglosarTasaReemplazoRPM` (formulaRPM.js) calcula
+// `tasaFinalAplicada` a partir de `semanasBaseIncrementoRPM` — el mismo parámetro que
+// `compararAnclaIncrementoRPM.js` compara entre ANCLA_FIJA_1300 y ANCLA_MINIMO_DINAMICO para
+// decidir si `PoliticaAnclaIncrementoMujer` aplica a este ejercicio. Es decir: bajo la
+// interpretación alternativa (ancla dinámica), la misma búsqueda de objetivo converge en un IBC
+// (y por tanto un aporte adicional) DISTINTO — esta cifra es tan condicionada como la pensión
+// proyectada y la comparación con el objetivo, nunca un dato de entrada.
+//
+// 'esfuerzo-adicional-deseado' es la excepción, deliberada — su IBC propuesto se deriva
+// directamente del monto exacto que la persona declaró querer aportar
+// (`ibcActual + monto/tasaCotizacionFraccion`, generarCaminosRPM.js línea ~979): tasaCotización
+// es el porcentaje legal fijo de cotización, sin relación con la tasa de REEMPLAZO en disputa
+// (Art. 34). Esa cifra es un dato de entrada — la persona la eligió — nunca el resultado de una
+// búsqueda hacia el objetivo, y permanece visible bajo política NO_RESUELTA. 'base' tampoco
+// depende: repite el IBC actual ya declarado, sin cambio.
+/**
+ * @param {{id: string}} escenario
+ * @returns {boolean}
+ */
+export function caminoIbcDependeDePoliticaJuridica(escenario) {
+  return escenario.id === 'aumentar-ibc-futuro'
+}
+
+// Corrección de auditoría visual (2026-09-25, ronda 2 — revisión visual de Carlos/Atlas sobre
+// el Nivel completo del Caso B, posterior a la ronda anterior): DATOS_UTILIZADOS no es el
+// único paso cuyo valor depende, para el camino 'aumentar-ibc-futuro', del IBC que salió de
+// la búsqueda hacia el objetivo — el paso IBL también lo usa como ENTRADA de su propio
+// cálculo. Trazabilidad verificada en `calcularProyeccionRPM.js` (cerrado, sin tocar):
+// `valorAplicado` (el IBC del camino, ya con el tope legal aplicado) alimenta tanto
+// `periodoFuturo` — el período que entra a la ventana del IBL (`seleccionarPeriodosIBL`) —
+// como `promediarConFuturo` para el promedio ordinario Y para la alternativa de vida laboral
+// completa (líneas ~394-425/465-470). Sin este helper, `IBL aplicable` (un número calculado
+// con esa cifra disputada) y, más grave, `trazabilidadVentana` (que embebe el período futuro
+// con ese mismo IBC crudo, `periodoFuturo.ibc`, dentro de un objeto anidado) seguían
+// revelando la cifra disputada aunque la tarjeta resumida y DATOS_UTILIZADOS ya la ocultaran
+// — la protección debía cubrir toda representación visual, no solo el paso de entrada más
+// obvio. Mismo criterio "todo o nada" por paso ya usado por DetallePasoAuditable: no se
+// distinguen campos dentro de IBL (esOpcionLegal/razonVidaLaboralNoEvaluada también dependen,
+// en cascada, de esa misma comparación calculada con el IBC disputado).
+const CODIGOS_PASO_QUE_USAN_EL_IBC_DEL_CAMINO = new Set(['DATOS_UTILIZADOS', 'IBL'])
+
+/**
+ * @param {string} codigoPaso
+ * @param {{id: string}} escenario
+ * @returns {boolean}
+ */
+export function pasoUsaIbcEnDisputaDelCamino(codigoPaso, escenario) {
+  return CODIGOS_PASO_QUE_USAN_EL_IBC_DEL_CAMINO.has(codigoPaso) && caminoIbcDependeDePoliticaJuridica(escenario)
 }
 
 /**

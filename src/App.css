@@ -599,16 +599,26 @@
   color: var(--text);
 }
 
-/* 7 filas reales (decisión de producto, 2026-08-24 — reordenamiento "esfuerzo → resultado →
-   objetivo"): encabezado, esfuerzo, pensión (+diferencia como 2ª línea interna), objetivo,
-   IBC (soporte, movido después de objetivo), notas, explicación. Declaradas explícitamente
-   — antes quedaban 2 filas (7 y 8) dependiendo del auto-sizing implícito de CSS Grid porque
-   el template nunca se actualizó al agregar la explicación de S4-007; mismo valor por
-   defecto (auto), pero ahora la estructura real queda documentada, no accidental. */
+/* 8 filas reales (decisión de producto, 2026-08-24 — reordenamiento "esfuerzo → resultado →
+   objetivo"; fila 7 agregada 2026-09-25): encabezado, esfuerzo, pensión (+diferencia como 2ª
+   línea interna), objetivo, IBC (soporte, movido después de objetivo), notas, detalle Nivel
+   completo, explicación. Declaradas explícitamente — antes quedaban 2 filas (7 y 8)
+   dependiendo del auto-sizing implícito de CSS Grid porque el template nunca se actualizó al
+   agregar la explicación de S4-007; mismo valor por defecto (auto), pero ahora la estructura
+   real queda documentada, no accidental.
+   Corrección de auditoría visual (2026-09-25, capturas reales de Carlos, Caso B): el control
+   "Ver el detalle auditable completo de este camino" (E6.6/E6.7, ProyectaTuPensionRPM.jsx) se
+   agregó como un <details> suelto, SIN grid-column/grid-row propios — con .camino-columna en
+   display:contents, ese elemento quedaba sujeto al auto-placement de CSS Grid (grid-auto-flow:
+   row, empaquetado disperso), que podía colocarlo en el primer hueco libre de OTRA columna
+   (ej. la fila de notas de un camino sin notas específicas) — el detalle de un camino
+   terminaba superpuesto visualmente sobre el texto de otro. Se le asigna aquí su propia fila
+   (.camino-celda--detalle-completo, abajo) y su propio grid-column (heredado de .camino-celda,
+   igual que el resto) para que nunca vuelva a depender del auto-placement. */
 .comparacion-caminos {
   display: grid;
   grid-template-columns: repeat(var(--comparacion-caminos-columnas), minmax(220px, 1fr));
-  grid-template-rows: repeat(7, auto);
+  grid-template-rows: repeat(8, auto);
   gap: 16px;
   width: 100%;
 }
@@ -672,11 +682,23 @@
   padding-top: 6px;
 }
 
-/* S4-007 — "Entender este camino": nueva fila, después de las notas específicas. El
-   border-bottom que antes cerraba .camino-celda--notas se mueve aquí porque esta es ahora
-   la última fila real de la tarjeta (--notas puede o no existir según el camino). */
-.camino-celda--explicacion {
+/* Corrección de auditoría visual (2026-09-25, capturas reales de Carlos, Caso B) — ver la
+   nota de cabecera junto a .comparacion-caminos: fila propia para el <details> "Ver el
+   detalle auditable completo de este camino" (Nivel completo), antes suelto y sujeto al
+   auto-placement de CSS Grid. */
+.camino-celda--detalle-completo {
   grid-row: 7;
+  padding-top: 6px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* S4-007 — "Entender este camino": nueva fila, después del detalle de Nivel completo (antes,
+   después de las notas específicas — corrida una fila por --detalle-completo, arriba). Mismo
+   border-bottom que ya tenía como última fila real de la tarjeta cuando IA_EXPUESTA_EN_MVP se
+   reactive. */
+.camino-celda--explicacion {
+  grid-row: 8;
   padding-top: 6px;
   padding-bottom: 14px;
   border-bottom: 1px solid var(--border);

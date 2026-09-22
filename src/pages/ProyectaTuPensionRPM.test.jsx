@@ -131,6 +131,26 @@ function propsMujerJuridicoConRestriccion(overrides = {}) {
   })
 }
 
+// --- Fixture Mujer, jurídico NO_RESUELTA + camino alternativo VIABLE, sin restricción
+// (verificado empíricamente, 2026-09-25, ronda 2 de la revisión visual de Carlos/Atlas sobre
+// el Caso B): mismo perfil que propsMujerJuridicoNoPublicable, con un objetivo moderadamente
+// más alto (fuerza bisección → camino 'aumentar-ibc-futuro') pero SIN restricción de costo —
+// a diferencia de propsMujerJuridicoConRestriccion (que fuerza el descarte del alternativo por
+// RESTRICCION_COSTO_LIMITA_RESULTADO), aquí el alternativo queda `estado: 'viable'`, con su
+// propio control de Nivel completo — el caso exacto de la captura de Carlos: la tarjeta
+// resumida oculta el IBC/aporte/resultado, pero el Nivel completo del camino alternativo debía
+// seguir ocultando también IBL aplicable y trazabilidadVentana (antes de esta corrección, no
+// lo hacía). `objetivoPensionMensual = smlv * 1.3` verificado con el barrido de este archivo:
+// produce exactamente 2 columnas (base + aumentar-ibc-futuro), ambas viables, ninguna
+// descartada.
+function propsMujerJuridicoConAlternativoViable(overrides = {}) {
+  const smlv = obtenerSmlv(hoyISO()).valor
+  return propsMujerJuridicoNoPublicable({
+    objetivoPensionMensual: String(Math.round(smlv * 1.3)),
+    ...overrides,
+  })
+}
+
 // --- Fixture Hombre con un camino descartado (verificado empíricamente, 2026-09-22): mismo
 // perfil que propsHombreCompleto, con un objetivo tan alto que ni el tope legal lo alcanza —
 // produce un camino 'base' viable Y un camino 'aumentar-ibc-futuro' descartado
@@ -292,19 +312,24 @@ describe('ProyectaTuPensionRPM — invalidación de la confirmación (E6.5, PL-2
 })
 
 describe('ProyectaTuPensionRPM — caso jurídico no publicable (E6.5/E7, PL-260 §0.6/§9 E9)', () => {
-  it('con una política jurídica NO_RESUELTA aplicable, el ejercicio queda incompleto/no publicable y la pantalla lo declara explícitamente', () => {
+  it('con una política jurídica NO_RESUELTA aplicable, el ejercicio queda incompleto/no publicable y la pantalla lo declara explícitamente, sin filtrar vocabulario interno', () => {
     render(<ProyectaTuPensionRPM {...propsMujerJuridicoNoPublicable()} confirmacionContinuidad={null} />)
 
     expect(screen.getByText('Este resultado todavía no es una cifra confiable para publicar')).toBeTruthy()
+
+    // Corrección de auditoría visual (2026-09-25): el aviso principal ya no repite el
+    // identificador interno de la política ni el nombre del campo "razonesIncompleto" —
+    // apunta a la sección propia, que sí desglosa cada política con su nombre traducido.
     expect(
       screen.getByText(
-        (contenido) =>
-          contenido.includes('PoliticaAnclaIncrementoMujer') && contenido.includes('no está resuelta')
+        'Una política jurídica aplicable a este ejercicio no está resuelta — ver "Políticas jurídicas de este ejercicio", abajo.'
       )
     ).toBeTruthy()
-    // EJERCICIO_NO_COMPLETO (razonesNoPublicable) coexiste con la causa jurídica de fondo —
-    // Contrato F nunca sustituye una razón por otra (ver evaluarCompleto/evaluarPublicable).
-    expect(screen.getByText('El ejercicio no está completo — ver razonesIncompleto.')).toBeTruthy()
+    expect(screen.queryByText((contenido) => contenido.includes('PoliticaAnclaIncrementoMujer'))).toBeNull()
+    // EJERCICIO_NO_COMPLETO era puramente redundante con el mensaje anterior (Contrato F solo
+    // lo agrega cuando razonesIncompleto ya no está vacío) y nombraba el campo interno
+    // "razonesIncompleto" — se suprime, sin perder ninguna información real.
+    expect(screen.queryByText('El ejercicio no está completo — ver razonesIncompleto.')).toBeNull()
   })
 
   // E7 (auditoría adversarial, 2026-09-23): PL-260 §0 punto 6 ("Ningún Preview puede
@@ -362,7 +387,7 @@ describe('ProyectaTuPensionRPM — caso jurídico no publicable (E6.5/E7, PL-260
 
     // Los 5 pasos dependientes muestran el mensaje de "pendiente" — nunca su valor calculado.
     const mensajesPendientes = screen.getAllByText(
-      'Pendiente: depende de la política jurídica "PoliticaAnclaIncrementoMujer", todavía sin resolver — ver "Políticas jurídicas de este ejercicio", abajo.'
+      'Pendiente: depende de la política jurídica "Ancla del incremento de la tasa de reemplazo (Art. 34) — mujeres", todavía sin resolver — ver "Políticas jurídicas de este ejercicio", abajo.'
     )
     expect(mensajesPendientes.length).toBe(5)
     // Ninguna cifra en pesos dentro de un bloque .detalle-paso__pendiente.
@@ -377,6 +402,99 @@ describe('ProyectaTuPensionRPM — caso jurídico no publicable (E6.5/E7, PL-260
     expect(document.querySelectorAll('.detalle-paso__valor').length).toBeGreaterThan(0)
 
     expect(screen.getByText('Políticas jurídicas de este ejercicio')).toBeTruthy()
+  })
+
+  // Corrección de auditoría visual, RONDA 2 (2026-09-25, revisión visual de Carlos/Atlas sobre
+  // el Caso B, posterior a la ronda anterior): la ronda anterior ocultó el IBC/aporte/
+  // resultado en la tarjeta resumida y DATOS_UTILIZADOS en el Nivel completo del camino
+  // 'aumentar-ibc-futuro' — pero el paso "Cálculo del IBL" (IBL aplicable, y sobre todo
+  // trazabilidadVentana, que embebe el período futuro con el IBC crudo disputado dentro de un
+  // objeto anidado) seguía mostrando su valor real, volviendo a filtrar indirectamente la
+  // misma cifra ($3.045.477 en la captura real de Carlos). Este fixture (objetivo = smlv*1.3,
+  // sin restricción) produce el alternativo VIABLE — no descartado — para poder expandir su
+  // Nivel completo y verificar la corrección completa.
+  it('RONDA 2 — regresión (Caso B): el camino alternativo VIABLE bajo política NO_RESUELTA oculta también IBL aplicable y trazabilidadVentana (incluido el período futuro anidado) — los 7 pasos quedan pendientes, ninguno expone una cifra', async () => {
+    const user = userEvent.setup()
+    render(<ProyectaTuPensionRPM {...propsMujerJuridicoConAlternativoViable()} confirmacionContinuidad={null} />)
+
+    // Confirma que este fixture realmente combina las tres condiciones que motivaron la
+    // corrección — si dejara de hacerlo, esta prueba debe fallar de forma visible, nunca pasar
+    // vacía sin haber ejercitado el caso real.
+    expect(screen.getByText('Políticas jurídicas de este ejercicio')).toBeTruthy()
+    const columnas = document.querySelectorAll('.camino-columna')
+    expect(columnas.length).toBe(2)
+
+    for (const control of screen.getAllByText('Ver el detalle auditable completo de este camino')) {
+      await user.click(control)
+    }
+
+    // Localiza la columna del camino alternativo por su título ya traducido (textoDecisionCamino)
+    // — nunca por posición, que no está garantizada por ordenarCaminosParaPresentacion.
+    const columnaAlternativa = Array.from(columnas).find((c) =>
+      c.querySelector('.camino-celda--encabezado')?.textContent.includes('Aumentar tu IBC futuro.')
+    )
+    expect(columnaAlternativa).toBeTruthy()
+    const columnaBase = Array.from(columnas).find((c) => c !== columnaAlternativa)
+
+    // Los 7 pasos del camino alternativo quedan pendientes — incluidos DATOS_UTILIZADOS e IBL,
+    // que para los demás caminos son datos de entrada visibles (ver E7, arriba). Ninguno
+    // expone su tabla de campos real (`.detalle-paso__campos`/`.detalle-paso__valor`).
+    expect(columnaAlternativa.querySelectorAll('.detalle-paso__pendiente').length).toBe(7)
+    expect(columnaAlternativa.querySelectorAll('.detalle-paso__valor').length).toBe(0)
+    expect(columnaAlternativa.querySelectorAll('.detalle-paso__campos').length).toBe(0)
+
+    // Ninguna cifra en pesos (ni la del IBC/aporte/resultado, ni la del IBL, ni ninguna otra)
+    // aparece en ningún lugar del DOM de la columna alternativa — ni en la tarjeta resumida ni
+    // en el Nivel completo expandido.
+    expect(columnaAlternativa.textContent).not.toMatch(/\$[\d.]+/)
+
+    // El paso "Cálculo del IBL" específicamente muestra el mensaje de pendiente — nunca "IBL
+    // aplicable" con un valor, nunca "Trazabilidad de la ventana usada" con el período futuro
+    // anidado (Fecha Desde/Fecha Hasta/Ibc/Días Cotizados/Es Escenario Futuro).
+    const bloqueIblAlternativo = Array.from(columnaAlternativa.querySelectorAll('.detalle-paso')).find(
+      (b) => b.querySelector('.detalle-paso__titulo')?.textContent === 'Cálculo del IBL'
+    )
+    expect(bloqueIblAlternativo).toBeTruthy()
+    expect(bloqueIblAlternativo.querySelector('.detalle-paso__pendiente')).toBeTruthy()
+    expect(bloqueIblAlternativo.textContent).not.toContain('IBL aplicable')
+    expect(bloqueIblAlternativo.textContent).not.toContain('Trazabilidad de la ventana usada')
+    expect(bloqueIblAlternativo.textContent).not.toContain('Es Escenario Futuro')
+    expect(bloqueIblAlternativo.textContent).not.toContain('Fecha Desde')
+
+    // El camino BASE es independiente de la política (caminoIbcDependeDePoliticaJuridica lo
+    // confirma false) — sigue mostrando su IBC actual, su IBL real y su trazabilidadVentana
+    // completa, sin ningún cambio por esta corrección.
+    expect(columnaBase.textContent).toContain('IBL aplicable')
+    expect(columnaBase.textContent).toContain('Trazabilidad de la ventana usada')
+    expect(columnaBase.querySelectorAll('.detalle-paso__valor').length).toBeGreaterThan(0)
+    // El camino base SÍ tiene cifras en pesos visibles (su propio IBC/IBL/resultado, ninguno
+    // en disputa) — confirma que la corrección no oculta de más.
+    expect(columnaBase.textContent).toMatch(/\$[\d.]+/)
+  })
+
+  // Corrección de auditoría visual (2026-09-25, capturas reales de Carlos, Caso B): el campo
+  // `origen` de DATOS_UTILIZADOS (dato de entrada, nunca en disputa para el camino 'base' —
+  // caminoIbcDependeDePoliticaJuridica lo confirma false) mostraba literalmente
+  // `continuidad_ibc_actual` (generarCaminosRPM.js) en vez de una frase legible. Se verifica
+  // aquí, y de paso que ningún identificador interno de código conocido (origen del camino,
+  // razón de vida laboral no evaluada) escape a texto crudo en ningún lugar de la pantalla.
+  it('regresión (Caso B): "Origen del dato" muestra una frase legible, nunca el identificador interno crudo del camino', async () => {
+    const user = userEvent.setup()
+    render(<ProyectaTuPensionRPM {...propsMujerJuridicoNoPublicable()} confirmacionContinuidad={null} />)
+    await user.click(screen.getAllByText('Ver el detalle auditable completo de este camino')[0])
+
+    expect(screen.getByText('Mismo IBC que tu situación actual, sin cambio')).toBeTruthy()
+
+    const texto = document.body.textContent
+    for (const identificadorInterno of [
+      'continuidad_ibc_actual',
+      'busqueda_objetivo_rpm',
+      'VIDA_LABORAL_REQUIERE_HISTORIA_ESTRUCTURADA',
+      'SEMANAS_TOTALES_INSUFICIENTES',
+      'DATOS_LEGALES_INSUFICIENTES',
+    ]) {
+      expect(texto).not.toContain(identificadorInterno)
+    }
   })
 
   it('E7: el mensaje de "paso pendiente" sigue presente tanto con el detalle cerrado como expandido, y después de confirmar continuidad', async () => {
@@ -394,14 +512,14 @@ describe('ProyectaTuPensionRPM — caso jurídico no publicable (E6.5/E7, PL-260
     // React) — el mensaje ya está en el DOM antes de expandir.
     expect(
       screen.getAllByText(
-        'Pendiente: depende de la política jurídica "PoliticaAnclaIncrementoMujer", todavía sin resolver — ver "Políticas jurídicas de este ejercicio", abajo.'
+        'Pendiente: depende de la política jurídica "Ancla del incremento de la tasa de reemplazo (Art. 34) — mujeres", todavía sin resolver — ver "Políticas jurídicas de este ejercicio", abajo.'
       ).length
     ).toBe(5)
 
     await user.click(screen.getAllByText('Ver el detalle auditable completo de este camino')[0])
     expect(
       screen.getAllByText(
-        'Pendiente: depende de la política jurídica "PoliticaAnclaIncrementoMujer", todavía sin resolver — ver "Políticas jurídicas de este ejercicio", abajo.'
+        'Pendiente: depende de la política jurídica "Ancla del incremento de la tasa de reemplazo (Art. 34) — mujeres", todavía sin resolver — ver "Políticas jurídicas de este ejercicio", abajo.'
       ).length
     ).toBe(5)
 
@@ -414,7 +532,7 @@ describe('ProyectaTuPensionRPM — caso jurídico no publicable (E6.5/E7, PL-260
     // pendientes exactamente igual.
     expect(
       screen.getAllByText(
-        'Pendiente: depende de la política jurídica "PoliticaAnclaIncrementoMujer", todavía sin resolver — ver "Políticas jurídicas de este ejercicio", abajo.'
+        'Pendiente: depende de la política jurídica "Ancla del incremento de la tasa de reemplazo (Art. 34) — mujeres", todavía sin resolver — ver "Políticas jurídicas de este ejercicio", abajo.'
       ).length
     ).toBe(5)
   })
@@ -426,6 +544,37 @@ describe('ProyectaTuPensionRPM — caso jurídico no publicable (E6.5/E7, PL-260
     render(<ProyectaTuPensionRPM {...propsMujerJuridicoNoPublicable()} confirmacionContinuidad={null} />)
     expect(screen.queryByText('Camino más alineado con tu objetivo y las condiciones que nos diste.')).toBeNull()
     expect(screen.queryByText('Qué podrías explorar ahora')).toBeNull()
+  })
+
+  // Corrección posterior (2026-09-24, revisión integral del caso jurídico NO_RESUELTA): con
+  // el objetivo declarado exactamente en el piso legal, el camino 'base' de este mismo
+  // fixture "ya alcanza" el objetivo bajo la interpretación con la que generarCaminosRPM.js
+  // calculó (verificado empíricamente: orientacionExploracion.codigo ===
+  // 'HOY_YA_ALCANZA_OBJETIVO', coexistiendo con la política NO_RESUELTA) — el hint bajo "Ver
+  // qué ocurriría con otro esfuerzo" (corregido en la ronda anterior por una contradicción de
+  // copy distinta) seguía afirmando "no es necesaria para alcanzar tu objetivo" en este
+  // estado, la misma cifra silenciosa que el resto de la pantalla ya retiene.
+  it('corrección: el hint de "Ver qué ocurriría con otro esfuerzo" nunca afirma "no es necesaria para alcanzar tu objetivo" bajo una política jurídica NO_RESUELTA, ni siquiera cuando HOY_YA_ALCANZA_OBJETIVO coincide', () => {
+    render(<ProyectaTuPensionRPM {...propsMujerJuridicoNoPublicable()} confirmacionContinuidad={null} />)
+
+    // Confirma que este fixture realmente combina ambas condiciones — si dejara de hacerlo,
+    // esta prueba debe fallar de forma visible, nunca pasar vacía sin haber ejercitado el
+    // caso real que motivó la corrección.
+    expect(screen.getByText('Este resultado todavía no es una cifra confiable para publicar')).toBeTruthy()
+
+    expect(screen.queryByText(/no es necesaria para alcanzar tu objetivo/)).toBeNull()
+    expect(
+      screen.getByText('Es una simulación opcional, independiente de los caminos ya comparados arriba — nunca una recomendación de aportar más.')
+    ).toBeTruthy()
+  })
+
+  it('regresión: sin política jurídica NO_RESUELTA, HOY_YA_ALCANZA_OBJETIVO sigue mostrando el hint original exacto — la corrección no lo oculta siempre', () => {
+    // Reutiliza el mismo fixture/objetivo ya verificado para HOY_YA_ALCANZA_OBJETIVO sin
+    // política jurídica (ver describe "corrección de auditoría visual... Caso A", abajo).
+    render(<ProyectaTuPensionRPM {...propsCasoA({ objetivoPensionMensual: '2000000' })} confirmacionContinuidad={null} />)
+    expect(
+      screen.getByText('Es una simulación opcional — no es necesaria para alcanzar tu objetivo ni una recomendación de aportar más.')
+    ).toBeTruthy()
   })
 
   it('E7: el gráfico de esfuerzo↔resultado tampoco se dibuja — traza la misma cuantía pendiente (coherencia resumen↔gráfica)', () => {
@@ -501,7 +650,12 @@ describe('ProyectaTuPensionRPM — caso jurídico no publicable (E6.5/E7, PL-260
     // CONFIRMACION_AUSENTE ya no aplica (sí se confirmó), pero la advertencia se mantiene por
     // la razón jurídica, que ninguna confirmación de continuidad puede resolver.
     expect(screen.getByText('Este resultado todavía no es una cifra confiable para publicar')).toBeTruthy()
-    expect(screen.getByText('El ejercicio no está completo — ver razonesIncompleto.')).toBeTruthy()
+    expect(
+      screen.getByText(
+        'Una política jurídica aplicable a este ejercicio no está resuelta — ver "Políticas jurídicas de este ejercicio", abajo.'
+      )
+    ).toBeTruthy()
+    expect(screen.queryByText('El ejercicio no está completo — ver razonesIncompleto.')).toBeNull()
     expect(screen.queryByText('No existe una confirmación válida del supuesto de continuidad de cotización.')).toBeNull()
     expect(
       screen.getAllByText('Cuantía pendiente: depende de una política jurídica sin resolver (ver Nivel completo).').length
@@ -575,6 +729,24 @@ describe('ProyectaTuPensionRPM — Nivel completo conectado (E6.6, PL-260 §9.1/
     expect(document.querySelectorAll('.detalle-paso__valor').length).toBeGreaterThan(0)
   })
 
+  // Corrección de auditoría visual (2026-09-25, capturas reales de Carlos, Caso B): este
+  // <details> vivía suelto, sin grid-column/grid-row propios — con .camino-columna en
+  // display:contents, quedaba sujeto al auto-placement de CSS Grid, que podía colocarlo en el
+  // hueco de OTRA columna (ej. la fila de notas de un camino sin notas específicas),
+  // superponiendo su texto sobre el de otro camino. Se verifica aquí que cada control tenga
+  // su propia celda de grid (`camino-celda camino-celda--detalle-completo`, App.css) — nunca
+  // solo `legal-detail` suelto.
+  it('regresión (superposición entre columnas): cada control de Nivel completo tiene su propia celda de grid, nunca un <details> suelto sin grid-column/grid-row', () => {
+    render(<ProyectaTuPensionRPM {...propsHombreCompleto()} confirmacionContinuidad={null} />)
+    const detalles = document.querySelectorAll('.camino-celda--detalle-completo')
+    expect(detalles.length).toBeGreaterThan(0)
+    for (const detalle of detalles) {
+      expect(detalle.tagName).toBe('DETAILS')
+      expect(detalle.classList.contains('camino-celda')).toBe(true)
+      expect(detalle.querySelector('summary').textContent).toBe('Ver el detalle auditable completo de este camino')
+    }
+  })
+
   it('un camino descartado nunca ofrece un control de Nivel completo — I7 garantiza que no tiene pasos que mostrar', () => {
     render(<ProyectaTuPensionRPM {...propsHombreConCaminoDescartado()} confirmacionContinuidad={null} />)
 
@@ -588,10 +760,14 @@ describe('ProyectaTuPensionRPM — Nivel completo conectado (E6.6, PL-260 §9.1/
   it('políticas jurídicas involucradas: la sección aparece con el mensaje literal cuando hay una política NO_RESUELTA, y no aparece cuando no hay ninguna', () => {
     const { unmount } = render(<ProyectaTuPensionRPM {...propsMujerJuridicoNoPublicable()} confirmacionContinuidad={null} />)
     expect(screen.getByText('Políticas jurídicas de este ejercicio')).toBeTruthy()
-    // "PoliticaAnclaIncrementoMujer" aparece también dentro del mensaje de razonesIncompleto
-    // (Nivel esencial, E6.5) — se verifica que la sección propia de Nivel completo (E6.6)
-    // exista, buscando su nodo dedicado (.politicas-juridicas__nombre) en vez del texto suelto.
-    expect(document.querySelector('.politicas-juridicas__nombre').textContent).toContain('PoliticaAnclaIncrementoMujer')
+    // Corrección de auditoría visual (2026-09-25): el nombre visible ya no es el identificador
+    // interno de código ("PoliticaAnclaIncrementoMujer") sino su traducción legible
+    // (etiquetaNombrePolitica) — se verifica que la sección propia de Nivel completo (E6.6)
+    // exista, buscando su nodo dedicado (.politicas-juridicas__nombre) y su texto traducido.
+    expect(document.querySelector('.politicas-juridicas__nombre').textContent).toContain(
+      'Ancla del incremento de la tasa de reemplazo (Art. 34) — mujeres'
+    )
+    expect(document.querySelector('.politicas-juridicas__nombre').textContent).not.toContain('PoliticaAnclaIncrementoMujer')
     unmount()
 
     render(<ProyectaTuPensionRPM {...propsHombreCompleto()} confirmacionContinuidad={null} />)

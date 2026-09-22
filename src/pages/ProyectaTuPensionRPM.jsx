@@ -136,6 +136,10 @@ import {
   calcularLimitacionesComunes,
   limitacionesEspecificas,
   filtrarLimitacionesPorPoliticaJuridica,
+  textoRazonVisible,
+  textoDecisionCamino,
+  caminoIbcDependeDePoliticaJuridica,
+  pasoUsaIbcEnDisputaDelCamino,
   debeOcultarRestriccion,
   validarEsfuerzoAdicionalMensualDeseado,
   ordenarCaminosParaPresentacion,
@@ -1051,13 +1055,24 @@ function ProyectaTuPensionRPM({
                   <p className="insight__label">
                     Este resultado todavía no es una cifra confiable para publicar
                   </p>
+                  {/* Corrección de auditoría visual (2026-09-25): textoRazonVisible
+                      (helpers.js) traduce/suprime dos mensajes de Contrato F inadecuados
+                      para esta lista — EJERCICIO_NO_COMPLETO (redundante, y nombra el campo
+                      interno "razonesIncompleto") y POLITICA_JURIDICA_NO_RESUELTA (nombra el
+                      identificador interno de la política a mitad de oración) — ver esa
+                      función para el detalle completo. Nunca cambia razonesNoPublicable/
+                      razonesIncompleto en sí, solo cómo se muestran aquí. */}
                   <ul className="comparacion-caminos__supuestos-lista">
-                    {cadenaVisual.modeloVisual.estadoEjercicio.razonesNoPublicable.map((razon) => (
-                      <li key={razon.codigo}>{razon.mensaje}</li>
-                    ))}
-                    {!cadenaVisual.modeloVisual.estadoEjercicio.completo &&
-                      cadenaVisual.modeloVisual.estadoEjercicio.razonesIncompleto.map((razon) => (
-                        <li key={razon.codigo}>{razon.mensaje}</li>
+                    {[
+                      ...cadenaVisual.modeloVisual.estadoEjercicio.razonesNoPublicable,
+                      ...(cadenaVisual.modeloVisual.estadoEjercicio.completo
+                        ? []
+                        : cadenaVisual.modeloVisual.estadoEjercicio.razonesIncompleto),
+                    ]
+                      .map((razon) => ({ codigo: razon.codigo, texto: textoRazonVisible(razon) }))
+                      .filter((razon) => razon.texto !== null)
+                      .map((razon) => (
+                        <li key={razon.codigo}>{razon.texto}</li>
                       ))}
                   </ul>
                 </div>
@@ -1088,6 +1103,13 @@ function ProyectaTuPensionRPM({
                 !politicaJuridicaNoResuelta &&
                 resultado.orientacion.caminoMasAlineadoId === escenario.id &&
                 !resultado.orientacion.objetivoLegalmenteInalcanzable
+              // Corrección de auditoría visual (2026-09-25): 'Aumentar tu IBC futuro para
+              // alcanzar tu objetivo.' (Contrato E, generarCaminosRPM.js) afirma alcanzar el
+              // objetivo — no confirmable mientras la política jurídica siga NO_RESUELTA.
+              // Usado tanto en el título visible como en el nombre accesible del control de
+              // Nivel completo (aria-label, más abajo) — nunca solo uno de los dos, para que
+              // un lector de pantalla nunca oiga la afirmación que la persona vidente ya no ve.
+              const textoDecision = textoDecisionCamino(escenario.decision, politicaJuridicaNoResuelta)
               // E7 corrección posterior (2026-09-23): mismo filtro que limitacionesComunes,
               // arriba — RESTRICCION_COSTO_LIMITA_RESULTADO nunca aparece como nota
               // específica de un camino bajo una política jurídica NO_RESUELTA tampoco.
@@ -1126,7 +1148,7 @@ function ProyectaTuPensionRPM({
                   key={escenario.id}
                 >
                   <div className="camino-celda camino-celda--encabezado">
-                    <p className="camino-celda__valor camino-celda__valor--titulo">{escenario.decision}</p>
+                    <p className="camino-celda__valor camino-celda__valor--titulo">{textoDecision}</p>
                     {esMasAlineado && <p className="camino-celda__nota">{CAMINO_MAS_ALINEADO_TEXTO}</p>}
                   </div>
 
@@ -1134,15 +1156,34 @@ function ProyectaTuPensionRPM({
                     <p className="camino-celda camino-celda--descartado">{escenario.razonDescartado.mensaje}</p>
                   ) : (
                     <>
+                      {/* Corrección de auditoría visual (2026-09-25): el IBC propuesto y el
+                          aporte adicional de 'aumentar-ibc-futuro' son la SALIDA de una
+                          búsqueda que persigue el objetivo usando la misma tasa de reemplazo en
+                          disputa (ver caminoIbcDependeDePoliticaJuridica, helpers.js, para la
+                          trazabilidad completa) — nunca un dato de entrada. 'base' y
+                          'esfuerzo-adicional-deseado' sí son datos de entrada (IBC actual, o el
+                          monto exacto que la persona declaró) y permanecen visibles siempre. */}
                       <div className="camino-celda camino-celda--ibc">
                         <span className="camino-celda__etiqueta">Tu IBC</span>
-                        <span className="camino-celda__valor camino-celda__valor--enfasis">
-                          {textoAjusteIBC(escenario)}
-                        </span>
+                        {politicaJuridicaNoResuelta && caminoIbcDependeDePoliticaJuridica(escenario) ? (
+                          <span className="camino-celda__valor camino-celda__valor--pendiente" role="note">
+                            IBC propuesto pendiente: depende de una política jurídica sin resolver (ver Nivel completo).
+                          </span>
+                        ) : (
+                          <span className="camino-celda__valor camino-celda__valor--enfasis">
+                            {textoAjusteIBC(escenario)}
+                          </span>
+                        )}
                       </div>
                       <div className="camino-celda camino-celda--esfuerzo">
                         <span className="camino-celda__etiqueta">Aporte pensional adicional mensual</span>
-                        <span className="camino-celda__valor">{textoEsfuerzoAdicional(escenario)}</span>
+                        {politicaJuridicaNoResuelta && caminoIbcDependeDePoliticaJuridica(escenario) ? (
+                          <span className="camino-celda__valor camino-celda__valor--pendiente">
+                            Pendiente de la misma cuantía.
+                          </span>
+                        ) : (
+                          <span className="camino-celda__valor">{textoEsfuerzoAdicional(escenario)}</span>
+                        )}
                       </div>
                       <div className="camino-celda camino-celda--proyeccion">
                         <span className="camino-celda__etiqueta">Pensión proyectada mensual (pesos de hoy)</span>
@@ -1221,7 +1262,18 @@ function ProyectaTuPensionRPM({
                           tarjeta entonces no ofrece este control, nunca un <details> vacío
                           (mismo criterio ya aplicado a textoValorCrudo, arriba). */}
                       {caminoVisual?.pasos && (
-                        <details className="legal-detail">
+                        // Corrección de auditoría visual (2026-09-25, capturas reales de
+                        // Carlos, Caso B): este <details> vivía suelto (solo `legal-detail`),
+                        // sin grid-column/grid-row propios — con .camino-columna en
+                        // display:contents, quedaba sujeto al auto-placement de CSS Grid, que
+                        // podía colocarlo en el hueco de OTRA columna (ej. la fila de notas de
+                        // un camino sin notas específicas) y su texto terminaba superpuesto
+                        // sobre el de otro camino. `camino-celda camino-celda--detalle-completo`
+                        // (App.css) le da su propia fila y columna, igual que el resto de las
+                        // celdas de esta tarjeta — mismo patrón ya usado por
+                        // `.camino-celda--descartado` aplicada directamente sobre un <p>, sin
+                        // necesitar un div envolvente adicional.
+                        <details className="legal-detail camino-celda camino-celda--detalle-completo">
                           {/* E6.7 (PL-260 §9.6): con más de un camino viable, dos controles con
                               el mismo texto visible ("Ver el detalle auditable completo de
                               este camino") son indistinguibles para quien navega por lectores
@@ -1231,7 +1283,7 @@ function ProyectaTuPensionRPM({
                               ve una persona vidente. Mismo criterio ya usado en esta pantalla
                               para los botones "Editar" del resumen revisable
                               (aria-label="Editar tu régimen actual", etc.). */}
-                          <summary aria-label={`Ver el detalle auditable completo del camino: ${escenario.decision}`}>
+                          <summary aria-label={`Ver el detalle auditable completo del camino: ${textoDecision}`}>
                             Ver el detalle auditable completo de este camino
                           </summary>
                           {/* E7 corrección (2026-09-23): un paso que depende de la tasa de
@@ -1239,13 +1291,42 @@ function ProyectaTuPensionRPM({
                               pasoDependeDePoliticaJuridica, nivelCompletoAuditable.helpers.js)
                               nunca expone su valor calculado bajo una política jurídica
                               NO_RESUELTA — sigue apareciendo (nunca se omite en silencio),
-                              pero con el mensaje de qué política lo bloquea en vez de `datos`. */}
+                              pero con el mensaje de qué política lo bloquea en vez de `datos`.
+
+                              Corrección de auditoría visual (2026-09-25): DATOS_UTILIZADOS es,
+                              en general, un paso de ENTRADA (nunca depende de la política —
+                              pasoDependeDePoliticaJuridica lo confirma) — pero para el camino
+                              'aumentar-ibc-futuro' específicamente, su valorDeclarado/
+                              valorAplicado NO es un dato de entrada: es la salida de la misma
+                              búsqueda de objetivo que ya depende de la tasa de reemplazo en
+                              disputa (ver caminoIbcDependeDePoliticaJuridica, helpers.js, para
+                              la trazabilidad completa).
+
+                              Corrección de auditoría visual, ronda 2 (2026-09-25, revisión
+                              visual de Carlos/Atlas): el paso IBL también usa ese mismo IBC
+                              disputado como entrada de su propio cálculo (valorAplicado
+                              alimenta tanto el período futuro de trazabilidadVentana como el
+                              promedio del IBL — ver pasoUsaIbcEnDisputaDelCamino, helpers.js,
+                              para la trazabilidad completa contra calcularProyeccionRPM.js).
+                              Sin esto, "IBL aplicable" y el período futuro anidado dentro de
+                              "Trazabilidad de la ventana usada" (con el IBC crudo embebido)
+                              seguían revelando la cifra disputada aunque la tarjeta resumida y
+                              DATOS_UTILIZADOS ya la ocultaran.
+
+                              DetallePasoAuditable no distingue campos dentro de un paso (todo
+                              o nada, mismo criterio ya usado para el resto) — DATOS_UTILIZADOS
+                              e IBL, solo para este camino, pasan a pendiente también.
+                              semanasCotizadas (el único otro dato de DATOS_UTILIZADOS,
+                              declarado y no disputado) sigue visible igual en los otros
+                              caminos del mismo ejercicio. */}
                           {Object.entries(caminoVisual.pasos).map(([codigoPaso, datosPaso]) => (
                             <DetallePasoAuditable
                               codigo={codigoPaso}
                               datos={datosPaso}
                               pendiente={
-                                politicaJuridicaNoResuelta && pasoDependeDePoliticaJuridica(codigoPaso)
+                                politicaJuridicaNoResuelta &&
+                                (pasoDependeDePoliticaJuridica(codigoPaso) ||
+                                  pasoUsaIbcEnDisputaDelCamino(codigoPaso, escenario))
                                   ? mensajePasoPendienteDePolitica(politicasNoResueltas)
                                   : null
                               }
@@ -1425,8 +1506,20 @@ function ProyectaTuPensionRPM({
                       cualquier otro estado (ej. el objetivo solo es alcanzable vía el camino
                       "Aumentar tu IBC futuro..."), esa frase contradecía directamente lo que
                       "Qué podrías explorar ahora" ya decía arriba — ver
-                      textoHintExploracionEsfuerzo, helpers.js. */}
-                  <p className="option__hint">{textoHintExploracionEsfuerzo(orientacionExploracion?.codigo)}</p>
+                      textoHintExploracionEsfuerzo, helpers.js.
+                      Corrección posterior (2026-09-24, revisión integral del caso jurídico
+                      NO_RESUELTA): verificado empíricamente que HOY_YA_ALCANZA_OBJETIVO puede
+                      coexistir con una política jurídica NO_RESUELTA (ej. objetivo declarado
+                      exactamente en el piso legal, que el camino base alcanza bajo la
+                      interpretación con la que generarCaminosRPM.js calculó — una de las dos
+                      en disputa, nunca ambas confirmadas). En ese caso, "no es necesaria para
+                      alcanzar tu objetivo" volvería a ser la misma cifra silenciosa que el
+                      resto de esta pantalla ya retiene (PL-260 §0 punto 6) — se fuerza el
+                      texto genérico pasando `null` (mismo efecto que un código desconocido:
+                      textoHintExploracionEsfuerzo ya lo resuelve a la variante segura). */}
+                  <p className="option__hint">
+                    {textoHintExploracionEsfuerzo(politicaJuridicaNoResuelta ? null : orientacionExploracion?.codigo)}
+                  </p>
                 </>
               )}
 

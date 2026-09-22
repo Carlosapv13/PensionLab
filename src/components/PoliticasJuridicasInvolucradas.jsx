@@ -16,7 +16,21 @@
 // llama ANTES del return temprano de abajo — las reglas de Hooks de React exigen el mismo
 // orden de llamadas en cada render, nunca condicionado por un return anterior.
 
+// Corrección de auditoría visual (2026-09-25, hallazgo de revisión con capturas reales de
+// Carlos, Caso B): `politica.nombre` es un identificador interno de código
+// (`NOMBRE_POLITICA_ANCLA_INCREMENTO_MUJER = 'PoliticaAnclaIncrementoMujer'`,
+// evaluarPoliticasEjercicioRPM.js — contrato cerrado, sin tocar) — se mostraba tal cual como
+// el título visible de esta sección. `etiquetaNombrePolitica` (nivelCompletoAuditable.helpers.js
+// — única fuente de esta traducción, reutilizada también por `mensajePasoPendienteDePolitica`
+// para que ambos lugares nunca queden inconsistentes entre sí) lo traduce a una descripción
+// legible, citando el mismo fundamento legal (Art. 34) que el propio `politica.mensaje` ya
+// usa — nunca inventa una posición jurídica, solo nombra de qué trata la política, tal como
+// PL-260 §2 ya la describe ("el ancla del incremento de tasa de reemplazo, Art. 34").
+// `politica.mensaje` en sí (el texto jurídico completo, reexpuesto sin cambios más abajo)
+// nunca incluyó el identificador interno — solo el título lo hacía.
+
 import { useId } from 'react'
+import { etiquetaNombrePolitica } from '../pages/nivelCompletoAuditable.helpers.js'
 
 const ETIQUETAS_ESTADO_POLITICA = {
   NO_RESUELTA: 'No resuelta',
@@ -41,7 +55,7 @@ export default function PoliticasJuridicasInvolucradas({ politicas }) {
         {politicas.map((politica) => (
           <li className="politicas-juridicas__item" key={politica.nombre}>
             <p className="politicas-juridicas__nombre">
-              {politica.nombre}
+              {etiquetaNombrePolitica(politica.nombre)}
               <span className="politicas-juridicas__estado">
                 {' — '}
                 {ETIQUETAS_ESTADO_POLITICA[politica.estado] ?? politica.estado}

@@ -30,10 +30,14 @@ describe('PoliticasJuridicasInvolucradas — arreglo vacío es un estado de domi
 })
 
 describe('PoliticasJuridicasInvolucradas — política NO_RESUELTA, mensaje literal', () => {
-  it('muestra nombre, estado traducido, si aplica al ejercicio, y el mensaje EXACTO — nunca resumido ni reescrito', () => {
+  it('muestra el nombre TRADUCIDO (nunca el identificador interno de código), estado traducido, si aplica al ejercicio, y el mensaje EXACTO — nunca resumido ni reescrito', () => {
     render(<PoliticasJuridicasInvolucradas politicas={[POLITICA_NO_RESUELTA]} />)
     expect(screen.getByText('Políticas jurídicas de este ejercicio')).toBeTruthy()
-    expect(screen.getByText('PoliticaAnclaIncrementoMujer', { exact: false })).toBeTruthy()
+    // Corrección de auditoría visual (2026-09-25): el título ya no muestra
+    // 'PoliticaAnclaIncrementoMujer' (identificador interno de código) — muestra su
+    // traducción legible (etiquetaNombrePolitica).
+    expect(screen.queryByText('PoliticaAnclaIncrementoMujer', { exact: false })).toBeNull()
+    expect(screen.getByText('Ancla del incremento de la tasa de reemplazo (Art. 34) — mujeres', { exact: false })).toBeTruthy()
     expect(screen.getByText('No resuelta', { exact: false })).toBeTruthy()
     expect(screen.getByText('Aplica a este ejercicio.')).toBeTruthy()
     expect(
@@ -45,13 +49,23 @@ describe('PoliticasJuridicasInvolucradas — política NO_RESUELTA, mensaje lite
     render(<PoliticasJuridicasInvolucradas politicas={[{ ...POLITICA_NO_RESUELTA, aplicaAEsteEjercicio: false }]} />)
     expect(screen.getByText('No aplica a este ejercicio.')).toBeTruthy()
   })
+
+  it('una política futura sin traducción conocida nunca se oculta — cae a su nombre humanizado, nunca al identificador crudo', () => {
+    render(
+      <PoliticasJuridicasInvolucradas
+        politicas={[{ nombre: 'OtraPoliticaFutura', estado: 'RESUELTA', aplicaAEsteEjercicio: false, mensaje: 'Otro mensaje literal.' }]}
+      />
+    )
+    expect(screen.getByText('Otra Politica Futura', { exact: false })).toBeTruthy()
+    expect(screen.queryByText('OtraPoliticaFutura', { exact: false })).toBeNull()
+  })
 })
 
 describe('PoliticasJuridicasInvolucradas — varias políticas, mismo orden de entrada', () => {
   it('renderiza cada política del arreglo, sin reordenar ni descartar ninguna', () => {
     const segunda = { nombre: 'OtraPoliticaFutura', estado: 'RESUELTA', aplicaAEsteEjercicio: false, mensaje: 'Otro mensaje literal.' }
     render(<PoliticasJuridicasInvolucradas politicas={[POLITICA_NO_RESUELTA, segunda]} />)
-    const nombres = screen.getAllByText(/PoliticaAnclaIncrementoMujer|OtraPoliticaFutura/)
+    const nombres = document.querySelectorAll('.politicas-juridicas__nombre')
     expect(nombres.length).toBe(2)
     expect(screen.getByText('Otro mensaje literal.')).toBeTruthy()
   })

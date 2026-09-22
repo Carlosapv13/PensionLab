@@ -463,4 +463,73 @@ export const FIXTURES = [
       objetivoPensionMensual: '7000000',
     },
   },
+  {
+    id: 'rpm-mujer-politica-juridica-no-resuelta',
+    nombre: 'RPM — mujer — política jurídica NO_RESUELTA (ancla de incremento, PL-260 §2) — "Caso B"',
+    // Revisión integral post-e1fab3c (2026-09-24): fixture mínimo y explícito para reproducir
+    // desde el panel de desarrollo, sin recorrer las ~15 pantallas previas, el único caso real
+    // del MVP donde `PoliticaAnclaIncrementoMujer` (PL-260 §2) aplica y sigue `NO_RESUELTA` —
+    // la política encontró un fundamento textual real para la interpretación
+    // `ANCLA_MINIMO_APLICABLE` pero no pudo verificar el texto resolutivo de la Sentencia
+    // C-197/2023, así que ningún resultado económico para una mujer con semanas entre su
+    // mínimo de elegibilidad y 1.300 puede marcarse `publicable`. Verificado empíricamente
+    // (no solo por lectura de código) contra `generarCaminosRPM.js`/
+    // `evaluarPoliticasEjercicioRPM.js` reales con esta fecha de nacimiento/edad objetivo —
+    // fuera de ese rango de semanas, ambas interpretaciones coinciden numéricamente y esta
+    // política deja de aparecer (§2, "fuera de ese rango... sí pueden calcularse").
+    //
+    // `objetivoPensionMensual`/`valorBaseCotizacionDeclarado`: $2.000.000, deliberadamente un
+    // número redondo, cómodamente por encima del SMLV vigente hoy (evita el bloqueo por piso
+    // legal) y con margen para seguir estándolo varios años — nunca atado al SMLV del momento
+    // en que se escribió este fixture, para que siga siendo reproducible sin ajustes.
+    // `historiaCotizacion`: mismo patrón compacto y real (3 períodos, ~10 años) ya usado por
+    // 'rpm-empleada-historia-evaluable', arriba — solo alimenta la ventana del IBL, nunca las
+    // semanas (declaradas aparte, GO-B) ni la política jurídica en sí.
+    //
+    // Guion rápido en la pantalla real: cargar este fixture → observar "Cuantía pendiente:
+    // depende de una política jurídica sin resolver" en la tarjeta, sin gráfico, con la
+    // sección "Políticas jurídicas de este ejercicio" visible → clic en "Entiendo y quiero
+    // explorar este escenario." → el aviso jurídico permanece (confirmar nunca resuelve una
+    // política) → editar la edad objetivo en el panel → la confirmación se invalida y vuelve
+    // a pedirse.
+    vistaSugerida: 'proyectaTuPensionRPM',
+    datos: {
+      motivoConsulta: 'vejez',
+      lugarResidencia: 'Colombia',
+      cotizaActualmente: 'si',
+      sexo: 'Mujer',
+      fechaNacimiento: '1974-01-01',
+      regimenActual: 'RPM',
+      trasladoRegimen: 'no',
+      tipoCotizante: 'empleado',
+      lugarCotizacion: 'colombia',
+      nivelConocimientoSemanas: 'conocido',
+      semanasCotizadas: '1039',
+      certezaBaseCotizacion: 'conocido',
+      valorBaseCotizacionDeclarado: '2000000',
+      infoEsencialCompletada: true,
+      historiaCotizacion: [
+        {
+          fechaDesde: '2016-01-01',
+          fechaHasta: '2019-12-31',
+          ibc: 2200000,
+          diasCotizados: diasCalendarioEnRango('2016-01-01', '2019-12-31'),
+        },
+        {
+          fechaDesde: '2020-01-01',
+          fechaHasta: '2022-12-31',
+          ibc: 2800000,
+          diasCotizados: diasCalendarioEnRango('2020-01-01', '2022-12-31'),
+        },
+        {
+          fechaDesde: '2023-01-01',
+          fechaHasta: '2025-12-31',
+          ibc: 2000000,
+          diasCotizados: diasCalendarioEnRango('2023-01-01', '2025-12-31'),
+        },
+      ],
+      edadJubilacionDeseada: '61',
+      objetivoPensionMensual: '2000000',
+    },
+  },
 ]

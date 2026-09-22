@@ -42,9 +42,38 @@ const CAMPOS_BOOLEANOS = new Set(['esOpcionLegal', 'cumple', 'aplicado', 'evalua
 
 const CAMPOS_NUMERO_PLANO = new Set(['bloquesAdicionales', 'valorSMLMV'])
 
+// Corrección de auditoría visual (2026-09-25, capturas reales de Carlos, Caso B): las dos
+// entradas de abajo (`declarado_por_usuario`/`calculado_desde_dato_declarado`, de
+// `determinarBaseCotizacion.js`) NO son los únicos códigos que fluyen por el campo `origen` —
+// `escenarioIbcFuturo.origen` (Contrato E, `generarCaminosRPM.js` — cerrado, sin tocar) usa un
+// vocabulario propio (`continuidad_ibc_actual`/`busqueda_objetivo_rpm`) que llega tal cual al
+// paso `DATOS_UTILIZADOS` (`construirEjercicioResueltoRPM.js`) y, sin esta entrada, se mostraba
+// crudo en el Nivel completo. Mismo criterio que el resto de este archivo: solo se traduce lo
+// que se verificó leyendo el código que lo produce, nunca se inventa una interpretación nueva
+// — `continuidad_ibc_actual` es el camino que mantiene el IBC actual sin cambio;
+// `busqueda_objetivo_rpm` es el IBC que resultó de buscar el mínimo que alcanza el objetivo
+// (biseccionarEscenarioIbcFuturo) — ninguna de las dos frases toma posición sobre CUÁNTO ni
+// bajo qué interpretación jurídica, solo nombra de dónde salió el número.
 const ETIQUETAS_ORIGEN = {
   declarado_por_usuario: 'Declarado por ti',
   calculado_desde_dato_declarado: 'Calculado desde el dato que declaraste',
+  continuidad_ibc_actual: 'Mismo IBC que tu situación actual, sin cambio',
+  busqueda_objetivo_rpm: 'Calculado para alcanzar tu objetivo',
+}
+
+// Corrección de auditoría visual (2026-09-25, capturas reales de Carlos, Caso B):
+// `razonVidaLaboralNoEvaluada` (paso IBL, `calcularProyeccionRPM.js` — cerrado, sin tocar) es
+// un código interno de dominio, nunca pensado para mostrarse tal cual — en particular
+// `VIDA_LABORAL_REQUIERE_HISTORIA_ESTRUCTURADA` apareció crudo en una captura real. Los tres
+// códigos que ese archivo produce hoy (línea ~460/473/479) se traducen aquí — nunca se
+// inventa una explicación jurídica, solo se nombra la razón operativa exacta que el propio
+// comentario de dominio ya documenta (semanas insuficientes / falta el IPC del año de
+// referencia / declaración agregada sin historia real que promediar).
+const ETIQUETAS_RAZON_VIDA_LABORAL_NO_EVALUADA = {
+  SEMANAS_TOTALES_INSUFICIENTES: 'No alcanzas las semanas mínimas para que esta alternativa se evalúe',
+  DATOS_LEGALES_INSUFICIENTES: 'Faltan datos legales (índice de precios) para calcular esta alternativa',
+  VIDA_LABORAL_REQUIERE_HISTORIA_ESTRUCTURADA:
+    'Tu declaración agregada de semanas no aporta historia salarial real con la que calcular esta alternativa — se requiere historia de cotización estructurada',
 }
 
 // Etiquetas legibles para los campos conocidos de los 7 PasoAuditable — traducción literal
@@ -122,18 +151,43 @@ export function pasoDependeDePoliticaJuridica(codigoPaso) {
   return PASOS_DEPENDIENTES_DE_TASA_REEMPLAZO.has(codigoPaso)
 }
 
+// Corrección de auditoría visual (2026-09-25, hallazgo de revisión con capturas reales de
+// Carlos, Caso B): `politica.nombre` (ej. `NOMBRE_POLITICA_ANCLA_INCREMENTO_MUJER =
+// 'PoliticaAnclaIncrementoMujer'`, evaluarPoliticasEjercicioRPM.js — contrato cerrado, sin
+// tocar) es un identificador interno de código, nunca pensado para mostrarse tal cual.
+// `etiquetaNombrePolitica` lo traduce citando el mismo fundamento legal (Art. 34) que el
+// propio `politica.mensaje` ya usa — nunca inventa una posición jurídica, solo nombra de qué
+// trata la política, tal como PL-260 §2 ya la describe. Única fuente de esta traducción —
+// usada tanto aquí (mensajePasoPendienteDePolitica, Nivel completo) como en
+// PoliticasJuridicasInvolucradas.jsx (su propio título), para que las dos nunca queden
+// inconsistentes entre sí. Una política futura sin traducción conocida nunca se oculta ni
+// queda sin nombre — cae a `humanizarClave` (misma garantía "nunca ocultar por falta de
+// etiqueta" ya aplicada a los campos de Nivel completo).
+const ETIQUETAS_NOMBRE_POLITICA = {
+  PoliticaAnclaIncrementoMujer: 'Ancla del incremento de la tasa de reemplazo (Art. 34) — mujeres',
+}
+
+/**
+ * @param {string} nombre - `politica.nombre`, identificador interno de código.
+ * @returns {string}
+ */
+export function etiquetaNombrePolitica(nombre) {
+  return ETIQUETAS_NOMBRE_POLITICA[nombre] ?? humanizarClave(nombre)
+}
+
 /**
  * Mensaje de "paso pendiente" para un PasoAuditable cuyo valor depende de una política
  * jurídica NO_RESUELTA — nunca afirma cuál interpretación es correcta, solo nombra la(s)
- * política(s) que impide(n) cerrarlo. `politicasNoResueltas` ya viene filtrado por el
- * llamador (`estado === 'NO_RESUELTA'`) — esta función solo compone el texto, nunca decide
- * cuáles políticas aplican.
+ * política(s) que impide(n) cerrarlo (con su nombre ya traducido, nunca el identificador
+ * interno de código — ver etiquetaNombrePolitica, arriba). `politicasNoResueltas` ya viene
+ * filtrado por el llamador (`estado === 'NO_RESUELTA'`) — esta función solo compone el texto,
+ * nunca decide cuáles políticas aplican.
  *
  * @param {Array<{nombre: string}>} politicasNoResueltas
  * @returns {string}
  */
 export function mensajePasoPendienteDePolitica(politicasNoResueltas) {
-  const nombres = politicasNoResueltas.map((p) => `"${p.nombre}"`).join(' y ')
+  const nombres = politicasNoResueltas.map((p) => `"${etiquetaNombrePolitica(p.nombre)}"`).join(' y ')
   return `Pendiente: depende de la política jurídica ${nombres}, todavía sin resolver — ver "Políticas jurídicas de este ejercicio", abajo.`
 }
 
@@ -173,6 +227,33 @@ export function tipoDeValor(valor) {
   return 'escalar'
 }
 
+// Corrección de auditoría visual (2026-09-25, capturas reales de Carlos, Caso B):
+// `semanasCotizadas` (paso DATOS_UTILIZADOS, `escenario.semanasCotizadas.total`) puede traer
+// decimales reales (ej. cuando la fuente es historia real, `diasCotizados / 7` —
+// `calcularPensionRPM.js`/`calcularProyeccionRPM.js`, cerrados, sin tocar) — `toLocaleString`
+// los mostraba tal cual ("1.470,857 semanas"), un decimal que nadie puede leer como una
+// cantidad de días. Se reexpresa en semanas completas + días restantes, calculados desde el
+// MISMO número real (nunca desde una versión ya redondeada) — `Math.round(valor * 7)` solo
+// corrige el ruido de punto flotante de esa división (`diasCotizados / 7` y su inverso deben
+// ser el mismo entero), nunca cambia el dato. Las semanas completas SIEMPRE se truncan
+// (`Math.floor`, nunca `Math.ceil`/`Math.round`) — redondear la cifra de semanas hacia arriba
+// afirmaría una semana que todavía no se completó; los días restantes son el resto exacto, sin
+// perder precisión. Un valor ya entero (ej. 1300, semanas declaradas) da 0 días restantes y se
+// muestra igual que antes ("1.300 semanas") — sin regresión para el caso ya cubierto.
+/**
+ * @param {number} valorEnSemanas - `semanasCotizadas` real, puede ser fraccionario.
+ * @returns {string}
+ */
+export function formatearSemanasComoTexto(valorEnSemanas) {
+  const diasTotales = Math.round(valorEnSemanas * 7)
+  const semanasCompletas = Math.floor(diasTotales / 7)
+  const diasRestantes = diasTotales - semanasCompletas * 7
+
+  const textoSemanas = `${semanasCompletas.toLocaleString('es-CO')} ${semanasCompletas === 1 ? 'semana' : 'semanas'}`
+  if (diasRestantes === 0) return textoSemanas
+  return `${textoSemanas} y ${diasRestantes} ${diasRestantes === 1 ? 'día' : 'días'}`
+}
+
 /**
  * Formatea un valor ESCALAR (nunca objeto/arreglo/null — ver tipoDeValor) a texto legible,
  * según el campo al que pertenece. Nunca redondea de forma distinta a lo ya calculado, nunca
@@ -185,10 +266,13 @@ export function tipoDeValor(valor) {
 export function formatearValorEscalar(clave, valor) {
   if (CAMPOS_PESOS.has(clave) && typeof valor === 'number') return formatearPesos(valor)
   if (CAMPOS_PORCENTAJE.has(clave) && typeof valor === 'number') return `${valor}%`
-  if (clave === 'semanasCotizadas' && typeof valor === 'number') return `${valor.toLocaleString('es-CO')} semanas`
+  if (clave === 'semanasCotizadas' && typeof valor === 'number') return formatearSemanasComoTexto(valor)
   if (CAMPOS_NUMERO_PLANO.has(clave) && typeof valor === 'number') return valor.toLocaleString('es-CO')
   if (CAMPOS_BOOLEANOS.has(clave) && typeof valor === 'boolean') return valor ? 'Sí' : 'No'
   if (clave === 'origen' && typeof valor === 'string') return ETIQUETAS_ORIGEN[valor] ?? valor
+  if (clave === 'razonVidaLaboralNoEvaluada' && typeof valor === 'string') {
+    return ETIQUETAS_RAZON_VIDA_LABORAL_NO_EVALUADA[valor] ?? valor
+  }
   if (typeof valor === 'number') return valor.toLocaleString('es-CO')
   if (typeof valor === 'boolean') return valor ? 'Sí' : 'No'
   return String(valor)

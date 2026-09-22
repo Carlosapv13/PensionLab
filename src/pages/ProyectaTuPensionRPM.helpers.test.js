@@ -36,6 +36,8 @@ import {
   textoResumenHistoriaCotizacion,
   textoResumenLimiteEsfuerzo,
   debeMostrarBotonGeneralEdicionObjetivo,
+  caminoIbcDependeDePoliticaJuridica,
+  pasoUsaIbcEnDisputaDelCamino,
 } from './ProyectaTuPensionRPM.helpers.js'
 
 describe('debeOcultarRestriccion — EVIDENCIA: solo se oculta cuando el resultado es semanas insuficientes (precisión de producto S4-006)', () => {
@@ -417,7 +419,7 @@ describe('textoFuenteSemanas — contrato GO-B (UX-RPM-02A, 2026-08-25)', () => 
     }
     const texto = textoFuenteSemanas(semanas)
     expect(texto).toBe(
-      'Conocemos las aproximadamente 1100 semanas que declaraste, pero todavía no conocemos el detalle de ' +
+      'Conocemos las aproximadamente 1.100 semanas que declaraste, pero todavía no conocemos el detalle de ' +
         'los IBC de cada período de tu historia — por eso esta proyección parte de esa cifra declarada, no ' +
         'de una historia de cotización verificada. Completarla puede afinar el resultado.'
     )
@@ -438,7 +440,10 @@ describe('textoFuenteSemanas — contrato GO-B (UX-RPM-02A, 2026-08-25)', () => 
       fuente: 'declaracion_agregada',
     }
     const texto = textoFuenteSemanas(semanas)
-    expect(texto).toContain('las 1400 semanas')
+    // Corrección de auditoría visual (2026-09-25, ronda 2): separador de miles, nunca "1400"
+    // crudo — mismo caso real reportado ("1039 semanas" debía ser "1.039 semanas").
+    expect(texto).toContain('las 1.400 semanas')
+    expect(texto).not.toContain('las 1400 semanas')
     expect(texto).not.toContain('aproximadamente')
   })
 
@@ -860,6 +865,67 @@ describe('textoResumenLimiteEsfuerzo — corrección puntual E4-C1 (hallazgo 4: 
   // nunca podría valer 0 y esta rama sería inalcanzable — no es el caso).
   it('EVIDENCIA: cero explícito es alcanzable desde el formulario — no es un caso inalcanzable ni rechazado', () => {
     expect(textoResumenLimiteEsfuerzo(0)).not.toBeNull()
+  })
+})
+
+// Corrección de auditoría visual (2026-09-25, capturas reales de Carlos, Caso B) — hallazgo
+// posterior a los tres defectos anteriores: "Lleva tu IBC de $2.000.000 a $3.045.477" y "$167.276
+// adicionales de aporte pensional al mes" en la tarjeta de 'aumentar-ibc-futuro'. Evidencia
+// verificada en generarCaminosRPM.js: ese IBC es la SALIDA de biseccionarEscenarioIbcFuturo, que
+// busca el IBC mínimo cuya mesadaGobernante (AJUSTE_LEGAL/RESULTADO_FINAL — el mismo tramo que
+// TASA_REEMPLAZO, según PASOS_DEPENDIENTES_DE_TASA_REEMPLAZO en nivelCompletoAuditable.helpers.js)
+// alcance objetivoValorMensual; desglosarTasaReemplazoRPM (formulaRPM.js) deriva tasaFinalAplicada
+// de semanasBaseIncrementoRPM — el mismo parámetro que compararAnclaIncrementoRPM.js compara entre
+// ANCLA_FIJA_1300 y ANCLA_MINIMO_DINAMICO para decidir si PoliticaAnclaIncrementoMujer aplica. Es
+// decir: bajo la interpretación alternativa, la misma búsqueda converge en un IBC distinto — esta
+// cifra depende de la política en disputa, igual que la pensión proyectada.
+describe('caminoIbcDependeDePoliticaJuridica — solo el camino cuyo IBC es la salida de una búsqueda hacia el objetivo depende de la política en disputa', () => {
+  it('"aumentar-ibc-futuro" (biseccionarEscenarioIbcFuturo, origen busqueda_objetivo_rpm): true', () => {
+    expect(caminoIbcDependeDePoliticaJuridica({ id: 'aumentar-ibc-futuro' })).toBe(true)
+  })
+
+  it('"esfuerzo-adicional-deseado" (IBC derivado directamente del monto que la persona declaró, tasa de COTIZACIÓN — no de reemplazo): false', () => {
+    expect(caminoIbcDependeDePoliticaJuridica({ id: 'esfuerzo-adicional-deseado' })).toBe(false)
+  })
+
+  it('"base" (repite el IBC actual ya declarado, sin búsqueda): false', () => {
+    expect(caminoIbcDependeDePoliticaJuridica({ id: 'base' })).toBe(false)
+  })
+
+  it('un id futuro/desconocido nunca se trata como dependiente por accidente', () => {
+    expect(caminoIbcDependeDePoliticaJuridica({ id: 'camino-futuro-desconocido' })).toBe(false)
+  })
+})
+
+// Corrección de auditoría visual, RONDA 2 (2026-09-25, revisión visual de Carlos/Atlas sobre
+// el Caso B): DATOS_UTILIZADOS no es el único paso que usa el IBC en disputa del camino
+// 'aumentar-ibc-futuro' como entrada — el paso IBL también lo usa (valorAplicado alimenta el
+// período futuro de la ventana Y el promedio del IBL, calcularProyeccionRPM.js). Sin esta
+// corrección, "IBL aplicable" y `trazabilidadVentana` (con el período futuro y su IBC crudo
+// anidado) seguían revelando la cifra disputada en el Nivel completo.
+describe('pasoUsaIbcEnDisputaDelCamino — DATOS_UTILIZADOS e IBL, solo para el camino cuyo IBC depende de la búsqueda hacia el objetivo', () => {
+  it('DATOS_UTILIZADOS del camino "aumentar-ibc-futuro": true (ya cubierto por la ronda anterior)', () => {
+    expect(pasoUsaIbcEnDisputaDelCamino('DATOS_UTILIZADOS', { id: 'aumentar-ibc-futuro' })).toBe(true)
+  })
+
+  it('IBL del camino "aumentar-ibc-futuro": true — mismo IBC en disputa alimenta su cálculo (hallazgo de la ronda 2)', () => {
+    expect(pasoUsaIbcEnDisputaDelCamino('IBL', { id: 'aumentar-ibc-futuro' })).toBe(true)
+  })
+
+  it('ningún otro paso de "aumentar-ibc-futuro" se marca por esta vía — los 5 restantes ya dependen de la tasa de reemplazo por pasoDependeDePoliticaJuridica, nunca duplicado aquí', () => {
+    for (const codigo of ['TASA_REEMPLAZO', 'RESULTADO_MATEMATICO', 'AJUSTE_LEGAL', 'RESULTADO_FINAL', 'COMPARACION_OBJETIVO']) {
+      expect(pasoUsaIbcEnDisputaDelCamino(codigo, { id: 'aumentar-ibc-futuro' })).toBe(false)
+    }
+  })
+
+  it('DATOS_UTILIZADOS e IBL del camino "base": false — su IBC es el actual ya declarado, sin búsqueda', () => {
+    expect(pasoUsaIbcEnDisputaDelCamino('DATOS_UTILIZADOS', { id: 'base' })).toBe(false)
+    expect(pasoUsaIbcEnDisputaDelCamino('IBL', { id: 'base' })).toBe(false)
+  })
+
+  it('DATOS_UTILIZADOS e IBL del camino "esfuerzo-adicional-deseado": false — su IBC viene del monto exacto declarado, no de una búsqueda', () => {
+    expect(pasoUsaIbcEnDisputaDelCamino('DATOS_UTILIZADOS', { id: 'esfuerzo-adicional-deseado' })).toBe(false)
+    expect(pasoUsaIbcEnDisputaDelCamino('IBL', { id: 'esfuerzo-adicional-deseado' })).toBe(false)
   })
 })
 

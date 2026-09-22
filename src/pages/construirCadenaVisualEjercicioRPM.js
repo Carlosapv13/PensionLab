@@ -1,14 +1,16 @@
-// E6.3 (sprint-4-correcciones-oscar-baldor) — orquestador puro y DORMIDO, aprobado en E6.1
-// (PL-260 §9.3) e implementado en E6.3. Encadena los tres pasos que E6.1/E6.2 ya cerraron
+// E6.3 (sprint-4-correcciones-oscar-baldor) — orquestador puro, aprobado en E6.1 (PL-260 §9.3)
+// e implementado en E6.3. Encadena los tres pasos que E6.1/E6.2 ya cerraron
 // (`evaluarPoliticasEjercicioRPM` → `construirEjercicioResueltoRPM` →
 // `construirModeloVisualEjercicioRPM`) sobre un `resultado` de `generarCaminosRPM(...)` ya
 // calculado — nunca invoca `generarCaminosRPM` (paso 1 de §9.3, responsabilidad exclusiva del
 // llamador, que ya lo ejecuta una sola vez por render en `ProyectaTuPensionRPM.jsx`).
 //
-// Sin consumidor visible todavía: `ProyectaTuPensionRPM.jsx` lo invoca detrás de
-// `MODELO_VISUAL_EJERCICIO_ACTIVO = false`, y aunque se encendiera, su salida no alimenta
-// ningún JSX en este checkpoint — mismo patrón dormido que `compararAnclaIncrementoRPM.js`
-// (E3-B→E5.4) y `construirModeloVisualEjercicioRPM.js` (E6.1→E6.2).
+// Nació dormido (sin consumidor visible en E6.3) — conectado en firme desde E6.5 (PL-260
+// §9.5): `ProyectaTuPensionRPM.jsx` lo invoca en cada render (`cadenaVisual`, sin ningún
+// interruptor local) y su salida (`modeloVisual`) alimenta el "Nivel esencial" y el "Nivel
+// completo" reales de esa pantalla — mismo patrón que `compararAnclaIncrementoRPM.js`
+// (E3-B→E5.4) y `construirModeloVisualEjercicioRPM.js` (E6.1→E6.2), ambos conectados desde
+// entonces.
 //
 // Contrato de salida (Carlos/Atlas, cierre de E6.3):
 // - `resultado` ausente (`null`/`undefined`) → `null`. Es el único caso que devuelve `null`
@@ -31,10 +33,11 @@
 //   propia forma `{estado, errores}`), nunca reinterpretada ni resumida.
 //
 // `confirmacionesSupuestos` se recibe tal cual del llamador — este archivo nunca inventa,
-// completa ni infiere una confirmación; en E6.3, `ProyectaTuPensionRPM.jsx` lo invoca
-// siempre con `[]` (todavía no existe el gate de confirmación real, ver PL-260 §9.4 — llega
-// en E6.4). El día que exista, basta con que el llamador pase el arreglo real: este
-// orquestador no cambia.
+// completa ni infiere una confirmación. En E6.3 (sin gate de confirmación real todavía, ver
+// PL-260 §9.4), `ProyectaTuPensionRPM.jsx` lo invocaba siempre con `[]`. Desde E6.4/E6.5, ese
+// gate existe (`confirmacionContinuidad`, estado real de `App.jsx`) y el llamador pasa
+// `confirmacionContinuidad ? [confirmacionContinuidad] : []` — exactamente el arreglo real,
+// tal como esta nota ya anticipaba: este orquestador no cambió.
 //
 // Segundo parámetro `overridesSoloParaPruebas` (mecanismo de inyección de dependencias
 // mínimo, exclusivo de pruebas): permite sustituir una de las tres funciones de etapa por un

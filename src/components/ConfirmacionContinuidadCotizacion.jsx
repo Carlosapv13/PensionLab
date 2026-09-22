@@ -1,19 +1,21 @@
 // E6.4 (sprint-4-correcciones-oscar-baldor) — control AISLADO de confirmación de
 // continuidad de cotización (PL-260 §8.4/§9.4). Puro y presentacional: no calcula nada, no
-// decide nada de dominio, no se conecta a `App.jsx` ni a `ProyectaTuPensionRPM.jsx` en este
-// checkpoint — esa conexión (estado en `App.jsx`, wrapper de invalidación,
-// `MODELO_VISUAL_EJERCICIO_ACTIVO`) pertenece a E6.5. Se prueba montado en aislamiento
-// (`ConfirmacionContinuidadCotizacion.test.jsx`), sin renderizar la página real.
+// decide nada de dominio. En E6.4 no se conectaba a `App.jsx` ni a `ProyectaTuPensionRPM.jsx`
+// — esa conexión (estado en `App.jsx`, wrapper de invalidación) se implementó en E6.5, ya
+// cerrada (ver `actualizarSexo`/`actualizarRegimenActual`/`actualizarFechaNacimiento`/
+// `actualizarEdadJubilacionDeseada`, App.jsx, y `onConfirmarContinuidad`/`confirmacionContinuidad`
+// en `ProyectaTuPensionRPM.jsx`). Este archivo sigue probándose también en aislamiento
+// (`ConfirmacionContinuidadCotizacion.test.jsx`, sin renderizar la página real) — su propio
+// comportamiento no cambió al conectarse.
 //
-// Decisión Carlos/Atlas (cierre del diseño de E6.4, documentada aquí — se implementa recién
-// en E6.5, no en este archivo): cuando la confirmación se conecte al estado de `App.jsx`,
-// cambiar `edadJubilacionDeseada`, `sexo`, `regimenActual` o `fechaNacimiento` invalidará la
+// Decisión Carlos/Atlas (cierre del diseño de E6.4, implementada en E6.5): cambiar
+// `edadJubilacionDeseada`, `sexo`, `regimenActual` o `fechaNacimiento` invalida la
 // confirmación; cambiar objetivo económico, IBC, límite de esfuerzo o historia de
-// cotización NO la invalidará. Este componente no implementa esa invalidación por sí mismo
-// (no tiene acceso a esos otros campos) — solo decide, dada una `confirmacion` y la
-// `edadJubilacionDeseada` actual, si la confirmación recibida sigue siendo vigente para ESA
-// edad (ver `vigente`, más abajo) — la primera mitad de esa regla, la única que este control
-// puede verificar con la información que recibe.
+// cotización NO la invalida. Este componente no implementa esa invalidación por sí mismo
+// (no tiene acceso a esos otros campos, y `App.jsx` es quien la aplica) — solo decide, dada
+// una `confirmacion` y la `edadJubilacionDeseada` actual, si la confirmación recibida sigue
+// siendo vigente para ESA edad (ver `vigente`, más abajo) — la primera mitad de esa regla, la
+// única que este control puede verificar con la información que recibe.
 //
 // Textos: el disclosure y el texto del botón son literales de PL-260 §8.4 (decisión ya
 // aprobada) — este archivo no los redacta, los reproduce tal cual. `TEXTO_CONFIRMACION_VIGENTE`
@@ -32,9 +34,10 @@
 // (`undefined`) — comparación `== null` en vez de `!== null`, mismo criterio ya aplicado
 // repetidas veces en este proyecto (E5.4/E6.3) para no depender de que el llamador pase
 // siempre `null` explícito en vez de omitir la prop. `onConfirmar` tiene un valor por
-// defecto no-operativo — un llamador que todavía no cableó el callback (legítimo en un
-// componente aislado como este, sin consumidor real todavía) no debe hacer que el botón
-// lance una excepción al hacer clic.
+// defecto no-operativo — un llamador que no cablee el callback (ej. en una prueba montada en
+// aislamiento, o un uso futuro sin necesidad de reaccionar a la confirmación) no debe hacer
+// que el botón lance una excepción al hacer clic. El consumidor real (`ProyectaTuPensionRPM.jsx`,
+// desde E6.5) sí lo cablea siempre.
 
 import { useId } from 'react'
 

@@ -5,10 +5,14 @@
 //
 // Decisión Carlos/Atlas que fija el contrato de este archivo:
 //
-// 1. NO sustituye el ancla actual de 1.300 semanas por el mínimo dinámico. NO integra
-//    todavía con calcularPensionRPM.js, calcularProyeccionRPM.js, generarCaminosRPM.js ni
-//    UI — esta función no tiene consumidores reales todavía. El comportamiento visible del
-//    producto no cambia por la existencia de este archivo.
+// 1. NO sustituye el ancla actual de 1.300 semanas por el mínimo dinámico — ninguna de las
+//    dos interpretaciones se aplica como si fuera la única correcta; calcularPensionRPM.js,
+//    calcularProyeccionRPM.js y generarCaminosRPM.js siguen calculando con el ancla fija de
+//    1.300 semanas, sin cambio. Nació sin consumidores reales (E3-B) — conectado en firme
+//    desde E5.4/E6.5: `evaluarPoliticasEjercicioRPM.js` invoca este comparador en cada
+//    ejercicio real, y cuando ambas interpretaciones divergen numéricamente, el producto
+//    declara `PoliticaAnclaIncrementoMujer` NO_RESUELTA y retiene la cifra en disputa —
+//    comportamiento visible real desde entonces (ver ProyectaTuPensionRPM.jsx, Caso B).
 // 2. Ninguna interpretación se presenta como posición oficial demostrada — `caracter`
 //    ('base_conservadora' / 'interpretacion_juridica_no_resuelta') y `referenciaInterpretativa
 //    .certeza` lo dejan explícito en cada resultado, nunca implícito por el nombre "principal".

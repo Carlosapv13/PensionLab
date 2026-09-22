@@ -226,6 +226,86 @@ describe('App — Caso B (política jurídica NO_RESUELTA) por la ruta real: pan
     expect(screen.getByRole('button', { name: TEXTO_BOTON_CONFIRMAR_CONTINUIDAD })).toBeTruthy()
     expect(screen.queryByText('Elegiste explorar este escenario bajo el supuesto de cotización continua.')).toBeNull()
   })
+
+  // Auditoría integral (2026-09-25, ronda 3 — revisión de release candidate para Óscar): App.jsx
+  // (actualizarSexo/actualizarRegimenActual/actualizarFechaNacimiento) ya invalidaba
+  // confirmacionContinuidad para estos datos desde E6.5 (PL-260 §9.4) — verificado leyendo el
+  // código real — pero solo la invalidación por edad tenía cobertura por la ruta real de
+  // App.jsx (arriba). Estas pruebas cierran ese hueco de cobertura, mismo patrón que la de
+  // edad — nunca un comportamiento nuevo, solo la regresión que faltaba.
+  //
+  // Sexo: usa rpm-empleado-proyecta-tu-pension (edadJubilacionDeseada 65, por encima del
+  // mínimo legal de cualquiera de los dos sexos — verificado empíricamente) en vez del
+  // fixture de Caso B, porque cambiar el sexo de esa mujer (edad 61) a "Hombre" cruzaría el
+  // mínimo legal masculino y volvería edadValida inválida, ocultando toda la sección de
+  // confirmación por una razón AJENA a la invalidación que esta prueba busca aislar.
+  //
+  // Régimen actual: NO se agrega una prueba equivalente aquí. Cambiarlo mientras se permanece
+  // en esta pantalla (RPM-específica) no es un flujo real — el único camino real para cambiar
+  // de régimen es el botón "Editar tu régimen actual" del resumen revisable, que navega a
+  // situacionPensional y de ahí a un destino distinto según el nuevo régimen (ya cubierto por
+  // navegacionRPM.test.js/destinoTrasEdicionDesdeResumenRPM) — nunca se queda en
+  // ProyectaTuPensionRPM.jsx con un régimen distinto de RPM. La línea de invalidación en sí
+  // (`actualizarRegimenActual`, App.jsx) es idéntica en forma a `actualizarSexo`/
+  // `actualizarFechaNacimiento` (mismo `if (valor !== actual) setConfirmacionContinuidad(null)`),
+  // verificada por lectura directa del código.
+  it('cambiar el sexo invalida una confirmación ya dada — App.jsx real (actualizarSexo, E6.5/PL-260 §9.4)', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await cargarFixtureYNavegar(user, 'rpm-empleado-proyecta-tu-pension')
+
+    await user.click(screen.getByRole('button', { name: TEXTO_BOTON_CONFIRMAR_CONTINUIDAD }))
+    expect(screen.getByText('Elegiste explorar este escenario bajo el supuesto de cotización continua.')).toBeTruthy()
+
+    const campoSexo = campoDevPanel('sexo')
+    expect(campoSexo).toBeTruthy()
+    await user.clear(campoSexo)
+    await user.type(campoSexo, 'Mujer')
+
+    expect(screen.getByRole('button', { name: TEXTO_BOTON_CONFIRMAR_CONTINUIDAD })).toBeTruthy()
+    expect(screen.queryByText('Elegiste explorar este escenario bajo el supuesto de cotización continua.')).toBeNull()
+  })
+
+  it('cambiar la fecha de nacimiento invalida una confirmación ya dada — App.jsx real (actualizarFechaNacimiento, E6.5/PL-260 §9.4)', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await cargarFixtureYNavegar(user, 'rpm-mujer-politica-juridica-no-resuelta')
+
+    await user.click(screen.getByRole('button', { name: TEXTO_BOTON_CONFIRMAR_CONTINUIDAD }))
+    expect(screen.getByText('Elegiste explorar este escenario bajo el supuesto de cotización continua.')).toBeTruthy()
+
+    const campoFecha = campoDevPanel('fechaNacimiento')
+    expect(campoFecha).toBeTruthy()
+    await user.clear(campoFecha)
+    await user.type(campoFecha, '1980-05-20')
+
+    expect(screen.getByRole('button', { name: TEXTO_BOTON_CONFIRMAR_CONTINUIDAD })).toBeTruthy()
+    expect(screen.queryByText('Elegiste explorar este escenario bajo el supuesto de cotización continua.')).toBeNull()
+  })
+
+  // E6.4 (decisión ya aprobada): objetivo económico, IBC/base de cotización, límite de
+  // esfuerzo e historia de cotización NUNCA invalidan la confirmación — sus setters en App.jsx
+  // son crudos, sin wrapper de invalidación (a diferencia de sexo/régimen/fecha/edad, arriba).
+  // ProyectaTuPensionRPM.test.jsx ya verifica el reverso a nivel de props; esta prueba lo
+  // confirma por la ruta real de App.jsx, para que un futuro wrapper agregado por error a
+  // actualizarObjetivoPensionMensual (o similar) se detecte aquí también.
+  it('cambiar el objetivo económico NO invalida una confirmación ya dada — App.jsx real (setter crudo, decisión E6.4)', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await cargarFixtureYNavegar(user, 'rpm-mujer-politica-juridica-no-resuelta')
+
+    await user.click(screen.getByRole('button', { name: TEXTO_BOTON_CONFIRMAR_CONTINUIDAD }))
+    expect(screen.getByText('Elegiste explorar este escenario bajo el supuesto de cotización continua.')).toBeTruthy()
+
+    const campoObjetivo = campoDevPanel('objetivoPensionMensual')
+    expect(campoObjetivo).toBeTruthy()
+    await user.clear(campoObjetivo)
+    await user.type(campoObjetivo, '2200000')
+
+    // La confirmación sigue vigente — nunca vuelve a pedirse por un dato que no la invalida.
+    expect(screen.getByText('Elegiste explorar este escenario bajo el supuesto de cotización continua.')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: TEXTO_BOTON_CONFIRMAR_CONTINUIDAD })).toBeNull()
+  })
 })
 
 // Corrección de auditoría visual (2026-09-25, capturas reales de Carlos, Caso B) — cuatro

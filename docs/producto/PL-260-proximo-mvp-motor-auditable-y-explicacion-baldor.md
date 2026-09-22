@@ -998,13 +998,14 @@ toda la sesión, cifras verificadas:**
   efecto en cada lugar visible de la pantalla.
 
 **Valores que siguen visibles en un ejercicio con política jurídica `NO_RESUELTA` aplicable
-(estado final, verificado):** decisión/tipo de cada camino; "Tu IBC" y "Aporte pensional
-adicional mensual" (Nivel esencial); `DATOS_UTILIZADOS` e `IBL` completos (Nivel completo);
-la sección "Políticas jurídicas de este ejercicio" con el mensaje jurídico íntegro; caminos
-descartados con su razón. **Nunca visibles como cuantía calculada:** "Pensión proyectada
-mensual", "Frente a tu objetivo", el gráfico de esfuerzo↔resultado, "Camino más alineado",
-"Qué podrías explorar ahora", el subtítulo final de orientación, y los 5 pasos de Nivel
-completo `TASA_REEMPLAZO`/`RESULTADO_MATEMATICO`/`AJUSTE_LEGAL`/`RESULTADO_FINAL`/
+(estado en este checkpoint, §9.15 — corregido en §9.16 para el camino cuyo IBC depende de la
+búsqueda hacia el objetivo, ver más abajo):** decisión/tipo de cada camino; "Tu IBC" y "Aporte
+pensional adicional mensual" (Nivel esencial); `DATOS_UTILIZADOS` e `IBL` completos (Nivel
+completo); la sección "Políticas jurídicas de este ejercicio" con el mensaje jurídico íntegro;
+caminos descartados con su razón. **Nunca visibles como cuantía calculada:** "Pensión
+proyectada mensual", "Frente a tu objetivo", el gráfico de esfuerzo↔resultado, "Camino más
+alineado", "Qué podrías explorar ahora", el subtítulo final de orientación, y los 5 pasos de
+Nivel completo `TASA_REEMPLAZO`/`RESULTADO_MATEMATICO`/`AJUSTE_LEGAL`/`RESULTADO_FINAL`/
 `COMPARACION_OBJETIVO` (aparecen con el mensaje de qué política los bloquea, nunca con su
 valor).
 
@@ -1014,3 +1015,157 @@ explícita de Carlos/Atlas para el conjunto. **Los checkpoints siguientes del pl
 Preview/validación manual, E9 prueba final de Oscar) siguen sin iniciarse** y dependen, como
 ya fija §0 punto 2, del cierre de las dos políticas jurídicas de §2 — ningún caso que dependa
 de ellas puede exhibirse en Preview como resultado confiable, en ningún lugar de la pantalla.
+
+### 9.16 Revisión visual real de Carlos/Atlas sobre capturas del Caso B, y auditoría integral final del release candidate para Óscar
+
+**Estado: correcciones acotadas y auditoría de cierre, ejecutadas y cerradas en la misma
+rama, sobre los commits `beb07bf`, `e1fab3c` y `f780db7` — con autorización explícita de
+Carlos/Atlas para el conjunto, incluida la validación visual final aprobada sobre `f780db7`.**
+
+Esta sección consolida tres rondas de trabajo posteriores a §9.15 (que solo documentaba hasta
+`748fbd9`) y la auditoría integral final del release candidate, pedida explícitamente antes de
+publicar para Óscar.
+
+**Commit `beb07bf` — RESTRICCION_COSTO_LIMITA_RESULTADO retenida.** Auditoría de "todo lugar
+visible" (pedida tras `748fbd9`): la limitación `RESTRICCION_COSTO_LIMITA_RESULTADO`
+("...tu objetivo sí sería alcanzable dentro del tope legal") es una conclusión derivada de
+`distanciaObjetivo.cumple` — la misma cuantía en disputa — y aparecía sin filtrar como nota de
+camino. Nueva `filtrarLimitacionesPorPoliticaJuridica` (`ProyectaTuPensionRPM.helpers.js`),
+aplicada a limitaciones comunes y específicas por camino solo cuando
+`politicaJuridicaNoResuelta` es verdadero; las demás limitaciones (disclaimers genéricos) no se
+tocan. Regresión dedicada: sin política aplicable, la misma limitación se sigue mostrando.
+
+**Commit `e1fab3c` — Caso A: superposición visual y contradicción de copy (revisión visual real
+de Carlos, primera captura de pantalla real sobre este flujo).** Dos hallazgos, ninguno de
+cálculo: (1) `ConfirmacionContinuidadCotizacion.jsx` ya renderiza su propio `<div
+className="insight">` de nivel superior; `ProyectaTuPensionRPM.jsx` lo envolvía en OTRO
+`<div className="insight">` junto al aviso de "no publicable" — dos cajas anidadas con el mismo
+borde/fondo, con 6px de separación (`.insight { gap: 6px }`) en vez de los 12px que
+`.insight + .insight` ya preveía para dos bloques hermanos. Corregido quitando el `<div>`
+envolvente (`Fragment` en su lugar). (2) "Qué podrías explorar ahora" y el hint bajo "Ver qué
+ocurriría con otro esfuerzo" podían afirmar cosas contradictorias sobre si el esfuerzo
+adicional era necesario, cuando `HOY_YA_ALCANZA_OBJETIVO` coexistía con una interpretación que
+sí requiere esfuerzo desde otro ángulo — corregido para que el segundo nunca contradiga al
+primero.
+
+**Commit `f780db7` — Caso B: fuga jurídica en el Nivel completo del camino alternativo, dos
+rondas sobre la misma revisión visual de Carlos/Atlas.**
+
+*Ronda 1 (hallazgo inicial, capturas reales de Carlos):* el camino `aumentar-ibc-futuro` bajo
+`PoliticaAnclaIncrementoMujer` `NO_RESUELTA` seguía revelando, en la tarjeta resumida y en
+`DATOS_UTILIZADOS` del Nivel completo, el IBC propuesto (`$3.045.477` en la captura real) y el
+aporte adicional (`$167.276`) — ambos son la SALIDA de `biseccionarEscenarioIbcFuturo`
+(`generarCaminosRPM.js`), que busca el IBC mínimo cuya mesada gobernante alcance el objetivo
+usando la misma tasa de reemplazo en disputa (`desglosarTasaReemplazoRPM`, mismo parámetro
+`semanasBaseIncrementoRPM` que decide si la política aplica) — nunca un dato de entrada, a
+diferencia de `base`/`esfuerzo-adicional-deseado`. Además: `PoliticaAnclaIncrementoMujer`
+(identificador interno de código) aparecía cruda como título de su propia sección y dentro del
+mensaje "Pendiente: depende de..."; el título de la decisión afirmaba "para alcanzar tu
+objetivo" bajo una política todavía sin resolver; y el <details> "Ver el detalle auditable
+completo de este camino" vivía suelto en el grid de CSS de la comparación de caminos (sin
+`grid-column`/`grid-row` propios), quedando sujeto al auto-placement de CSS Grid, que podía
+colocarlo en el hueco de OTRA columna — texto de un camino superpuesto visualmente sobre el de
+otro.
+
+Corrección: `caminoIbcDependeDePoliticaJuridica(escenario)` (`ProyectaTuPensionRPM.helpers.js`)
+identifica el único camino afectado (`id === 'aumentar-ibc-futuro'`); `etiquetaNombrePolitica`
+(`nivelCompletoAuditable.helpers.js`, única fuente, reutilizada también por
+`PoliticasJuridicasInvolucradas.jsx`) traduce el nombre de la política sin inventar una
+posición jurídica; `textoDecisionCamino` neutraliza el título de la decisión;
+`camino-celda--detalle-completo` (fila de grid propia, `App.css`) fija el `<details>` a su
+columna correcta. `formatearSemanasComoTexto` (`nivelCompletoAuditable.helpers.js`) descompone
+semanas fraccionarias en semanas completas + días restantes, sin redondear hacia arriba
+(`1.470 semanas y 6 días`, el caso real reportado); `ETIQUETAS_ORIGEN`/
+`ETIQUETAS_RAZON_VIDA_LABORAL_NO_EVALUADA` traducen `continuidad_ibc_actual`/
+`busqueda_objetivo_rpm`/`VIDA_LABORAL_REQUIERE_HISTORIA_ESTRUCTURADA`, antes crudos en el Nivel
+completo.
+
+*Ronda 2 (hallazgo posterior, misma revisión visual — la fuga era más profunda de lo que
+parecía):* con el IBC/aporte/resultado ya ocultos, el Nivel completo del mismo camino todavía
+mostraba `IBL aplicable` con un valor real y, dentro de "Trazabilidad de la ventana usada", el
+período futuro completo con el IBC crudo embebido (`Ibc 3.045.477`, `Días Cotizados 3.023`,
+`Es Escenario Futuro Sí`) — volviendo a revelar indirectamente la misma cifra. Verificado en
+`calcularProyeccionRPM.js` (cerrado, sin tocar): `valorAplicado` (el IBC del camino) alimenta
+tanto `periodoFuturo` (que entra a la ventana del IBL) como `promediarConFuturo`, para el IBL
+ordinario y para la alternativa de vida laboral — el paso IBL depende del mismo IBC disputado,
+no solo `DATOS_UTILIZADOS`. Corrección: `pasoUsaIbcEnDisputaDelCamino(codigoPaso, escenario)`
+(`ProyectaTuPensionRPM.helpers.js`) extiende el criterio "todo o nada por paso" a `IBL` además
+de `DATOS_UTILIZADOS`, solo para el camino afectado — el paso completo (incluida
+`trazabilidadVentana` anidada) queda pendiente, igual que los 5 pasos ya dependientes de la
+tasa de reemplazo. El camino `base` (independiente) nunca cambia: su IBC, IBL y trazabilidad
+siguen completos y reales.
+
+**Corrección adicional de la misma sesión de `f780db7`:** `textoFuenteSemanas`
+(`ProyectaTuPensionRPM.helpers.js`) mostraba las semanas declaradas sin separador de miles
+("1039 semanas") — corregido a `toLocaleString('es-CO')` ("1.039 semanas"), sin redondeo (es
+un entero declarado, no uno fraccionario).
+
+**Tabla corregida de "valores que siguen visibles" (reemplaza la de §9.15 para el camino
+afectado):** en un ejercicio con política jurídica `NO_RESUELTA` aplicable, el camino cuyo IBC
+depende de la búsqueda hacia el objetivo (`caminoIbcDependeDePoliticaJuridica`) tiene sus
+**7 pasos de Nivel completo pendientes** (`DATOS_UTILIZADOS`, `IBL`, y los 5 ya dependientes de
+la tasa de reemplazo) — ninguno expone un valor calculado. Los demás caminos del mismo
+ejercicio (`base`, y `esfuerzo-adicional-deseado` cuando existe) conservan `DATOS_UTILIZADOS` e
+`IBL` completos y reales — su IBC nunca sale de una búsqueda condicionada por la política.
+
+**Auditoría integral final del release candidate (ronda 3, esta misma sesión, sin nuevos
+defectos funcionales/jurídicos encontrados):** se revisó el flujo completo App.jsx →
+`generarCaminosRPM` → `evaluarPoliticasEjercicioRPM` → `construirEjercicioResueltoRPM` →
+`construirModeloVisualEjercicioRPM`/`construirCadenaVisualEjercicioRPM` →
+`ProyectaTuPensionRPM.jsx` → Nivel completo, contra el código real y las pruebas vigentes
+(nunca solo contra comentarios o informes previos). Hallazgos, todos de documentación en
+código (comentarios desactualizados, ninguno de comportamiento):
+- `construirCadenaVisualEjercicioRPM.js`, `construirModeloVisualEjercicioRPM.js`,
+  `construirEjercicioResueltoRPM.js`, `evaluarPoliticasEjercicioRPM.js` y
+  `compararAnclaIncrementoRPM.js` seguían describiéndose en su cabecera como "dormidos, sin
+  consumidor real" — desde E6.5 todos están conectados en firme (verificado: `resultado`,
+  `politicasInvolucradas` y `modeloVisual` de esta cadena alimentan cada render real de
+  `ProyectaTuPensionRPM.jsx`, incluida la comparación de las dos interpretaciones del ancla de
+  incremento). Corregido: cada cabecera ahora registra que nació dormido y cuándo se conectó.
+- `ConfirmacionContinuidadCotizacion.jsx` seguía describiéndose como "sin conexión con `App.jsx`
+  ni con `ProyectaTuPensionRPM.jsx`" — conectado desde E6.5 (`confirmacionContinuidad`/
+  `onConfirmarContinuidad`, `App.jsx`/`ProyectaTuPensionRPM.jsx`). Corregido.
+- **Hueco de cobertura real (no un defecto de comportamiento) encontrado y cerrado:** la
+  invalidación de `confirmacionContinuidad` al cambiar sexo, régimen actual o fecha de
+  nacimiento (`actualizarSexo`/`actualizarRegimenActual`/`actualizarFechaNacimiento`, `App.jsx`
+  — código ya correcto desde E6.5, verificado por lectura directa) solo tenía cobertura de
+  regresión real para edad objetivo (`App.test.jsx`). Se agregaron pruebas para sexo y fecha de
+  nacimiento por la ruta real de `App.jsx` (usando un fixture/edad donde el cambio de sexo no
+  cruza el mínimo legal de elegibilidad, para aislar la invalidación de un efecto colateral no
+  relacionado), y una prueba de que cambiar el objetivo económico NUNCA invalida (decisión ya
+  aprobada, E6.4). El régimen actual no recibió una prueba equivalente de este tipo: cambiarlo
+  sin salir de `ProyectaTuPensionRPM.jsx` no es un flujo real (el único camino real es el botón
+  "Editar tu régimen actual", que navega a `situacionPensional` — ya cubierto por
+  `navegacionRPM.test.js`); la línea de invalidación en sí es idéntica en forma a las otras
+  tres, verificada por lectura directa.
+- Ningún identificador interno de código, mensaje crudo de dominio, ni cifra dependiente de una
+  política jurídica sin resolver se encontró expuesto fuera de lo ya corregido en `beb07bf`/
+  `e1fab3c`/`f780db7` — verificado por búsqueda literal en todo `src/` de
+  `continuidad_ibc_actual`, `busqueda_objetivo_rpm`, `VIDA_LABORAL_REQUIERE_HISTORIA_ESTRUCTURADA`,
+  `PoliticaAnclaIncrementoMujer` y `razonesIncompleto` fuera de comentarios/pruebas, y por
+  revisión de cada lugar donde un campo `.codigo`/`.nombre`/`.estado` interno se interpola en
+  JSX (ninguno se renderiza como texto visible; los únicos usos son `key` de React).
+- **Ninguna interpretación jurídica fue elegida en ningún momento de esta auditoría ni de las
+  correcciones anteriores** — las dos políticas de §2 siguen exactamente `NO_RESUELTA`, sin
+  cambio; toda corrección fue de presentación (qué se muestra, nunca qué valor legal es
+  correcto).
+
+**Resultado final consolidado — `beb07bf` + `e1fab3c` + `f780db7` + esta auditoría (ronda 3),
+cifras verificadas:**
+- Suite completa: **81 archivos / 1698 pruebas en verde**, verificado ejecutando la suite
+  completa en esta sesión (línea base registrada en §9.15: 82 archivos / 1657 pruebas — el
+  conteo de pruebas creció en las tres rondas; la cifra de archivos no se re-auditó
+  retroactivamente en esta sesión, solo se reporta el conteo real y actual, ejecutado ahora).
+- Lint (`eslint .`) sin hallazgos; build (`vite build`) exitoso; `git diff --check` sin errores.
+- `src/App.test.jsx` — primer archivo con cobertura de la ruta real COMPLETA (`App.jsx` montado
+  entero, panel de desarrollo → fixture real → pantalla real), para el Caso A jurídicamente
+  resuelto y el Caso B con política `NO_RESUELTA`, incluida la invalidación de la confirmación.
+- **Validación visual real de Carlos y Atlas, aprobada explícitamente sobre `f780db7`** —
+  primera vez que este flujo se valida contra la interfaz real, no solo contra DOM de pruebas.
+- **E8 (Preview y validación manual) y E9 (prueba final de Oscar) siguen sin iniciarse** — la
+  validación visual de esta ronda cubre el comportamiento del Caso A/Caso B ya implementado,
+  pero no constituye el Preview formal de E8 ni la prueba de aceptación de E9, y las dos
+  políticas jurídicas de §2 siguen `NO_RESUELTA`, sin cambio. IA explicativa (S4-007) y el resto
+  de `IA_EXPUESTA_EN_MVP`/`MODELO_VISUAL_EJERCICIO_ACTIVO` (este último ya retirado desde E6.5)
+  permanecen sin activarse para esta publicación — decisión de producto ya registrada, no
+  reabierta aquí.

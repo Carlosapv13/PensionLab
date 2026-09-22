@@ -1,6 +1,7 @@
 // E5.4 (sprint-4-correcciones-oscar-baldor) — adaptador entre los datos reales de un ejercicio
-// (`generarCaminosRPM.js`) y la capa comparativa dormida `compararAnclaIncrementoRPM.js`
-// (E3-B, corregida en E5.4-A). Produce `politicasInvolucradas` en la forma exacta que
+// (`generarCaminosRPM.js`) y la capa comparativa `compararAnclaIncrementoRPM.js` (E3-B,
+// corregida en E5.4-A; nació dormida, conectada en firme desde E6.5 — ver más abajo). Produce
+// `politicasInvolucradas` en la forma exacta que
 // `construirEjercicioResueltoRPM.js` (Contrato F, E5.3) ya consume — F nunca invoca a este
 // archivo ni al comparador directamente (recibe `politicasInvolucradas` como entrada externa,
 // decisión fijada desde E5.1/PL-260 §8.2).

@@ -1,10 +1,12 @@
-// E6.2 (sprint-4-correcciones-oscar-baldor) — adaptador visual puro y DORMIDO, aprobado en
-// E6.1 (PL-260 §9.2). Traduce `EjercicioResueltoRPM` (Contrato F,
+// E6.2 (sprint-4-correcciones-oscar-baldor) — adaptador visual puro, aprobado en E6.1
+// (PL-260 §9.2). Traduce `EjercicioResueltoRPM` (Contrato F,
 // `construirEjercicioResueltoRPM.js`) + `politicasInvolucradas` (salida de
 // `evaluarPoliticasEjercicioRPM.js`) a una forma lista para presentación — nunca calcula,
-// nunca decide, nunca redacta. Sin consumidor real todavía: `ProyectaTuPensionRPM.jsx` no lo
-// invoca hasta E6.3 en adelante (mismo patrón ya usado por `compararAnclaIncrementoRPM.js`,
-// dormido de E3-B a E5.4).
+// nunca decide, nunca redacta. Nació dormido (sin consumidor real hasta E6.3) — conectado en
+// firme desde E6.5 (PL-260 §9.5): `ProyectaTuPensionRPM.jsx` lo invoca en cada render, vía
+// `construirCadenaVisualEjercicioRPM.js`, y su salida alimenta el "Nivel esencial"/"Nivel
+// completo" reales de esa pantalla (mismo patrón que `compararAnclaIncrementoRPM.js`, dormido
+// de E3-B a E5.4 y conectado desde entonces).
 //
 // Ubicación (Carlos/Atlas, E6.1 §9.2): junto a `ProyectaTuPensionRPM.jsx`, patrón de helpers
 // de página (`ordenarCaminosParaPresentacion` en `ProyectaTuPensionRPM.helpers.js`) — no en

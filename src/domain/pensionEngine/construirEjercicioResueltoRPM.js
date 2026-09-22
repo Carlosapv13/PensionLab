@@ -3,9 +3,11 @@
 // (elegibilidad), B (disponibilidadCuantia) y E (generarCaminosRPM) — nunca recalcula
 // ninguna cifra que A-E ya resolvió, solo compone y valida. No importa
 // compararAnclaIncrementoRPM.js: `politicasInvolucradas` se recibe como entrada externa ya
-// evaluada (E5.4, checkpoint separado, todavía sin implementar). Sin ningún consumidor real
-// todavía (mismo criterio ya usado por compararAnclaIncrementoRPM.js, E3-B) — permanece
-// dormido hasta que E5.4 exista.
+// evaluada (por `evaluarPoliticasEjercicioRPM.js`, E5.4 — implementado y cerrado). Nació sin
+// ningún consumidor real (mismo criterio de "dormido hasta que exista el consumidor" ya usado
+// por `compararAnclaIncrementoRPM.js`, E3-B) — conectado en firme desde E6.5 (PL-260 §9.5),
+// vía `construirCadenaVisualEjercicioRPM.js`, invocado en cada render de
+// `ProyectaTuPensionRPM.jsx`.
 //
 // Decisiones de diseño (Carlos/Atlas, revisión previa a esta implementación):
 // - `fechaBaseMonetaria` (top-level) nunca se calcula: se reúne únicamente desde

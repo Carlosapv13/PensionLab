@@ -1620,3 +1620,56 @@ checkpoints E3-E5.1 documentados en detalle allí (§6-§8).
   hallazgos; build exitoso; `git diff --check` sin errores de espacio en blanco. Sin
   verificación visual real ni validación jurídica — ambas siguen pendientes, sin cambio de
   estado en las dos políticas jurídicas de PL-260 §2.
+- **Revisión visual real de Carlos/Atlas sobre capturas reales (Caso A y Caso B), y auditoría
+  integral final del release candidate para Óscar — commits `beb07bf`, `e1fab3c`, `f780db7`,
+  cerrados en la misma rama; validación visual aprobada explícitamente sobre `f780db7`.**
+  Detalle completo, hallazgos y corrección exacta en PL-260 §9.16 — este bullet resume solo lo
+  esencial para no duplicar ese detalle.
+  **`beb07bf`:** `RESTRICCION_COSTO_LIMITA_RESULTADO` (conclusión derivada de la cuantía en
+  disputa) retenida bajo política jurídica `NO_RESUELTA` — hueco encontrado en la auditoría
+  "todo lugar visible" pedida tras `748fbd9`.
+  **`e1fab3c`:** primera revisión visual real de Carlos sobre este flujo — dos defectos de
+  presentación en el Caso A (jurídicamente resuelto, sin relación con la política en disputa):
+  superposición visual de dos cajas `.insight` anidadas, y una contradicción de copy entre "Qué
+  podrías explorar ahora" y el hint de "Ver qué ocurriría con otro esfuerzo".
+  **`f780db7`:** revisión visual real de Carlos/Atlas sobre el Caso B — el camino
+  `aumentar-ibc-futuro` bajo `PoliticaAnclaIncrementoMujer` `NO_RESUELTA` seguía revelando su
+  IBC propuesto y aporte adicional (salida de `biseccionarEscenarioIbcFuturo`, condicionada por
+  la misma tasa de reemplazo en disputa) en la tarjeta y en `DATOS_UTILIZADOS` del Nivel
+  completo (ronda 1), y — hallazgo posterior sobre la misma revisión — también en `IBL
+  aplicable` y en el período futuro anidado de `trazabilidadVentana` (ronda 2), porque ese
+  mismo IBC alimenta el cálculo del IBL. Corregido para el camino afectado en ambas rondas
+  (7 pasos de Nivel completo pendientes, ninguno expone una cifra); el camino `base`
+  (independiente) conserva sus datos completos y reales, sin cambio. Corregidos también:
+  identificador interno de la política (`PoliticaAnclaIncrementoMujer`) crudo en pantalla,
+  título de decisión que afirmaba alcanzar el objetivo bajo política sin resolver,
+  superposición visual entre columnas del comparador de caminos (auto-placement de CSS Grid
+  sobre un `<details>` sin celda propia), semanas cotizadas con decimales crudos
+  (`1.470 semanas y 6 días`, sin redondear hacia arriba) y semanas declaradas sin separador de
+  miles (`1.039 semanas`).
+  **Auditoría integral final (ronda 3, sin defectos funcionales/jurídicos nuevos):** revisado el
+  flujo completo `App.jsx` → `generarCaminosRPM` → `evaluarPoliticasEjercicioRPM` →
+  `construirEjercicioResueltoRPM` → adaptador visual → `ProyectaTuPensionRPM.jsx` → Nivel
+  completo, contra código y pruebas reales. Hallazgos, todos de documentación en código (nunca
+  de comportamiento): cinco archivos de la cadena visual (`construirCadenaVisualEjercicioRPM.js`,
+  `construirModeloVisualEjercicioRPM.js`, `construirEjercicioResueltoRPM.js`,
+  `evaluarPoliticasEjercicioRPM.js`, `compararAnclaIncrementoRPM.js`) y
+  `ConfirmacionContinuidadCotizacion.jsx` seguían describiéndose en su cabecera como "dormidos,
+  sin consumidor real" — conectados en firme desde E6.5, corregido. **Hueco de cobertura real
+  cerrado:** la invalidación de la confirmación de continuidad al cambiar sexo o fecha de
+  nacimiento (código ya correcto desde E6.5) solo tenía prueba de regresión real por edad
+  objetivo — se agregaron pruebas para sexo y fecha de nacimiento por la ruta real de `App.jsx`,
+  y una prueba de que cambiar el objetivo económico nunca invalida. El régimen actual no recibió
+  prueba equivalente: cambiarlo sin salir de `ProyectaTuPensionRPM.jsx` no es un flujo real (el
+  único camino real ya está cubierto por `navegacionRPM.test.js`). Búsqueda literal confirmó
+  ausencia de todo identificador interno de código fuera de lo ya corregido. **Ninguna
+  interpretación jurídica fue elegida** — las dos políticas de PL-260 §2 siguen `NO_RESUELTA`.
+  **Resultado final:** suite completa 81 archivos / 1698 pruebas en verde; lint sin hallazgos;
+  build exitoso; `git diff --check` sin errores. Primera cobertura de la ruta real COMPLETA
+  (`src/App.test.jsx`, `App.jsx` montado entero vía el panel de desarrollo) para el Caso A y el
+  Caso B, incluida la invalidación de la confirmación. **Validación visual real de Carlos y
+  Atlas, aprobada explícitamente sobre `f780db7`** — primera vez que este flujo se valida contra
+  la interfaz real. **E8 (Preview) y E9 (prueba final de Oscar) siguen sin iniciarse** — dependen
+  del cierre de las dos políticas jurídicas de PL-260 §2, sin cambio de estado. IA explicativa
+  (S4-007) y `IA_EXPUESTA_EN_MVP` permanecen sin activarse para esta publicación — decisión de
+  producto ya registrada, no reabierta en esta sesión.

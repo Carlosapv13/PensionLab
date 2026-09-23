@@ -45,6 +45,41 @@ describe('DetallePasoAuditable — campos escalares conocidos, nunca recalcula',
     expect(screen.getByText('Sí')).toBeTruthy()
     expect(screen.queryByText('true')).toBeNull()
   })
+
+  // Auditoría adversarial (2026-09-25, validación de Carlos/Atlas sobre el Preview del Caso A
+  // real, commit 759a010) — caso exacto reportado: Hombre 52 años, objetivo $5.000.000,
+  // camino alternativo con pensión $5.000.001 (supera el objetivo por $1). El detalle
+  // auditable mostraba "Diferencia frente al objetivo $-1" junto a "¿Cumple el objetivo? Sí"
+  // — contradictorio. Nunca debe aparecer "$-1" en el DOM.
+  it('caso real reportado: delta -1 (pensión $5.000.001 vs. objetivo $5.000.000) nunca muestra "$-1", muestra "$1 por encima del objetivo", coherente con "Cumple: Sí"', () => {
+    render(<DetallePasoAuditable codigo="COMPARACION_OBJETIVO" datos={{ valorObjetivo: 5000000, delta: -1, cumple: true }} />)
+    expect(screen.getByText('$1 por encima del objetivo')).toBeTruthy()
+    expect(screen.queryByText('$-1')).toBeNull()
+    expect(screen.getByText('Sí')).toBeTruthy()
+  })
+
+  it('caso simétrico: resultado por debajo del objetivo muestra la diferencia faltante, sin perder magnitud', () => {
+    render(<DetallePasoAuditable codigo="COMPARACION_OBJETIVO" datos={{ valorObjetivo: 5000000, delta: 1788243, cumple: false }} />)
+    expect(screen.getByText('$1.788.243 por debajo del objetivo')).toBeTruthy()
+    expect(screen.getByText('No')).toBeTruthy()
+  })
+
+  // Auditoría adversarial (2026-09-25, validación de Carlos/Atlas sobre el Preview del Caso A
+  // real) — caso exacto reportado: "Tasa de reemplazo inicial" con 14 decimales de precisión
+  // de punto flotante ("64.35353674799146%"). Nunca debe aparecer con más de 2 decimales.
+  it('caso real reportado: tasas con precisión de punto flotante se muestran con máximo 2 decimales, formato español', () => {
+    render(
+      <DetallePasoAuditable
+        codigo="TASA_REEMPLAZO"
+        datos={{ tasaInicial: 64.35353674799146, tasaFinalAplicada: 63.71520830218928, tasaMaxima: 80 }}
+      />
+    )
+    expect(screen.getByText('64,35%')).toBeTruthy()
+    expect(screen.getByText('63,72%')).toBeTruthy()
+    expect(screen.getByText('80%')).toBeTruthy()
+    expect(screen.queryByText('64.35353674799146%')).toBeNull()
+    expect(screen.queryByText('63.71520830218928%')).toBeNull()
+  })
 })
 
 describe('DetallePasoAuditable — objetos anidados, recursivo', () => {
@@ -81,18 +116,61 @@ describe('DetallePasoAuditable — objetos anidados, recursivo', () => {
     expect(screen.getByText('$1.750.905')).toBeTruthy()
     expect(screen.getAllByText('Ley 100 de 1993').length).toBe(2)
     expect(screen.getAllByText('35').length).toBe(2)
+    // Corrección de auditoría visual (2026-09-25, validación de Carlos/Atlas): el
+    // identificador interno de la norma nunca aparece en el DOM — fuente/artículo (ya
+    // verificados arriba) son el único texto humano para este dato, sin fila "Norma".
+    expect(screen.queryByText('L-100-1993-art-35')).toBeNull()
+    expect(screen.queryByText('Norma')).toBeNull()
   })
 
-  it('un campo null (ej. razonNoEvaluable) se muestra como "—", nunca "null" crudo ni se oculta la fila', () => {
+  // Corrección de auditoría visual (2026-09-25, validación de Carlos/Atlas sobre el Preview
+  // del Caso A real): esta prueba afirmaba antes que un campo `null` "nunca se oculta la
+  // fila" — cierto en general (`aplica`/`valorSMLMV`/`valorPesosDeHoy`/`fundamento` siguen
+  // mostrando "—", verificado abajo), PERO `razonNoEvaluable: null` es un caso especial
+  // verificado: significa exactamente "sí se evaluó" (ver `ajustarMesadaLegalRPM.js` — nunca
+  // no-nulo salvo en las ramas donde el ajuste no se evaluó en absoluto). Mostrar la fila fija
+  // "Razón: no evaluable" con un valor vacío al lado era la contradicción real reportada
+  // ("¿Se evaluó? Sí" + "Razón: no evaluable —"), no una garantía a preservar.
+  it('campos null distintos de razonNoEvaluable se muestran como "—", nunca "null" crudo, y nunca se ocultan', () => {
     render(
       <DetallePasoAuditable
         codigo="AJUSTE_LEGAL"
         datos={{ pisoEvaluado: { evaluable: false, aplica: null, valorSMLMV: null, valorPesosDeHoy: null, fundamento: null, razonNoEvaluable: null } }}
       />
     )
-    expect(screen.getByText('Razón: no evaluable')).toBeTruthy()
+    expect(screen.getByText('¿Aplica?')).toBeTruthy()
+    expect(screen.getByText('Valor en salarios mínimos (SMLMV)')).toBeTruthy()
+    expect(screen.getByText('Valor en pesos de hoy')).toBeTruthy()
+    expect(screen.getByText('Fundamento normativo')).toBeTruthy()
     expect(screen.getAllByText('—').length).toBeGreaterThan(0)
     expect(screen.queryByText('null')).toBeNull()
+  })
+
+  it('razonNoEvaluable: null nunca muestra la fila "Razón: no evaluable" (contradiría "¿Se evaluó? Sí" cuando aplica) — nunca inventa una razón', () => {
+    render(
+      <DetallePasoAuditable
+        codigo="AJUSTE_LEGAL"
+        datos={{
+          pisoEvaluado: { evaluable: true, aplica: false, valorSMLMV: 1, valorPesosDeHoy: 1750905, fundamento: { normaId: 'x', fuente: 'Ley 100', articulo: '35' }, razonNoEvaluable: null },
+        }}
+      />
+    )
+    expect(screen.getByText('¿Se evaluó?')).toBeTruthy()
+    expect(screen.getByText('¿Aplica?')).toBeTruthy()
+    expect(screen.queryByText('Razón: no evaluable')).toBeNull()
+  })
+
+  it('razonNoEvaluable con un código real (no nulo) SIGUE mostrando la fila tal cual — la corrección nunca oculta una razón que sí existe', () => {
+    render(
+      <DetallePasoAuditable
+        codigo="AJUSTE_LEGAL"
+        datos={{
+          pisoEvaluado: { evaluable: false, aplica: null, valorSMLMV: null, valorPesosDeHoy: null, fundamento: null, razonNoEvaluable: 'ELEGIBILIDAD_NO_EVALUABLE' },
+        }}
+      />
+    )
+    expect(screen.getByText('Razón: no evaluable')).toBeTruthy()
+    expect(screen.getByText('ELEGIBILIDAD_NO_EVALUABLE')).toBeTruthy()
   })
 })
 

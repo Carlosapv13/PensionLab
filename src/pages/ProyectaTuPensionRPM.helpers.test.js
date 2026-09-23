@@ -687,14 +687,24 @@ describe('textoObjetivoInferiorAlPisoLegal — checkpoint E4-C1, Decisión 2', (
 describe('textoResumenSemanasDeclaradas — checkpoint E4-C1, Decisión 5', () => {
   it('conocido: cifra exacta, sin prefijo "aproximadamente", documenta ausencia de fecha de referencia', () => {
     expect(textoResumenSemanasDeclaradas('conocido', '1400')).toBe(
-      '1400 semanas — sin una fecha de referencia registrada todavía.'
+      '1.400 semanas — sin una fecha de referencia registrada todavía.'
     )
   })
 
   it('aproximado: prefijo "aproximadamente"', () => {
     expect(textoResumenSemanasDeclaradas('aproximado', '1100')).toBe(
-      'aproximadamente 1100 semanas — sin una fecha de referencia registrada todavía.'
+      'aproximadamente 1.100 semanas — sin una fecha de referencia registrada todavía.'
     )
+  })
+
+  // Corrección de auditoría visual (2026-09-25, validación de Carlos/Atlas sobre el Preview
+  // del Caso A real): "1500" se mostraba sin separador de miles ("1500 semanas" en vez de
+  // "1.500 semanas") — mismo caso real reportado.
+  it('separador de miles (caso real reportado): "1500" se muestra "1.500 semanas", nunca "1500 semanas"', () => {
+    expect(textoResumenSemanasDeclaradas('aproximado', '1500')).toBe(
+      'aproximadamente 1.500 semanas — sin una fecha de referencia registrada todavía.'
+    )
+    expect(textoResumenSemanasDeclaradas('aproximado', '1500')).not.toContain('1500 semanas')
   })
 
   it('desconocido: mensaje distinto, nunca "0 semanas"', () => {

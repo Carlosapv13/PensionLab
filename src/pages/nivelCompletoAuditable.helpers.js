@@ -23,7 +23,8 @@
 import { formatearPesos } from '../format/formatearDinero.js'
 
 // Campos verificados como monto en pesos de hoy (mismo criterio que el resto de la pantalla,
-// formatearPesos ya usado para escenario.resultado.valor/objetivoValorMensual/etc.).
+// formatearPesos ya usado para escenario.resultado.valor/objetivoValorMensual/etc.). `delta`
+// NO está aquí a propósito — ver `formatearDeltaObjetivo`, más abajo, para su formato especial.
 const CAMPOS_PESOS = new Set([
   'valorDeclarado',
   'valorAplicado',
@@ -31,7 +32,6 @@ const CAMPOS_PESOS = new Set([
   'valorAplicable',
   'valor',
   'valorObjetivo',
-  'delta',
   'valorPesosDeHoy',
 ])
 
@@ -254,6 +254,59 @@ export function formatearSemanasComoTexto(valorEnSemanas) {
   return `${textoSemanas} y ${diasRestantes} ${diasRestantes === 1 ? 'día' : 'días'}`
 }
 
+// Corrección de auditoría visual (2026-09-25, validación de Carlos/Atlas sobre el Preview del
+// Caso A real): `delta` (`COMPARACION_OBJETIVO`, `objetivoValorMensual - resultado.valor` —
+// generarCaminosRPM.js, cerrado, sin tocar) es negativo cuando el resultado SUPERA el
+// objetivo — `formatearPesos` conservaba el signo tal cual ("$-1"), una diferencia negativa
+// que, junto a "¿Cumple el objetivo? Sí", leía como una contradicción ("cumple, pero la
+// diferencia es negativa" — ¿negativa respecto a qué?). El signo aritmético es correcto y
+// necesario para el cálculo (`delta <= 0` es exactamente el criterio de `cumple`, sin tocar
+// aquí) — el problema es puramente de presentación: un número negativo mostrado como dinero
+// nunca comunica por sí solo "superaste el objetivo". Se reexpresa en lenguaje inequívoco,
+// sin inventar ninguna cifra nueva (`Math.abs` no cambia la magnitud, solo el signo visible):
+// `delta < 0` → superó el objetivo, se muestra "por encima"; `delta > 0` → todavía falta, se
+// muestra "por debajo"; `delta === 0` → coincide exactamente, caso límite explícito (nunca
+// forzado a una de las otras dos frases, que serían engañosas con magnitud $0).
+/**
+ * @param {number} delta - `objetivoValorMensual - resultado.valor` (COMPARACION_OBJETIVO) —
+ *   negativo cuando el resultado supera el objetivo, positivo cuando falta.
+ * @returns {string}
+ */
+export function formatearDeltaObjetivo(delta) {
+  if (delta < 0) return `${formatearPesos(Math.abs(delta))} por encima del objetivo`
+  if (delta > 0) return `${formatearPesos(delta)} por debajo del objetivo`
+  return 'Exactamente en el objetivo'
+}
+
+// Corrección de auditoría visual (2026-09-25, validación de Carlos/Atlas sobre el Preview del
+// Caso A real): dos campos anidados que nunca deben renderizarse como una fila propia del
+// Nivel completo, sin ocultar ningún dato jurídico real:
+// - `normaId` (`fundamento.normaId`, ej. "const-art48-ley100-art35-piso-pension-minima" —
+//   `data/legal/referenciasNormativasAjusteLegalRPM.js`, cerrado, sin tocar): identificador
+//   interno de código, verificado que el contrato NUNCA provee un nombre humano distinto para
+//   este mismo dato — `fuente`/`articulo`/`descripcion` (siempre presentes junto a `normaId`,
+//   nunca alterados aquí) ya cumplen esa función con lenguaje real. Se omite la fila en vez de
+//   inventar una traducción jurídica que el contrato no aprobó.
+// - `razonNoEvaluable` cuando es `null`: significa exactamente "sí se evaluó" (ver
+//   `ajustarMesadaLegalRPM.js` — este campo solo es no-nulo en las ramas donde el ajuste NO
+//   se evaluó en absoluto). Sin esta corrección, un piso/techo evaluado con normalidad
+//   (`evaluable:true`, `aplica:false` — el caso más común, cuando el resultado simplemente no
+//   cruza esa frontera) mostraba la fila fija "Razón: no evaluable" con el valor vacío ("—"),
+//   una contradicción directa con "¿Se evaluó? Sí" ya mostrado arriba. Cuando SÍ existe un
+//   código de no-evaluable real (`razonNoEvaluable` no nulo), la fila se sigue mostrando tal
+//   cual — esta corrección nunca inventa una razón, solo evita mostrar la etiqueta cuando no
+//   hay ningún valor detrás.
+/**
+ * @param {string} clave
+ * @param {*} valor
+ * @returns {boolean}
+ */
+export function debeOcultarCampoAnidado(clave, valor) {
+  if (clave === 'normaId') return true
+  if (clave === 'razonNoEvaluable' && valor === null) return true
+  return false
+}
+
 /**
  * Formatea un valor ESCALAR (nunca objeto/arreglo/null — ver tipoDeValor) a texto legible,
  * según el campo al que pertenece. Nunca redondea de forma distinta a lo ya calculado, nunca
@@ -264,8 +317,17 @@ export function formatearSemanasComoTexto(valorEnSemanas) {
  * @returns {string}
  */
 export function formatearValorEscalar(clave, valor) {
+  if (clave === 'delta' && typeof valor === 'number') return formatearDeltaObjetivo(valor)
   if (CAMPOS_PESOS.has(clave) && typeof valor === 'number') return formatearPesos(valor)
-  if (CAMPOS_PORCENTAJE.has(clave) && typeof valor === 'number') return `${valor}%`
+  // Corrección de auditoría visual (2026-09-25, validación de Carlos/Atlas): las tasas de
+  // reemplazo reales traen hasta 14 decimales de precisión de punto flotante
+  // ("64.35353674799146%") — nunca un error de cálculo, solo más precisión de la que una
+  // persona necesita leer. `maximumFractionDigits: 2` redondea SOLO la presentación (nunca el
+  // valor real usado por el motor, que sigue completo en el dominio) — "80" sigue como "80%",
+  // sin agregar decimales que no tenía.
+  if (CAMPOS_PORCENTAJE.has(clave) && typeof valor === 'number') {
+    return `${valor.toLocaleString('es-CO', { maximumFractionDigits: 2 })}%`
+  }
   if (clave === 'semanasCotizadas' && typeof valor === 'number') return formatearSemanasComoTexto(valor)
   if (CAMPOS_NUMERO_PLANO.has(clave) && typeof valor === 'number') return valor.toLocaleString('es-CO')
   if (CAMPOS_BOOLEANOS.has(clave) && typeof valor === 'boolean') return valor ? 'Sí' : 'No'

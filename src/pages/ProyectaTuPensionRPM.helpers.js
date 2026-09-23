@@ -617,7 +617,17 @@ export function textoResumenSemanasDeclaradas(nivelConocimientoSemanas, semanasC
   const prefijo = nivelConocimientoSemanas === 'aproximado' ? 'aproximadamente ' : ''
   // Ausencia documentada a propósito (checkpoint E4-C1, Decisión 5): no existe hoy un dato
   // de "fecha de referencia" para esta cifra — no se inventa ni se implementa aquí.
-  return `${prefijo}${semanasCotizadas} semanas — sin una fecha de referencia registrada todavía.`
+  //
+  // Corrección de auditoría visual (2026-09-25, validación de Carlos/Atlas sobre el Preview
+  // del Caso A): `semanasCotizadas` es el string crudo del campo ("1500") — se interpolaba
+  // sin separador de miles ("1500 semanas" en vez de "1.500 semanas"), mismo defecto ya
+  // corregido en `textoFuenteSemanas` (arriba, mismo archivo) para el caso de declaración
+  // agregada — nunca extendido a este resumen. Mismo patrón exacto: `Number(...).toLocaleString('es-CO')`,
+  // nunca redondea (es un entero declarado); si el campo llegara vacío/no numérico (no debería,
+  // ya validado antes de llegar aquí), se muestra tal cual en vez de "NaN".
+  const semanasNumero = Number(semanasCotizadas)
+  const semanasFormateadas = Number.isFinite(semanasNumero) ? semanasNumero.toLocaleString('es-CO') : semanasCotizadas
+  return `${prefijo}${semanasFormateadas} semanas — sin una fecha de referencia registrada todavía.`
 }
 
 // Revisión correctiva E4-C1 (2026-09-10), punto 4: el resumen NUNCA muestra el nombre

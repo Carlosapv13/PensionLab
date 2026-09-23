@@ -18,8 +18,20 @@
 // apareciendo (nunca se omite en silencio, PL-260 §8), pero su valor calculado se reemplaza
 // por la explicación de qué política lo bloquea. Este componente no decide cuáles pasos
 // están afectados ni redacta el mensaje — solo lo muestra tal cual, en vez de `datos`.
+//
+// Corrección de auditoría visual (2026-09-25, validación de Carlos/Atlas sobre el Preview del
+// Caso A real): `debeOcultarCampoAnidado` (nivelCompletoAuditable.helpers.js) filtra las dos
+// únicas filas que nunca deben mostrarse (`normaId` crudo; `razonNoEvaluable` cuando es
+// `null`, que solo significa "sí se evaluó") — nunca oculta un campo por falta de etiqueta
+// (esa garantía sigue intacta, ver `etiquetaCampo`), solo estos dos casos verificados.
 
-import { ETIQUETAS_PASO, etiquetaCampo, tipoDeValor, formatearValorEscalar } from '../pages/nivelCompletoAuditable.helpers.js'
+import {
+  ETIQUETAS_PASO,
+  etiquetaCampo,
+  tipoDeValor,
+  formatearValorEscalar,
+  debeOcultarCampoAnidado,
+} from '../pages/nivelCompletoAuditable.helpers.js'
 
 // Recursivo: un valor "objeto" se despliega como una sub-lista de definición con las mismas
 // reglas de etiqueta/formato (mismo diccionario, a cualquier profundidad — ver cabecera del
@@ -35,14 +47,16 @@ function ValorAuditable({ clave, valor }) {
   if (tipo === 'objeto') {
     return (
       <dl className="detalle-paso__anidado">
-        {Object.entries(valor).map(([subclave, subvalor]) => (
-          <div className="detalle-paso__fila" key={subclave}>
-            <dt>{etiquetaCampo(subclave)}</dt>
-            <dd>
-              <ValorAuditable clave={subclave} valor={subvalor} />
-            </dd>
-          </div>
-        ))}
+        {Object.entries(valor)
+          .filter(([subclave, subvalor]) => !debeOcultarCampoAnidado(subclave, subvalor))
+          .map(([subclave, subvalor]) => (
+            <div className="detalle-paso__fila" key={subclave}>
+              <dt>{etiquetaCampo(subclave)}</dt>
+              <dd>
+                <ValorAuditable clave={subclave} valor={subvalor} />
+              </dd>
+            </div>
+          ))}
       </dl>
     )
   }
@@ -81,14 +95,16 @@ export default function DetallePasoAuditable({ codigo, datos, pendiente = null }
         </p>
       ) : (
         <dl className="detalle-paso__campos">
-          {Object.entries(datos ?? {}).map(([clave, valor]) => (
-            <div className="detalle-paso__fila" key={clave}>
-              <dt>{etiquetaCampo(clave)}</dt>
-              <dd>
-                <ValorAuditable clave={clave} valor={valor} />
-              </dd>
-            </div>
-          ))}
+          {Object.entries(datos ?? {})
+            .filter(([clave, valor]) => !debeOcultarCampoAnidado(clave, valor))
+            .map(([clave, valor]) => (
+              <div className="detalle-paso__fila" key={clave}>
+                <dt>{etiquetaCampo(clave)}</dt>
+                <dd>
+                  <ValorAuditable clave={clave} valor={valor} />
+                </dd>
+              </div>
+            ))}
         </dl>
       )}
     </div>

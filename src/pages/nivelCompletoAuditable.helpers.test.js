@@ -8,6 +8,8 @@ import {
   tipoDeValor,
   formatearValorEscalar,
   formatearSemanasComoTexto,
+  formatearDeltaObjetivo,
+  debeOcultarCampoAnidado,
   ETIQUETAS_PASO,
   pasoDependeDePoliticaJuridica,
   mensajePasoPendienteDePolitica,
@@ -58,15 +60,27 @@ describe('formatearValorEscalar — nunca recalcula, solo presenta', () => {
   it('campos de pesos verificados usan formatearPesos (mismo formato que el resto de la pantalla)', () => {
     expect(formatearValorEscalar('valorDeclarado', 2900000)).toBe('$2.900.000')
     expect(formatearValorEscalar('valorPesosDeHoy', 1750905)).toBe('$1.750.905')
-    // formatearPesos (formatearDinero.js, sin cambios en este checkpoint) antepone el signo $
-    // al número ya formateado — para negativos, produce "$-50.000", no "-$50.000". Mismo
-    // formato que ya usa el resto de la pantalla (ej. textoDiferenciaFrenteABase).
-    expect(formatearValorEscalar('delta', -50000)).toBe('$-50.000')
   })
 
-  it('campos de porcentaje verificados agregan "%" sobre el número literal, sin dividir/multiplicar', () => {
-    expect(formatearValorEscalar('tasaInicial', 65.5)).toBe('65.5%')
+  // Corrección de auditoría visual (2026-09-25, validación de Carlos/Atlas sobre el Preview
+  // del Caso A real): `delta` ya NO usa `formatearPesos` genérico (que producía "$-1", una
+  // diferencia negativa incomprensible junto a "¿Cumple el objetivo? Sí") — tiene su propio
+  // formato humano, ver describe `formatearDeltaObjetivo` más abajo para el detalle completo.
+  it('delta usa formatearDeltaObjetivo, nunca formatearPesos crudo (ver describe dedicado)', () => {
+    expect(formatearValorEscalar('delta', -1)).toBe('$1 por encima del objetivo')
+    expect(formatearValorEscalar('delta', 1788243)).toBe('$1.788.243 por debajo del objetivo')
+    expect(formatearValorEscalar('delta', -1)).not.toContain('$-1')
+  })
+
+  // Corrección de auditoría visual (2026-09-25, validación de Carlos/Atlas): las tasas reales
+  // traen hasta 14 decimales de precisión de punto flotante ("64.35353674799146%") — se
+  // presentan con máximo 2 decimales, formato español (coma decimal, `toLocaleString('es-CO')`,
+  // el mismo ya usado en todo este archivo para miles) — nunca cambia el valor real.
+  it('campos de porcentaje verificados agregan "%" sobre el número, redondeado a máximo 2 decimales en formato español (coma)', () => {
+    expect(formatearValorEscalar('tasaInicial', 65.5)).toBe('65,5%')
     expect(formatearValorEscalar('tasaMaxima', 80)).toBe('80%')
+    expect(formatearValorEscalar('tasaInicial', 64.35353674799146)).toBe('64,35%')
+    expect(formatearValorEscalar('tasaFinalAplicada', 63.71520830218928)).toBe('63,72%')
   })
 
   it('semanasCotizadas agrega el sufijo "semanas" sobre el número literal', () => {
@@ -172,6 +186,59 @@ describe('formatearSemanasComoTexto — semanas completas + días restantes, cal
 
   it('0 semanas con residuo sigue mostrando la etiqueta de semanas en plural, más los días', () => {
     expect(formatearSemanasComoTexto(3 / 7)).toBe('0 semanas y 3 días')
+  })
+})
+
+// Auditoría adversarial (2026-09-25, validación de Carlos/Atlas sobre el Preview del Caso A
+// real, commit 759a010): "Diferencia frente al objetivo $-1" con "¿Cumple el objetivo? Sí" —
+// contradictorio para una persona usuaria. `delta = objetivoValorMensual - resultado.valor`
+// (generarCaminosRPM.js, cerrado, sin tocar) — negativo cuando el resultado SUPERA el
+// objetivo, `cumple: delta <= 0`. Caso real reportado: resultado $5.000.001 contra objetivo
+// $5.000.000 → delta = -1.
+describe('formatearDeltaObjetivo — expresa el signo aritmético en lenguaje humano, nunca invierte el criterio de cumplimiento', () => {
+  it('caso real reportado: delta -1 (resultado $5.000.001 vs. objetivo $5.000.000) → "$1 por encima del objetivo", nunca "$-1"', () => {
+    expect(formatearDeltaObjetivo(-1)).toBe('$1 por encima del objetivo')
+    expect(formatearDeltaObjetivo(-1)).not.toContain('-')
+  })
+
+  it('delta negativo grande: sigue "por encima", con la magnitud absoluta correcta', () => {
+    expect(formatearDeltaObjetivo(-500000)).toBe('$500.000 por encima del objetivo')
+  })
+
+  it('delta positivo (falta dinero): "por debajo del objetivo", sin perder magnitud — caso real reportado: $1.788.243', () => {
+    expect(formatearDeltaObjetivo(1788243)).toBe('$1.788.243 por debajo del objetivo')
+  })
+
+  it('delta exactamente 0: caso límite explícito, nunca forzado a "por encima" ni "por debajo" con magnitud $0', () => {
+    expect(formatearDeltaObjetivo(0)).toBe('Exactamente en el objetivo')
+  })
+})
+
+// Auditoría adversarial (2026-09-25, validación de Carlos/Atlas): dos identificadores/valores
+// que nunca deben aparecer como fila propia del Nivel completo — `normaId` (identificador
+// interno de código, sin nombre humano alternativo en el contrato) y `razonNoEvaluable: null`
+// (significa "sí se evaluó" — mostrar "Razón: no evaluable" al lado de un valor vacío
+// contradice "¿Se evaluó? Sí" ya mostrado). Nunca oculta un campo por falta de etiqueta —
+// esa garantía general sigue intacta, ver `etiquetaCampo`.
+describe('debeOcultarCampoAnidado — oculta solo normaId y razonNoEvaluable:null, nunca otro campo', () => {
+  it('normaId: siempre oculto, sin importar el valor', () => {
+    expect(debeOcultarCampoAnidado('normaId', 'const-art48-ley100-art35-piso-pension-minima')).toBe(true)
+    expect(debeOcultarCampoAnidado('normaId', null)).toBe(true)
+  })
+
+  it('razonNoEvaluable: oculto SOLO cuando es null', () => {
+    expect(debeOcultarCampoAnidado('razonNoEvaluable', null)).toBe(true)
+  })
+
+  it('razonNoEvaluable: NUNCA oculto cuando trae un código real — la corrección nunca oculta una razón que sí existe', () => {
+    expect(debeOcultarCampoAnidado('razonNoEvaluable', 'ELEGIBILIDAD_NO_EVALUABLE')).toBe(false)
+  })
+
+  it('cualquier otro campo, incluido null: nunca se oculta (fuente, articulo, aplica, valorSMLMV, etc.)', () => {
+    for (const clave of ['fuente', 'articulo', 'descripcion', 'aplica', 'valorSMLMV', 'valorPesosDeHoy', 'evaluable']) {
+      expect(debeOcultarCampoAnidado(clave, null)).toBe(false)
+      expect(debeOcultarCampoAnidado(clave, 'cualquier valor')).toBe(false)
+    }
   })
 })
 

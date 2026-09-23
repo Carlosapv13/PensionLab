@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { ajustarMesadaLegalRPM } from './ajustarMesadaLegalRPM.js'
+import { mesadaGobernante } from './generarCaminosRPM.js'
 import { REFERENCIAS_NORMATIVAS_AJUSTE_LEGAL_RPM } from '../../data/legal/referenciasNormativasAjusteLegalRPM.js'
 import { ESTADOS_ELEGIBILIDAD_RPM } from './evaluarElegibilidadProyectadaRPM.js'
 import { evaluarVigenciaSmlv, obtenerSmlv } from '../../data/legal/index.js'
@@ -142,6 +143,80 @@ describe('ajustarMesadaLegalRPM — piso y techo', () => {
     expect(r.pisoEvaluado.aplica).toBe(true)
     expect(r.supuestos.some((s) => s.codigo === 'LITIGIO_DE_FONDO_PENDIENTE')).toBe(true)
     expect(r.razon).toBeNull()
+  })
+})
+
+// Auditoría adversarial, ronda 2 (2026-09-25 — revisión de Atlas sobre el veredicto APTO PARA
+// PREVIEW): las 5 fronteras EXACTAS de 1 peso alrededor del piso y del techo, pedidas
+// explícitamente ("no solamente lectura del código"). Cada caso demuestra las 4 cosas que
+// Atlas pidió: (1) el valor matemático de entrada nunca se muta (`r.resultadoMatematico`);
+// (2) si el ajuste de piso/techo se aplicó o no (`pisoEvaluado.aplica`/`techoEvaluado.aplica`);
+// (3) el resultado final exacto (`r.resultadoFinalAjustado`); (4) que `resultado.valor` (el
+// campo que la UI/Contrato E realmente exponen) usa ese valor ajustado, nunca el matemático
+// crudo — verificado con `mesadaGobernante` (generarCaminosRPM.js), la MISMA función real que
+// decide `resultado.valor` en producción (exportada exclusivamente para poder probar esto sin
+// mockear módulos completos — ver su propia cabecera), nunca una función de prueba distinta.
+//
+// `mesadaGobernante` recibe `proyeccion.ajusteLegal`, y exige `ajusteLegal.estado === 'evaluado'`
+// — ese campo `estado` lo agrega `calcularProyeccionRPM.js` como envoltorio ADITIVO sobre la
+// salida cruda de `ajustarMesadaLegalRPM` (ver JSDoc de `calcularProyeccionRPM.js`:
+// "'evaluado'/'no_evaluable' ... espejo directo de ajustarMesadaLegalRPM.js más el propio
+// campo estado"), nunca lo produce esta función por sí sola. `comoAjusteLegalReal` replica
+// exactamente ese envoltorio (nunca inventa un campo nuevo) para poder invocar la función real
+// de producción sin mockearla.
+function comoAjusteLegalReal(r) {
+  return { ...r, estado: r.razon === null ? 'evaluado' : 'no_evaluable' }
+}
+
+describe('ajustarMesadaLegalRPM — fronteras EXACTAS de 1 peso alrededor del piso y del techo (auditoría Atlas, ronda 2)', () => {
+  it('un peso por DEBAJO del piso (SMLMV - 1): el piso SÍ aplica, resultado final = SMLMV exacto, resultado.valor usa el ajustado', () => {
+    const r = ajustarMesadaLegalRPM(entradaBase({ resultadoMatematico: SMLV_2026 - 1 }))
+    expect(r.resultadoMatematico).toBe(SMLV_2026 - 1) // nunca mutado
+    expect(r.pisoEvaluado.aplica).toBe(true)
+    expect(r.techoEvaluado.aplica).toBe(false)
+    expect(r.resultadoFinalAjustado).toBe(SMLV_2026)
+    expect(mesadaGobernante({ ajusteLegal: comoAjusteLegalReal(r) })).toBe(SMLV_2026)
+    expect(mesadaGobernante({ ajusteLegal: comoAjusteLegalReal(r) })).not.toBe(r.resultadoMatematico)
+  })
+
+  it('exactamente en el piso (SMLMV): el piso NO aplica (< estricto), resultado final = matemático = SMLMV, resultado.valor coincide con ambos (no hay ajuste que distinguir aquí)', () => {
+    const r = ajustarMesadaLegalRPM(entradaBase({ resultadoMatematico: SMLV_2026 }))
+    expect(r.resultadoMatematico).toBe(SMLV_2026)
+    expect(r.pisoEvaluado.aplica).toBe(false)
+    expect(r.techoEvaluado.aplica).toBe(false)
+    expect(r.resultadoFinalAjustado).toBe(SMLV_2026)
+    expect(mesadaGobernante({ ajusteLegal: comoAjusteLegalReal(r) })).toBe(SMLV_2026)
+  })
+
+  it('un peso por ENCIMA del piso (SMLMV + 1): ningún ajuste aplica, resultado final = matemático sin cambio, resultado.valor usa ese mismo valor (nunca el piso)', () => {
+    const r = ajustarMesadaLegalRPM(entradaBase({ resultadoMatematico: SMLV_2026 + 1 }))
+    expect(r.resultadoMatematico).toBe(SMLV_2026 + 1)
+    expect(r.pisoEvaluado.aplica).toBe(false)
+    expect(r.techoEvaluado.aplica).toBe(false)
+    expect(r.resultadoFinalAjustado).toBe(SMLV_2026 + 1)
+    expect(mesadaGobernante({ ajusteLegal: comoAjusteLegalReal(r) })).toBe(SMLV_2026 + 1)
+    expect(mesadaGobernante({ ajusteLegal: comoAjusteLegalReal(r) })).not.toBe(SMLV_2026) // nunca se "pega" al piso por error de frontera
+  })
+
+  it('exactamente en el techo (25×SMLMV): el techo NO aplica (> estricto), resultado final = matemático = techo, resultado.valor usa ese mismo valor', () => {
+    const valorTecho = 25 * SMLV_2026
+    const r = ajustarMesadaLegalRPM(entradaBase({ resultadoMatematico: valorTecho }))
+    expect(r.resultadoMatematico).toBe(valorTecho)
+    expect(r.pisoEvaluado.aplica).toBe(false)
+    expect(r.techoEvaluado.aplica).toBe(false)
+    expect(r.resultadoFinalAjustado).toBe(valorTecho)
+    expect(mesadaGobernante({ ajusteLegal: comoAjusteLegalReal(r) })).toBe(valorTecho)
+  })
+
+  it('un peso por ENCIMA del techo (25×SMLMV + 1): el techo SÍ aplica, resultado final = techo exacto (recortado), resultado.valor usa el ajustado, nunca el matemático crudo por encima del techo', () => {
+    const valorTecho = 25 * SMLV_2026
+    const r = ajustarMesadaLegalRPM(entradaBase({ resultadoMatematico: valorTecho + 1 }))
+    expect(r.resultadoMatematico).toBe(valorTecho + 1) // nunca mutado
+    expect(r.pisoEvaluado.aplica).toBe(false)
+    expect(r.techoEvaluado.aplica).toBe(true)
+    expect(r.resultadoFinalAjustado).toBe(valorTecho)
+    expect(mesadaGobernante({ ajusteLegal: comoAjusteLegalReal(r) })).toBe(valorTecho)
+    expect(mesadaGobernante({ ajusteLegal: comoAjusteLegalReal(r) })).not.toBe(r.resultadoMatematico)
   })
 })
 

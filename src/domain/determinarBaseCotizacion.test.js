@@ -192,6 +192,99 @@ describe('determinarBaseCotizacion — valor declarado (conocido/aproximado)', (
   })
 })
 
+// Auditoría adversarial, ronda 2 (2026-09-25 — revisión de Atlas): fronteras EXACTAS del IBC
+// pedidas explícitamente ("no solamente lectura del código") — vacío, cero, un peso debajo
+// del piso, exactamente en el tope, un peso encima, magnitud extrema finita. Cada caso
+// comprueba rechazo/bloqueo/clamp según el contrato YA EXISTENTE (líneas 51-59 y 138-151 de
+// determinarBaseCotizacion.js — `validarMonto`/`aplicarTopeMaximoIBC`), nunca una regla nueva.
+describe('determinarBaseCotizacion — fronteras EXACTAS del IBC (auditoría Atlas, ronda 2)', () => {
+  it('vacío (cadena vacía, literal): certeza se conserva, sin ningún IBC — nunca calcula con una entrada ausente', () => {
+    const r = determinarBaseCotizacion({
+      certeza: 'conocido',
+      valorDeclarado: '',
+      tipoCotizante: 'empleado',
+      lugarCotizacion: 'colombia',
+      salarioParaEstimar: '',
+      fecha: FECHA,
+    })
+    expect(r.ibcActualDeclarado).toBeNull()
+    expect(r.ibcAplicableSimulacion).toBeNull()
+    expect(r.certezaValorDeclarado).toBe('conocido')
+  })
+
+  it('cero (literal): SÍ se parsea como número (0 es un monto válido, no una ausencia), pero el piso legal lo bloquea — nunca se usa como IBC', () => {
+    const r = determinarBaseCotizacion({
+      certeza: 'conocido',
+      valorDeclarado: '0',
+      tipoCotizante: 'empleado',
+      lugarCotizacion: 'colombia',
+      salarioParaEstimar: '',
+      fecha: FECHA,
+    })
+    expect(r.ibcActualDeclarado).toBe(0) // el dato original nunca se sobrescribe, ni con null
+    expect(r.ibcAplicableSimulacion).toBeNull()
+    expect(r.razonNoApto).toBe('valor_bajo_piso_legal')
+  })
+
+  it('un peso por DEBAJO de 1 SMLV: el piso SÍ bloquea (< estricto)', () => {
+    const r = determinarBaseCotizacion({
+      certeza: 'conocido',
+      valorDeclarado: String(SMLV - 1),
+      tipoCotizante: 'empleado',
+      lugarCotizacion: 'colombia',
+      salarioParaEstimar: '',
+      fecha: FECHA,
+    })
+    expect(r.ibcActualDeclarado).toBe(SMLV - 1)
+    expect(r.ibcAplicableSimulacion).toBeNull()
+    expect(r.razonNoApto).toBe('valor_bajo_piso_legal')
+  })
+
+  it('exactamente en el tope (25×SMLV): NO se ajusta (<= inclusive) — se usa tal cual, sin entrada en ajustesAplicados', () => {
+    const r = determinarBaseCotizacion({
+      certeza: 'conocido',
+      valorDeclarado: String(TOPE_PESOS),
+      tipoCotizante: 'empleado',
+      lugarCotizacion: 'colombia',
+      salarioParaEstimar: '',
+      fecha: FECHA,
+    })
+    expect(r.ibcActualDeclarado).toBe(TOPE_PESOS)
+    expect(r.ibcAplicableSimulacion).toBe(TOPE_PESOS)
+    expect(r.ajustesAplicados).toEqual([])
+  })
+
+  it('un peso por ENCIMA del tope: SÍ se recorta (clamp exacto al tope), el valor original se conserva en ibcActualDeclarado', () => {
+    const r = determinarBaseCotizacion({
+      certeza: 'conocido',
+      valorDeclarado: String(TOPE_PESOS + 1),
+      tipoCotizante: 'empleado',
+      lugarCotizacion: 'colombia',
+      salarioParaEstimar: '',
+      fecha: FECHA,
+    })
+    expect(r.ibcActualDeclarado).toBe(TOPE_PESOS + 1)
+    expect(r.ibcAplicableSimulacion).toBe(TOPE_PESOS)
+    expect(r.ajustesAplicados).toEqual([
+      { codigo: 'TOPE_MAXIMO_IBC', valorAntes: TOPE_PESOS + 1, valorDespues: TOPE_PESOS, normaUsada: r.normaUsada },
+    ])
+  })
+
+  it('magnitud extrema finita (10^15): nunca un camino distinto — mismo clamp genérico al tope, sin desbordar ni producir NaN/Infinity', () => {
+    const r = determinarBaseCotizacion({
+      certeza: 'conocido',
+      valorDeclarado: String(1e15),
+      tipoCotizante: 'empleado',
+      lugarCotizacion: 'colombia',
+      salarioParaEstimar: '',
+      fecha: FECHA,
+    })
+    expect(r.ibcActualDeclarado).toBe(1e15)
+    expect(r.ibcAplicableSimulacion).toBe(TOPE_PESOS)
+    expect(Number.isFinite(r.ibcAplicableSimulacion)).toBe(true)
+  })
+})
+
 describe('determinarBaseCotizacion — desconocido, empleado con ayuda de salario', () => {
   it('salario dentro del rango: produce un IBC calculado, nunca "validada_directamente_aplicable"', () => {
     const r = determinarBaseCotizacion({

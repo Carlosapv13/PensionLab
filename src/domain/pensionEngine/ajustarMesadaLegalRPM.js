@@ -43,8 +43,12 @@
 //    términos reales hasta esa fecha futura es una CONVENCIÓN DE ESCENARIO del producto, no
 //    una garantía legal sobre el valor nominal futuro — declarada en `supuestos`.
 // 6. Esta función es neutral del dominio: no importa React, no importa IA, no lee
-//    data/legal directamente (recibe todo ya resuelto) y no se integra todavía en
-//    generarCaminosRPM.js ni en ningún orquestador.
+//    data/legal directamente (recibe todo ya resuelto). Nació sin integrar en ningún
+//    orquestador — conectada en firme desde E3-C2c/E3-C2d vía `calcularProyeccionRPM.js`
+//    (que envuelve esta salida en `ajusteLegal`, agregando el campo `estado`) →
+//    `generarCaminosRPM.js` (`mesadaGobernante`, exportada allí, decide `resultado.valor`
+//    a partir de `ajusteLegal.resultadoFinalAjustado`, nunca del matemático crudo — ver
+//    fronteras exactas de piso/techo, auditoría Atlas 2026-09-25, en el archivo de pruebas).
 
 import { ESTADOS_ELEGIBILIDAD_RPM } from './evaluarElegibilidadProyectadaRPM.js'
 import { esFechaValida } from './validarHistoriaCotizacionTemporal.js'

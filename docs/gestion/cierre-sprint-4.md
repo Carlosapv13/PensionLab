@@ -1673,3 +1673,36 @@ checkpoints E3-E5.1 documentados en detalle allí (§6-§8).
   del cierre de las dos políticas jurídicas de PL-260 §2, sin cambio de estado. IA explicativa
   (S4-007) y `IA_EXPUESTA_EN_MVP` permanecen sin activarse para esta publicación — decisión de
   producto ya registrada, no reabierta en esta sesión.
+- **Ronda 2 de la auditoría adversarial — fronteras exactas con pruebas reales, decisión de
+  alcance sobre indemnización sustitutiva, y corrección del plan de aceptación de Óscar
+  (2026-09-25, revisión de Atlas) — cierre acotado, sin commit todavía.** Detalle completo en
+  PL-260 §9.17 — este bullet resume solo lo esencial.
+  **Fronteras exactas agregadas, con pruebas reales (nunca solo lectura de código):** piso y
+  techo de la pensión (1 peso por debajo/en/por encima del piso, en/por encima del techo,
+  cada una verificando valor matemático, ajuste aplicado o no, resultado final, y que
+  `resultado.valor` usa el ajustado vía `mesadaGobernante`); elegibilidad del motor RPM real
+  (edad exacta/±1 año, semanas exactas/±1 semana — declarado explícitamente: ninguna depende
+  de la política jurídica en disputa, y la edad en este motor se compara por año entero, sin
+  frontera de día — esa es capacidad de `evidenciaEdadPension.js`); IBC (vacío, cero,
+  ±1 peso del piso y del tope, magnitud extrema finita); esfuerzo adicional negativo/cero
+  directo en dominio; el camino "aumentar IBC" nunca por debajo del actual; una ejecución
+  nunca mezcla fechas base monetarias. **Ningún defecto encontrado** — todas confirman el
+  contrato ya existente.
+  **Decisión de alcance (Carlos/Atlas):** la indemnización sustitutiva queda expresamente
+  fuera del alcance de este MVP — el MVP proyecta pensión de vejez RPM y se detiene
+  honestamente cuando no se alcanzan los requisitos, nunca calcula ni recomienda indemnización
+  sustitutiva. Ninguna pantalla afirma cubrir "todas las prestaciones posibles" — sin cambio
+  de UI, solo este cierre documental.
+  **Contradicción del plan de aceptación de Óscar, corregida:** la fila 11 del "Set de
+  aceptación para Oscar" le pedía cargar un fixture del panel de desarrollo — imposible en el
+  Preview real. Investigado: el Caso B SÍ se reproduce por el recorrido público normal (el
+  panel de desarrollo escribe los mismos campos de estado de `App.jsx` que las pantallas
+  reales, verificado campo por campo) — se documentaron los datos y pasos exactos en la
+  matriz, sin agregar ninguna ruta secreta ni control QA al bundle público.
+  **`.vercel/output` — resuelto:** `vite.config.js` agrega `test.exclude` con `.vercel` y
+  `.claude` (preservando todas las exclusiones por defecto de Vitest) — el comando oficial
+  (`npm test`, sin flags) contaba 4 archivos/~30 pruebas ajenas al código real de esta rama.
+  **Resultado final:** suite completa (comando oficial) **81 archivos / 1724 pruebas** en
+  verde; RAIS sin cambios (62/62); lint sin hallazgos; build exitoso; `git diff --check` sin
+  errores. Sin commit — pendiente de nueva revisión de Carlos/Atlas antes de confirmar el
+  veredicto APTO PARA PREVIEW.

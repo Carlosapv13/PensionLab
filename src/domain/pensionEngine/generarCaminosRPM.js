@@ -43,7 +43,11 @@
 import { calcularProyeccionRPM } from './calcularProyeccionRPM.js'
 import { obtenerTasaCotizacion } from '../../data/legal/index.js'
 import { objetivoValorMensualEsValido } from './requisitosDatosImprescindiblesRPM.js'
-import { evaluarElegibilidadProyectadaRPM, ESTADOS_ELEGIBILIDAD_RPM } from './evaluarElegibilidadProyectadaRPM.js'
+import {
+  evaluarElegibilidadProyectadaRPM,
+  ESTADOS_ELEGIBILIDAD_RPM,
+  formatearSemanasSinDecimales,
+} from './evaluarElegibilidadProyectadaRPM.js'
 import { evaluarDisponibilidadCuantiaRPM } from './evaluarDisponibilidadCuantiaRPM.js'
 
 function hoyISO() {
@@ -688,7 +692,7 @@ export function generarCaminosRPM({
         : 'Con la historia y el escenario de cotización utilizados'
     return resultadoVacio(
       'SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM',
-      `${fraseFuente}, a esa fecha proyectamos ${elegibilidad.semanasTotalesEnFechaObjetivo.toFixed(1)} semanas. El requisito legal aplicable es ${elegibilidad.semanasMinimasAplicables.valor}; faltarían ${(elegibilidad.semanasMinimasAplicables.valor - elegibilidad.semanasTotalesEnFechaObjetivo).toFixed(1)} semanas.`,
+      `${fraseFuente}, a esa fecha proyectamos ${formatearSemanasSinDecimales(elegibilidad.semanasTotalesEnFechaObjetivo)}. El requisito legal aplicable es ${elegibilidad.semanasMinimasAplicables.valor.toLocaleString('es-CO')}; faltarían ${formatearSemanasSinDecimales(elegibilidad.semanasMinimasAplicables.valor - elegibilidad.semanasTotalesEnFechaObjetivo)}.`,
       { ...razonSemanas.detalle, fuenteSemanas: elegibilidad.semanasActuales.procedencia },
       elegibilidad
     )
@@ -803,7 +807,7 @@ export function generarCaminosRPM({
           : 'Con la historia y el escenario de cotización utilizados'
       return resultadoVacio(
         'SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM',
-        `${fraseFuente}, a esa fecha proyectamos ${semanasProyectadas.toFixed(1)} semanas. El requisito legal aplicable es ${semanasMinimasValor}; faltarían ${semanasFaltantes.toFixed(1)} semanas.`,
+        `${fraseFuente}, a esa fecha proyectamos ${formatearSemanasSinDecimales(semanasProyectadas)}. El requisito legal aplicable es ${semanasMinimasValor.toLocaleString('es-CO')}; faltarían ${formatearSemanasSinDecimales(semanasFaltantes)}.`,
         { semanasMinimas: semanasMinimasValor, semanasProyectadas, semanasFaltantes, fuenteSemanas: resultadoBase.semanasCotizadas.fuente },
         elegibilidad,
         disponibilidadCuantia

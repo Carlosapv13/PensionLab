@@ -211,6 +211,14 @@ describe('generarCaminosRPM — UX-RPM-01: historia vacía + horizonte largo →
     expect(r.detalleElegibilidad).not.toBeNull()
     expect(r.detalleElegibilidad.semanasMinimas).toBe(1300)
     expect(r.detalleElegibilidad.semanasProyectadas).toBeLessThan(1300)
+    // Auditoría adversarial (2026-09-25, release candidate para Óscar): semanasProyectadas es
+    // fraccionario (días futuros / 7) — r.orientacion.razon (el mensaje mostrado) nunca debe
+    // exponerlo como decimal crudo ("1234.5 semanas"); se presenta como semanas y días
+    // (formatearSemanasSinDecimales, reutilizado de evaluarElegibilidadProyectadaRPM.js). El
+    // dato real en detalleElegibilidad.semanasProyectadas, arriba, sigue exacto y sin redondear.
+    expect(r.detalleElegibilidad.semanasProyectadas % 1).not.toBe(0)
+    expect(r.orientacion.razon).not.toMatch(/\.\d(?!\d)\s*semanas/)
+    expect(r.orientacion.razon).toContain('semanas y')
   })
 })
 
@@ -260,6 +268,12 @@ describe('generarCaminosRPM — objetivo alcanzable mediante otro IBC futuro', (
     expect(Number.isInteger(ibcEncontrado)).toBe(true)
     expect(alternativo.entradas.escenarioIbcFuturo.valorDeclarado).toBe(ibcEncontrado)
 
+    // Auditoría adversarial, ronda 2 (2026-09-25 — revisión de Atlas): "aumentar IBC" nunca
+    // devuelve un IBC inferior al actual — verificado aquí con el valor REAL encontrado por la
+    // bisección (nunca simulado), contra PERFIL_BASE.ibcAplicableSimulacion (el IBC actual real
+    // de este mismo fixture).
+    expect(ibcEncontrado).toBeGreaterThanOrEqual(PERFIL_BASE.ibcAplicableSimulacion)
+
     // ...y es el MÍNIMO entero suficiente: un peso menos ya no alcanza el objetivo. Esta es
     // la verificación más fuerte del criterio de convergencia — no solo "algún valor que
     // sirve", sino "el más pequeño que sirve, con precisión de 1 peso".
@@ -271,6 +285,32 @@ describe('generarCaminosRPM — objetivo alcanzable mediante otro IBC futuro', (
       fecha: FECHA_CALCULO,
     })
     expect(unPesoMenos.pensionMensualProyectada).toBeLessThan(objetivoValorMensual)
+  })
+
+  // Auditoría adversarial, ronda 2 (2026-09-25 — revisión de Atlas): caso más ajustado posible
+  // — objetivo apenas 1 peso por encima de lo que el camino base ya produce (el margen de
+  // búsqueda de la bisección es el más estrecho posible aquí) — el caso donde, si existiera
+  // un error de límites en `biseccionarEscenarioIbcFuturo`, sería más probable que se
+  // manifestara devolviendo un IBC por debajo del actual o igual a él sin en realidad
+  // necesitar aumentarlo.
+  it('caso más ajustado: objetivo apenas 1 peso por encima del resultado del base — el IBC encontrado sigue siendo >= al actual, nunca inferior', () => {
+    const base = calcularProyeccionRPM({
+      historiaCotizacion: PERFIL_BASE.historiaCotizacion,
+      fechaNacimiento: PERFIL_BASE.fechaNacimiento,
+      edadJubilacionDeseada: PERFIL_BASE.edadJubilacionDeseada,
+      escenarioIbcFuturo: { valor: PERFIL_BASE.ibcAplicableSimulacion, origen: 'continuidad_ibc_actual' },
+      fecha: FECHA_CALCULO,
+      elegibilidad: { estado: 'CUMPLE_REQUISITOS_EN_FECHA_OBJETIVO' },
+    })
+    // +1 sobre el valor GOBERNANTE (ajustado), nunca sobre el matemático crudo — un objetivo
+    // basado en el crudo podría ya estar cumplido por el ajustado (piso/techo), y entonces
+    // ni siquiera se generaría el camino alternativo (el base ya lo cumpliría).
+    const objetivoValorMensual = base.ajusteLegal.resultadoFinalAjustado + 1
+
+    const r = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual })
+    const alternativo = r.escenarios.find((e) => e.id === 'aumentar-ibc-futuro')
+    expect(alternativo).toBeDefined()
+    expect(alternativo.entradas.escenarioIbcFuturo.valorAplicado).toBeGreaterThanOrEqual(PERFIL_BASE.ibcAplicableSimulacion)
   })
 
   it('determinismo: misma entrada produce exactamente el mismo resultado', () => {
@@ -544,6 +584,31 @@ describe('generarCaminosRPM — camino personalizado (esfuerzoAdicionalMensualDe
     expect(conPersonalizado.barrido).toEqual(sinPersonalizado.barrido)
     expect(conPersonalizado.horizonte).toEqual(sinPersonalizado.horizonte)
     expect(conPersonalizado.escenarios).toHaveLength(sinPersonalizado.escenarios.length + 1)
+  })
+
+  // Auditoría adversarial, ronda 2 (2026-09-25 — revisión de Atlas): "esfuerzo adicional
+  // negativo directamente en dominio" — el guard real es `esNumeroValido(esfuerzoAdicionalMensualDeseado)
+  // && esfuerzoAdicionalMensualDeseado > 0` (generarCaminosRPM.js, justo antes de construir el
+  // camino personalizado) — ya probado indirectamente por `validarEsfuerzoAdicionalMensualDeseado`
+  // a nivel de UI (ProyectaTuPensionRPM.helpers.test.js), pero nunca directamente contra
+  // generarCaminosRPM.js pasando el valor crudo, saltándose la UI. Estas pruebas cierran ese
+  // hueco: un esfuerzo negativo o cero, pasado directamente al dominio, nunca genera el
+  // camino personalizado — ni lo genera con un IBC menor (lo cual violaría además la garantía
+  // de "aumentar-ibc-futuro"/"esfuerzo-adicional-deseado" de nunca proponer un IBC por debajo
+  // del actual), simplemente el escenario no existe.
+  it('esfuerzo adicional NEGATIVO pasado directamente al dominio (bypasseando la UI): nunca genera el camino personalizado', () => {
+    const objetivoValorMensual = objetivoNoAlcanzadoPorBase()
+    const r = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual, esfuerzoAdicionalMensualDeseado: -200000 })
+    expect(r.escenarios.find((e) => e.id === 'esfuerzo-adicional-deseado')).toBeUndefined()
+    // Mismo resultado que no pasar el parámetro en absoluto — nunca un tercer camino "roto".
+    const sinEsfuerzo = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual })
+    expect(r.escenarios).toEqual(sinEsfuerzo.escenarios)
+  })
+
+  it('esfuerzo adicional CERO pasado directamente al dominio: tampoco genera el camino personalizado (guard es estrictamente > 0, nunca >= 0)', () => {
+    const objetivoValorMensual = objetivoNoAlcanzadoPorBase()
+    const r = generarCaminosRPM({ ...PERFIL_BASE, objetivoValorMensual, esfuerzoAdicionalMensualDeseado: 0 })
+    expect(r.escenarios.find((e) => e.id === 'esfuerzo-adicional-deseado')).toBeUndefined()
   })
 })
 
@@ -1070,6 +1135,10 @@ describe('generarCaminosRPM — contrato GO-B: semanas declaradas propagadas has
     expect(r.orientacion.codigo).toBe('SEMANAS_INSUFICIENTES_PARA_RECONOCIMIENTO_RPM')
     expect(r.detalleElegibilidad.fuenteSemanas).toBe('declaracion_agregada')
     expect(r.orientacion.razon).toContain('Con las semanas que declaraste y el escenario de cotización futuro utilizado')
+    // Auditoría adversarial (2026-09-25, release candidate para Óscar): semanasProyectadas
+    // (50 declaradas + días futuros/7) es fraccionario — nunca un decimal crudo en el mensaje.
+    expect(r.detalleElegibilidad.semanasProyectadas % 1).not.toBe(0)
+    expect(r.orientacion.razon).not.toMatch(/\.\d(?!\d)\s*semanas/)
   })
 
   it('E — regresión: sin ninguna declaración, el comportamiento por defecto (PERFIL_BASE, con historia real) no cambia', () => {

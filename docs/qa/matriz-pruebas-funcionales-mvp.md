@@ -209,15 +209,28 @@ detalle técnico.
     (si no hay otra causa), y "Ver el detalle auditable completo de este
     camino" debe mostrar los 7 pasos con cifras reales. Luego cambia la edad
     objetivo: la confirmación debe pedirse de nuevo.
-11. **Caso jurídico sin resolver** (`RPM-037`/`RPM-038`) — carga el fixture
-    de desarrollo "RPM — mujer — política jurídica NO_RESUELTA" (mujer,
-    semanas entre el mínimo de elegibilidad y 1.300): debe verse "todavía no
-    es una cifra confiable para publicar", la sección "Políticas jurídicas
-    de este ejercicio" con el nombre traducido y el mensaje legal completo, y
-    ningún número (IBC, aporte, pensión, comparación, gráfico) para el
-    camino cuyo IBC depende de esa política — ni siquiera al expandir su
-    Nivel completo. Confirmar continuidad no debe hacer que ese aviso
-    desaparezca.
+11. **Caso jurídico sin resolver** (`RPM-037`/`RPM-038`) — corrección
+    2026-09-25 (auditoría de Atlas): la versión anterior de este punto le
+    pedía a Óscar cargar un fixture del panel de desarrollo, una herramienta
+    que el build de Preview correctamente NUNCA expone (verificado:
+    `import.meta.env.DEV`, ausente en producción) — instrucción imposible de
+    seguir, corregida aquí con los datos y pasos reales por el recorrido
+    público, verificados contra el mismo mecanismo que usa ese fixture (el
+    panel de desarrollo aplica estos datos a través de los mismos campos de
+    estado que las pantallas reales — `src/dev/aplicarFixture.js` —, nunca
+    por una vía especial). Completa el recorrido normal con estos datos:
+    sexo **Mujer**, fecha de nacimiento **1974-01-01**, régimen **RPM** (sin
+    traslado), empleada, semanas cotizadas conocidas: **1.039**, base de
+    cotización conocida: **$2.000.000**; agrega tu historia de cotización con
+    tres períodos (2016-01-01 a 2019-12-31 con IBC $2.200.000; 2020-01-01 a
+    2022-12-31 con IBC $2.800.000; 2023-01-01 a 2025-12-31 con IBC
+    $2.000.000); edad objetivo **61**, objetivo de pensión **$2.000.000**.
+    Debe verse "todavía no es una cifra confiable para publicar", la sección
+    "Políticas jurídicas de este ejercicio" con el nombre traducido y el
+    mensaje legal completo, y ningún número (IBC, aporte, pensión,
+    comparación, gráfico) para el camino cuyo IBC depende de esa política —
+    ni siquiera al expandir su Nivel completo. Confirmar continuidad no debe
+    hacer que ese aviso desaparezca.
 
 ---
 

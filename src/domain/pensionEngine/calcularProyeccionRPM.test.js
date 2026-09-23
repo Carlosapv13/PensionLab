@@ -148,6 +148,30 @@ describe('calcularProyeccionRPM — E3-C1: vigencia del SMLV (mismas fechas de f
     expect(resultado.pensionMensualProyectada).toBeGreaterThan(0)
   })
 
+  // Auditoría adversarial, ronda 2 (2026-09-25 — revisión de Atlas): "una ejecución no mezcla
+  // fechas base monetarias". Verificado en dos niveles:
+  // (a) por lectura del código (ya reportado): `anioReferenciaIPC` se calcula UNA sola vez
+  //     (calcularProyeccionRPM.js, `new Date(fecha).getUTCFullYear() - 1`) y se reutiliza
+  //     idéntico para el IBL ordinario Y para la alternativa de vida laboral — nunca dos
+  //     valores distintos dentro de la misma llamada.
+  // (b) aquí, empíricamente: llamadas SECUENCIALES con distinta `fecha` nunca se contaminan
+  //     entre sí (esta función es pura, sin estado compartido) — repetir la primera fecha
+  //     después de haber calculado con una fecha distinta produce EXACTAMENTE el mismo
+  //     resultado que la primera vez, nunca uno mezclado con la fecha intermedia.
+  it('no mezcla fechas base monetarias: llamadas secuenciales con fechas distintas nunca se contaminan entre sí (determinismo independiente del orden de llamada)', () => {
+    const resultadoFechaA_primeraVez = calcularProyeccionRPM({ ...perfilBase, fecha: FECHA_CALCULO })
+    // Fecha B: mismo año de vigencia del SMLV (2026), pero con litigio pendiente declarado
+    // distinto (ver test de arriba, '2026-09-07') — ejercita una rama de `vigenciaSmlv`
+    // realmente diferente entre A y B, no solo un día distinto sin efecto observable.
+    const resultadoFechaB = calcularProyeccionRPM({ ...perfilBase, fecha: '2026-09-07' })
+    const resultadoFechaA_segundaVez = calcularProyeccionRPM({ ...perfilBase, fecha: FECHA_CALCULO })
+
+    expect(resultadoFechaA_primeraVez).toEqual(resultadoFechaA_segundaVez)
+    // Confirma que A y B de verdad difieren (si no, la prueba de arriba sería vacía) — la
+    // advertencia de litigio es la señal más directa de que se resolvió una fecha distinta.
+    expect(resultadoFechaA_primeraVez.vigenciaSmlv.advertencia).not.toEqual(resultadoFechaB.vigenciaSmlv.advertencia)
+  })
+
   it('fecha anterior a la cobertura de SMLV disponible (2025-12-31): no evaluable, FUENTE_LEGAL_NO_ENCONTRADA, sin inventar un SMLV histórico', () => {
     let resultado
     expect(() => {

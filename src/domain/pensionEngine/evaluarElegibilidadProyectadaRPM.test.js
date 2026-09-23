@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { evaluarElegibilidadProyectadaRPM } from './evaluarElegibilidadProyectadaRPM.js'
+import { evaluarElegibilidadProyectadaRPM, formatearSemanasSinDecimales } from './evaluarElegibilidadProyectadaRPM.js'
 import { calcularFechaPorEdad } from '../calcularFechaPorEdad.js'
 import { diasCalendarioEnRango, diaSiguiente } from '../seleccionarPeriodosIBL.js'
 
@@ -188,6 +188,15 @@ describe('evaluarElegibilidadProyectadaRPM — estados NO_ELEGIBLE con causa exp
     expect(r.estado).toBe('NO_CUMPLE_SEMANAS_EN_FECHA_OBJETIVO')
     expect(r.razones).toHaveLength(1)
     expect(r.razones[0].codigo).toBe('SEMANAS_INSUFICIENTES')
+    // Auditoría adversarial (2026-09-25, release candidate para Óscar): semanasTotalesEnFechaObjetivo
+    // es fraccionario (declaradas + días futuros / 7) — el mensaje nunca debe mostrarlo como
+    // decimal crudo ("154.5 semanas"; distinto del separador de miles "1.145", que agrupa de
+    // a 3 dígitos — un decimal crudo de toFixed(1) siempre deja exactamente 1 dígito tras el
+    // punto). detalle.semanasProyectadas SÍ conserva el número real exacto, sin redondear —
+    // solo el texto de mensaje se presenta sin decimales engañosos, como semanas y días.
+    expect(r.razones[0].mensaje).not.toMatch(/\.\d(?!\d)\s*semanas/)
+    expect(r.razones[0].mensaje).toContain('semanas y')
+    expect(r.razones[0].detalle.semanasProyectadas % 1).not.toBe(0)
   })
 
   it('edad y semanas insuficientes (con evidencia) → NO_CUMPLE_EDAD_NI_SEMANAS_EN_FECHA_OBJETIVO, ambas razones presentes', () => {
@@ -323,6 +332,132 @@ describe('evaluarElegibilidadProyectadaRPM — hombre y mujer', () => {
     // 1.250 semanas para fechas de reconocimiento en 2026.
     expect(r.semanasMinimasAplicables.valor).toBe(1250)
     expect(r.semanasMinimasAplicables.normaId).toBe('semanas-minimas-pension-mujer-cronograma-2026')
+  })
+})
+
+// Auditoría adversarial, ronda 2 (2026-09-25 — revisión de Atlas): fronteras EXACTAS de
+// elegibilidad, por la ruta del motor RPM REAL (`evaluarElegibilidadProyectadaRPM`), nunca
+// por `evidenciaEdadPension.js` (capacidad distinta, ya cubierta aparte). Sexo Hombre en
+// ambos bloques, deliberadamente: `edadMinimaAplicable`/`semanasMinimasAplicables` para
+// Hombre son valores fijos (`edadPensionHombre`/`semanasMinimasPensionHombre`,
+// data/legal/versions/vigente-2026.json — nunca un cronograma como el de mujer bajo
+// C-197/2023) — así ninguna de estas fronteras depende de una interpretación jurídica en
+// disputa. Se declara explícitamente, como pide Atlas: NINGUNA de estas fronteras depende
+// de `PoliticaAnclaIncrementoMujer` NO_RESUELTA — esa política es exclusiva de mujeres y de
+// la TASA DE REEMPLAZO (E5.4/generarCaminosRPM.js), nunca de la elegibilidad de edad/semanas
+// que evalúa este archivo (E2, anterior e independiente — ver también el hallazgo del fork
+// de auditoría: "la elegibilidad NUNCA depende de la política en disputa, solo la cuantía").
+describe('evaluarElegibilidadProyectadaRPM — fronteras EXACTAS de edad (motor RPM real, auditoría Atlas ronda 2)', () => {
+  // Nota honesta (declarada explícitamente, no simulada): `edadJubilacionDeseada` es un
+  // ENTERO de años elegido por la persona (`edadSuficiente = edadJubilacionDeseada >=
+  // edadMinimaAplicable.valor`, línea ~350 de este mismo archivo) — no existe, en este motor,
+  // una comparación a nivel de DÍA para la edad en sí (a diferencia de las semanas, que sí
+  // son continuas). "Un día antes/después" de la edad mínima, tal como lo pidió Atlas, no es
+  // una frontera que este motor module a nivel de día — es la frontera de
+  // `evidenciaEdadPension.js` (capacidad distinta, con su propio test de frontera de
+  // cumpleaños exacto, ya verificado en la ronda anterior de esta auditoría). Aquí se
+  // demuestra la frontera real y completa que SÍ existe en este motor: el año entero exacto,
+  // un año menos, un año más.
+  it('edad exacta en el mínimo legal (62 años, Hombre): CUMPLE', () => {
+    const r = evaluarElegibilidadProyectadaRPM({
+      sexo: 'Hombre',
+      fechaNacimiento: '1970-06-15',
+      edadJubilacionDeseada: 62,
+      historiaCotizacion: [],
+      semanasReferenciaDeclaradas: { cantidad: 2000, certeza: 'conocido' }, // semanas nunca es la causa aquí
+      fecha: FECHA_CALCULO,
+    })
+    expect(r.edadMinimaAplicable.valor).toBe(62)
+    expect(r.estado).toBe('CUMPLE_REQUISITOS_EN_FECHA_OBJETIVO')
+  })
+
+  it('un año MENOS que el mínimo (61 años, Hombre): NO_CUMPLE_EDAD_EN_FECHA_OBJETIVO, nunca CUMPLE', () => {
+    const r = evaluarElegibilidadProyectadaRPM({
+      sexo: 'Hombre',
+      fechaNacimiento: '1970-06-15',
+      edadJubilacionDeseada: 61,
+      historiaCotizacion: [],
+      semanasReferenciaDeclaradas: { cantidad: 2000, certeza: 'conocido' },
+      fecha: FECHA_CALCULO,
+    })
+    expect(r.edadMinimaAplicable.valor).toBe(62)
+    expect(r.estado).toBe('NO_CUMPLE_EDAD_EN_FECHA_OBJETIVO')
+    expect(r.razones[0].detalle.aniosFaltantes).toBe(1)
+  })
+
+  it('un año MÁS que el mínimo (63 años, Hombre): CUMPLE — la frontera no se "pega" al mínimo por error de comparación', () => {
+    const r = evaluarElegibilidadProyectadaRPM({
+      sexo: 'Hombre',
+      fechaNacimiento: '1970-06-15',
+      edadJubilacionDeseada: 63,
+      historiaCotizacion: [],
+      semanasReferenciaDeclaradas: { cantidad: 2000, certeza: 'conocido' },
+      fecha: FECHA_CALCULO,
+    })
+    expect(r.edadMinimaAplicable.valor).toBe(62)
+    expect(r.estado).toBe('CUMPLE_REQUISITOS_EN_FECHA_OBJETIVO')
+  })
+})
+
+// Fronteras EXACTAS de semanas, con el total en la fecha objetivo (`semanasTotalesEnFechaObjetivo`
+// = declaradas + semanas futuras hasta esa fecha) fijado en un ENTERO exacto — nunca aproximado.
+// Combinación deliberada, verificada por aritmética exacta (no adivinada): fechaNacimiento
+// '1964-12-31' + edadJubilacionDeseada 62 (Hombre, mínimo de edad ya satisfecho, para aislar
+// esta frontera de la de edad) con fecha de cálculo '2026-01-01' → fechaObjetivoSolicitada
+// '2026-12-31' (calcularFechaPorEdad: año 1964+62, mismo mes/día). Horizonte =
+// diasCalendarioEnRango(diaSiguiente('2026-01-01'), '2026-12-31') = diasCalendarioEnRango(
+// '2026-01-02','2026-12-31') = 364 días exactos (2026 no es bisiesto) = EXACTAMENTE 52
+// semanas futuras, sin residuo — por eso declarar 1.248/1.247/1.249 semanas produce un total
+// de 1.300/1.299/1.301 semanas exactas en la fecha objetivo, sin ningún redondeo de por medio.
+describe('evaluarElegibilidadProyectadaRPM — fronteras EXACTAS de semanas (motor RPM real, auditoría Atlas ronda 2)', () => {
+  const FECHA_CALCULO_2026 = '2026-01-01'
+  const NACIMIENTO_364_DIAS = '1964-12-31'
+  const EDAD_OBJETIVO_364_DIAS = 62
+
+  it('verificación previa: el horizonte de este fixture es exactamente 364 días (52 semanas futuras exactas)', () => {
+    const futuras = semanasFuturasEsperadas(NACIMIENTO_364_DIAS, EDAD_OBJETIVO_364_DIAS, FECHA_CALCULO_2026)
+    expect(futuras).toBe(52)
+  })
+
+  it('semanas EXACTAS en el mínimo (1.300 = 1.248 declaradas + 52 futuras): CUMPLE', () => {
+    const r = evaluarElegibilidadProyectadaRPM({
+      sexo: 'Hombre',
+      fechaNacimiento: NACIMIENTO_364_DIAS,
+      edadJubilacionDeseada: EDAD_OBJETIVO_364_DIAS,
+      historiaCotizacion: [],
+      semanasReferenciaDeclaradas: { cantidad: 1248, certeza: 'conocido' },
+      fecha: FECHA_CALCULO_2026,
+    })
+    expect(r.semanasMinimasAplicables.valor).toBe(1300)
+    expect(r.semanasTotalesEnFechaObjetivo).toBe(1300)
+    expect(r.estado).toBe('CUMPLE_REQUISITOS_EN_FECHA_OBJETIVO')
+  })
+
+  it('una semana MENOS que el mínimo (1.299 = 1.247 declaradas + 52 futuras): NO_CUMPLE_SEMANAS_EN_FECHA_OBJETIVO', () => {
+    const r = evaluarElegibilidadProyectadaRPM({
+      sexo: 'Hombre',
+      fechaNacimiento: NACIMIENTO_364_DIAS,
+      edadJubilacionDeseada: EDAD_OBJETIVO_364_DIAS,
+      historiaCotizacion: [],
+      semanasReferenciaDeclaradas: { cantidad: 1247, certeza: 'conocido' },
+      fecha: FECHA_CALCULO_2026,
+    })
+    expect(r.semanasTotalesEnFechaObjetivo).toBe(1299)
+    expect(r.estado).toBe('NO_CUMPLE_SEMANAS_EN_FECHA_OBJETIVO')
+    expect(r.razones[0].detalle.semanasFaltantes).toBe(1)
+  })
+
+  it('una semana MÁS que el mínimo (1.301 = 1.249 declaradas + 52 futuras): CUMPLE — la frontera no se "pega" al mínimo', () => {
+    const r = evaluarElegibilidadProyectadaRPM({
+      sexo: 'Hombre',
+      fechaNacimiento: NACIMIENTO_364_DIAS,
+      edadJubilacionDeseada: EDAD_OBJETIVO_364_DIAS,
+      historiaCotizacion: [],
+      semanasReferenciaDeclaradas: { cantidad: 1249, certeza: 'conocido' },
+      fecha: FECHA_CALCULO_2026,
+    })
+    expect(r.semanasTotalesEnFechaObjetivo).toBe(1301)
+    expect(r.estado).toBe('CUMPLE_REQUISITOS_EN_FECHA_OBJETIVO')
   })
 })
 
@@ -468,5 +603,30 @@ describe('evaluarElegibilidadProyectadaRPM — determinismo', () => {
     const r1 = evaluarElegibilidadProyectadaRPM(input)
     const r2 = evaluarElegibilidadProyectadaRPM(input)
     expect(r1).toEqual(r2)
+  })
+})
+
+// Auditoría adversarial (2026-09-25, release candidate para Óscar): `semanasTotalesEnFechaObjetivo`
+// (y su diferencia con el mínimo legal) se interpolaban con `.toFixed(1)` directamente en
+// `mensaje` ("proyectamos 1470.9 semanas") — mismo decimal engañoso ya corregido en el Nivel
+// completo (`formatearSemanasComoTexto`, `nivelCompletoAuditable.helpers.js`), nunca extendido
+// a estos mensajes de dominio hasta ahora. `generarCaminosRPM.js` reutiliza esta misma función
+// (importada, nunca duplicada) para sus dos mensajes equivalentes.
+describe('formatearSemanasSinDecimales — semanas completas + días restantes, nunca un decimal crudo, nunca redondea hacia arriba', () => {
+  it('un entero exacto no agrega días', () => {
+    expect(formatearSemanasSinDecimales(1300)).toBe('1.300 semanas')
+  })
+
+  it('1.470 semanas y 6 días — mismo caso real ya establecido como estándar (10.296 días / 7)', () => {
+    expect(formatearSemanasSinDecimales(10296 / 7)).toBe('1.470 semanas y 6 días')
+  })
+
+  it('nunca redondea las semanas hacia arriba, ni con un residuo de 6 de 7 días', () => {
+    expect(formatearSemanasSinDecimales((999 * 7 + 6) / 7)).toBe('999 semanas y 6 días')
+  })
+
+  it('singular de "semana"/"día" cuando la cantidad es exactamente 1', () => {
+    expect(formatearSemanasSinDecimales(1)).toBe('1 semana')
+    expect(formatearSemanasSinDecimales(8 / 7)).toBe('1 semana y 1 día')
   })
 })

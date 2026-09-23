@@ -86,6 +86,29 @@ function sumarDias(fechaISO, dias) {
   return d.toISOString().slice(0, 10)
 }
 
+// Auditoría adversarial (2026-09-25, release candidate para Óscar): las semanas fraccionarias
+// de este contrato (`semanasTotalesEnFechaObjetivo`/su diferencia con el mínimo, ambas
+// `diasFuturos / 7` — nunca enteras) se interpolaban con `.toFixed(1)` directamente en
+// `mensaje` ("proyectamos 1470.9 semanas") — el mismo decimal engañoso que ya se corrigió en
+// el Nivel completo (`formatearSemanasComoTexto`, `nivelCompletoAuditable.helpers.js`), pero
+// nunca se extendió a estos mensajes de dominio. Réplica dentro del dominio, deliberada
+// (nunca un import cruzado hacia `src/pages/`: este archivo es dominio puro, sin dependencia
+// de la capa de presentación; exportada para que `generarCaminosRPM.js` — que ya importa de
+// este archivo — la reutilice sin duplicar la lógica, Principio 11) — misma aritmética exacta:
+// semanas completas por `Math.floor` (nunca redondea hacia arriba) + días restantes exactos,
+// `Math.round(valor * 7)` solo corrige el ruido de
+// punto flotante de la propia división, nunca cambia el dato. Solo afecta el texto de
+// `mensaje` — los campos `detalle` conservan el número real exacto, sin redondear, para
+// trazabilidad.
+export function formatearSemanasSinDecimales(valorEnSemanas) {
+  const diasTotales = Math.round(valorEnSemanas * 7)
+  const semanasCompletas = Math.floor(diasTotales / 7)
+  const diasRestantes = diasTotales - semanasCompletas * 7
+  const textoSemanas = `${semanasCompletas.toLocaleString('es-CO')} ${semanasCompletas === 1 ? 'semana' : 'semanas'}`
+  if (diasRestantes === 0) return textoSemanas
+  return `${textoSemanas} y ${diasRestantes} ${diasRestantes === 1 ? 'día' : 'días'}`
+}
+
 // Identificadores estables de cada valor trazable de este contrato — para que un consumidor
 // (hoy generarCaminosRPM.js; en Slices futuros, el ejercicio tipo Baldor) pueda referenciar
 // "de dónde vino este número" sin depender de copiarlo entre objetos. No son literales
@@ -513,7 +536,7 @@ export function evaluarElegibilidadProyectadaRPM({
     })
     razones.push({
       codigo: 'SEMANAS_INSUFICIENTES',
-      mensaje: `En la fecha que elegiste explorar proyectamos ${semanasTotalesEnFechaObjetivo.toFixed(1)} semanas; el requisito legal aplicable es ${semanasMinimasAplicables.valor}.`,
+      mensaje: `En la fecha que elegiste explorar proyectamos ${formatearSemanasSinDecimales(semanasTotalesEnFechaObjetivo)}; el requisito legal aplicable es ${semanasMinimasAplicables.valor.toLocaleString('es-CO')}.`,
       detalle: { semanasMinimas: semanasMinimasAplicables.valor, semanasProyectadas: semanasTotalesEnFechaObjetivo, semanasFaltantes: semanasMinimasAplicables.valor - semanasTotalesEnFechaObjetivo },
     })
   } else if (!edadSuficiente) {
@@ -527,7 +550,7 @@ export function evaluarElegibilidadProyectadaRPM({
     estado = ESTADOS_ELEGIBILIDAD_RPM.NO_CUMPLE_SEMANAS
     razones.push({
       codigo: 'SEMANAS_INSUFICIENTES',
-      mensaje: `En la fecha que elegiste explorar proyectamos ${semanasTotalesEnFechaObjetivo.toFixed(1)} semanas. El requisito legal aplicable es ${semanasMinimasAplicables.valor}; faltarían ${(semanasMinimasAplicables.valor - semanasTotalesEnFechaObjetivo).toFixed(1)} semanas.`,
+      mensaje: `En la fecha que elegiste explorar proyectamos ${formatearSemanasSinDecimales(semanasTotalesEnFechaObjetivo)}. El requisito legal aplicable es ${semanasMinimasAplicables.valor.toLocaleString('es-CO')}; faltarían ${formatearSemanasSinDecimales(semanasMinimasAplicables.valor - semanasTotalesEnFechaObjetivo)}.`,
       detalle: { semanasMinimas: semanasMinimasAplicables.valor, semanasProyectadas: semanasTotalesEnFechaObjetivo, semanasFaltantes: semanasMinimasAplicables.valor - semanasTotalesEnFechaObjetivo },
     })
   } else if (semanasAmbiguas) {

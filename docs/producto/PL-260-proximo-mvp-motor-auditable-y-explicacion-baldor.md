@@ -1169,3 +1169,94 @@ cifras verificadas:**
   de `IA_EXPUESTA_EN_MVP`/`MODELO_VISUAL_EJERCICIO_ACTIVO` (este último ya retirado desde E6.5)
   permanecen sin activarse para esta publicación — decisión de producto ya registrada, no
   reabierta aquí.
+
+### 9.17 Cierre de huecos explícitos de la auditoría §9.16 (ronda 2, revisión de Atlas) — decisión de alcance sobre indemnización sustitutiva
+
+**Estado: fronteras exactas cerradas con pruebas reales; decisión de alcance registrada;
+contradicción del plan de aceptación de Óscar corregida — cierre acotado, sin commit todavía
+(pendiente de nueva revisión de Carlos/Atlas antes de confirmar el veredicto APTO PARA
+PREVIEW).**
+
+**Fronteras exactas agregadas (nunca solo lectura de código — cada una es una prueba real
+ejecutada, ver archivos citados):**
+- **Piso y techo** (`ajustarMesadaLegalRPM.test.js`): 1 peso por debajo del piso, exactamente
+  en el piso, 1 peso por encima, exactamente en el techo, 1 peso por encima del techo — cada
+  caso confirma valor matemático (nunca mutado), ajuste aplicado/no aplicado, resultado final
+  exacto, y que `mesadaGobernante` (la función real de `generarCaminosRPM.js` que decide
+  `resultado.valor`) usa el valor ajustado, nunca el crudo.
+- **Elegibilidad, motor RPM real** (`evaluarElegibilidadProyectadaRPM.test.js`, nunca
+  `evidenciaEdadPension.js`): edad exacta en el mínimo (62, Hombre), un año menos, un año más;
+  semanas exactas en el mínimo (1.300 = 1.248 declaradas + 52 futuras, combinación verificada
+  por aritmética exacta), una semana menos, una semana más. **Declarado explícitamente, como
+  exigió Atlas**: ninguna de estas fronteras depende de `PoliticaAnclaIncrementoMujer`
+  NO_RESUELTA (exclusiva de mujeres y de la tasa de reemplazo, nunca de la elegibilidad de
+  edad/semanas — por eso ambos bloques usan sexo Hombre, con valores fijos de ley, para
+  aislar la frontera de cualquier interpretación en disputa). **Hallazgo honesto declarado, no
+  simulado**: la edad, en este motor, se compara como ENTERO de años (`edadJubilacionDeseada
+  >= edadMinimaAplicable.valor`) — no existe una frontera de "un día antes/después" a nivel de
+  este motor (esa es la frontera de `evidenciaEdadPension.js`, capacidad distinta, ya
+  verificada en la ronda anterior); la frontera real de este motor es el año entero, que es la
+  que se probó.
+- **IBC** (`determinarBaseCotizacion.test.js`): vacío, cero (parsea como número válido, pero el
+  piso legal lo bloquea — nunca "ausente"), negativo y no numérico (ya cubiertos antes),
+  exactamente 1 SMLV (ya cubierto), un peso por debajo de 1 SMLV, exactamente en el tope
+  (`<=` inclusivo, sin ajuste), un peso por encima del tope (clamp exacto), magnitud extrema
+  finita (10^15, mismo clamp genérico, sin NaN/Infinity).
+- **Otras coberturas pedidas** (`generarCaminosRPM.test.js`, `calcularProyeccionRPM.test.js`):
+  esfuerzo adicional negativo y cero pasados directamente al dominio (bypasseando la UI) nunca
+  generan el camino personalizado; el camino "aumentar IBC" nunca propone un IBC inferior al
+  actual, verificado con el valor real de la bisección en el caso general y en el caso más
+  ajustado (objetivo apenas 1 peso por encima de lo que el base ya produce); una ejecución
+  nunca mezcla fechas base monetarias — verificado por lectura (`anioReferenciaIPC` se calcula
+  una sola vez y se reutiliza idéntico) y empíricamente (llamadas secuenciales con fechas
+  distintas nunca se contaminan entre sí).
+- Ningún defecto encontrado en ninguna de estas fronteras — todas confirman el contrato ya
+  existente, sin necesitar ninguna corrección de comportamiento.
+
+**Decisión de alcance — indemnización sustitutiva (Carlos/Atlas):** **la indemnización
+sustitutiva queda expresamente fuera del alcance de este MVP para Óscar.** El MVP proyecta
+pensión de vejez RPM y se detiene honestamente cuando no se alcanzan los requisitos — nunca
+calcula, estima ni recomienda indemnización sustitutiva. Verificado que ninguna pantalla
+afirma actualmente cubrir "todas las prestaciones posibles" (búsqueda literal en `src/pages/`
+y `src/components/`, sin resultados) — `Bienvenida.jsx` ya acota explícitamente el alcance a
+"vejez", nombrando otros casos (incapacidad laboral, protección familiar, pensión ya
+reconocida, reclamación/trámite activo) como exclusiones, nunca como opciones disponibles —
+por eso esta decisión no requiere ningún texto nuevo en la UI, solo este cierre documental.
+
+**Contradicción del plan de aceptación de Óscar, corregida:** la fila 11 del "Set de
+aceptación para Oscar" (`docs/qa/matriz-pruebas-funcionales-mvp.md`) le pedía a Óscar cargar
+un fixture del panel de desarrollo — imposible en el Preview real, que correctamente nunca
+expone esa herramienta (`import.meta.env.DEV`, confirmado ausente del bundle de producción en
+§9.16). Investigado y resuelto por la vía 1 (Atlas): **el Caso B SÍ se puede reproducir por el
+recorrido público normal** — el panel de desarrollo aplica sus fixtures escribiendo
+exactamente los mismos campos de estado de `App.jsx` que las pantallas reales ya escriben
+(`src/dev/aplicarFixture.js`, verificado campo por campo contra las props de
+`DatosIniciales.jsx`/`SituacionPensional.jsx`/`InformacionPensionalEsencial.jsx`/
+`BaseCotizacion.jsx`/`HistoriaCotizacionRPM.jsx`/`ProyectaTuPensionRPM.jsx` en `App.jsx`) —
+nunca por una vía especial solo alcanzable desde el panel. Se documentaron los datos y pasos
+exactos directamente en la matriz (mujer, 1974-01-01, RPM sin traslado, empleada, 1.039
+semanas conocidas, IBC $2.000.000 conocido, tres períodos de historia reales, edad objetivo 61,
+objetivo $2.000.000). **Nunca se agregó ninguna ruta secreta, query param, fixture loader ni
+control QA al bundle público** — la corrección es puramente de guía de prueba, sin tocar
+código de producción. El Caso A (fixture "RPM — empleado — Proyecta tu pensión...") ya estaba
+correctamente planteado en el Set de aceptación desde antes (ítems 1/3-6) por el mismo
+recorrido público, sin depender nunca del panel de desarrollo.
+
+**Contaminación de `.vercel/output` en el conteo de pruebas — resuelto:** `vite.config.js`
+gana `test.exclude: [...configDefaults.exclude, '**/.vercel/**', '**/.claude/**']` — preserva
+TODAS las exclusiones por defecto de Vitest, solo agrega estas dos (nunca las reemplaza).
+`.vercel/output/functions/**` (artefacto de `vercel build`, E8) y `.claude/worktrees/**` (un
+git worktree ajeno, rama distinta, no relacionado con esta sesión) contaminaban el comando
+oficial (`npm test` / `vitest run`, sin flags) con 4 archivos / ~30 pruebas que no pertenecen
+al código real de esta rama. Conteo autoritativo verificado con el comando oficial, sin ningún
+flag manual: **81 archivos / 1724 pruebas**, verificado ejecutando la suite completa con el
+comando oficial en esta sesión (1702 antes de esta ronda + 22 pruebas nuevas de fronteras
+exactas y regresión — ver detalle arriba).
+
+**Resultado final de esta ronda:** suite completa (comando oficial) 81 archivos / 1724
+pruebas en verde; suite RAIS sin cambios (62/62); lint sin hallazgos; build exitoso; `git diff
+--check` sin errores. Archivos modificados: `vite.config.js`,
+`evaluarElegibilidadProyectadaRPM.js`/`.test.js`, `generarCaminosRPM.js`/`.test.js`,
+`ajustarMesadaLegalRPM.js`/`.test.js`, `determinarBaseCotizacion.test.js`,
+`calcularProyeccionRPM.test.js`, `docs/qa/matriz-pruebas-funcionales-mvp.md`, este documento,
+`cierre-sprint-4.md`. Sin commit todavía — pendiente de nueva revisión de Carlos/Atlas.

@@ -307,6 +307,22 @@ export function debeOcultarCampoAnidado(clave, valor) {
   return false
 }
 
+// Corrección de auditoría visual (2026-09-25, validación de Carlos/Atlas): las tasas de
+// reemplazo reales traen hasta 14 decimales de precisión de punto flotante
+// ("64.35353674799146%") — nunca un error de cálculo, solo más precisión de la que una
+// persona necesita leer. `maximumFractionDigits: 2` redondea SOLO la presentación (nunca el
+// valor real usado por el motor, que sigue completo en el dominio) — "80" sigue como "80%",
+// sin agregar decimales que no tenía. Extraída como función propia (antes en línea dentro de
+// `formatearValorEscalar`) para que ExploraTuProyeccionRPM.jsx (Caso B, misma corrección de
+// Carlos/Atlas sobre "64.56%") reutilice el mismo criterio en vez de duplicar el formato.
+/**
+ * @param {number} valor
+ * @returns {string}
+ */
+export function formatearPorcentaje(valor) {
+  return `${valor.toLocaleString('es-CO', { maximumFractionDigits: 2 })}%`
+}
+
 /**
  * Formatea un valor ESCALAR (nunca objeto/arreglo/null — ver tipoDeValor) a texto legible,
  * según el campo al que pertenece. Nunca redondea de forma distinta a lo ya calculado, nunca
@@ -319,15 +335,7 @@ export function debeOcultarCampoAnidado(clave, valor) {
 export function formatearValorEscalar(clave, valor) {
   if (clave === 'delta' && typeof valor === 'number') return formatearDeltaObjetivo(valor)
   if (CAMPOS_PESOS.has(clave) && typeof valor === 'number') return formatearPesos(valor)
-  // Corrección de auditoría visual (2026-09-25, validación de Carlos/Atlas): las tasas de
-  // reemplazo reales traen hasta 14 decimales de precisión de punto flotante
-  // ("64.35353674799146%") — nunca un error de cálculo, solo más precisión de la que una
-  // persona necesita leer. `maximumFractionDigits: 2` redondea SOLO la presentación (nunca el
-  // valor real usado por el motor, que sigue completo en el dominio) — "80" sigue como "80%",
-  // sin agregar decimales que no tenía.
-  if (CAMPOS_PORCENTAJE.has(clave) && typeof valor === 'number') {
-    return `${valor.toLocaleString('es-CO', { maximumFractionDigits: 2 })}%`
-  }
+  if (CAMPOS_PORCENTAJE.has(clave) && typeof valor === 'number') return formatearPorcentaje(valor)
   if (clave === 'semanasCotizadas' && typeof valor === 'number') return formatearSemanasComoTexto(valor)
   if (CAMPOS_NUMERO_PLANO.has(clave) && typeof valor === 'number') return valor.toLocaleString('es-CO')
   if (CAMPOS_BOOLEANOS.has(clave) && typeof valor === 'boolean') return valor ? 'Sí' : 'No'

@@ -17,6 +17,16 @@
 // El dominio (calcularPensionRPM.js) solo entrega códigos estructurados de
 // razonNoEvaluable — toda la redacción vive aquí, mismo criterio ya corregido en
 // determinarBaseCotizacion.js y QueDeterminaTuResultado.jsx.
+//
+// Corrección de auditoría visual (2026-09-26, validación de Carlos/Atlas sobre el Preview del
+// commit 31221ec, Caso B): `semanasObservadas` y `tasaReemplazo` son números reales del
+// dominio (calcularPensionRPM.js, sin tocar aquí) que antes se presentaban con `.toFixed(1)`/
+// `.toFixed(2)` crudos ("521.9 semanas", "64.56%") — decimal en punto en vez de coma, y
+// semanas fraccionarias que nadie cuenta así. Se reutilizan los mismos formateadores públicos
+// ya usados y probados en el detalle auditable (nivelCompletoAuditable.helpers.js):
+// `formatearSemanasComoTexto` (semanas completas + días, sin redondear la cantidad real) y
+// `formatearPorcentaje` (es-CO, máximo 2 decimales). El bloqueo jurídico posterior del Caso B
+// no se toca.
 
 import { useRef } from 'react'
 import { calcularPensionRPM } from '../domain/pensionEngine/calcularPensionRPM.js'
@@ -24,6 +34,7 @@ import { evaluarIndicioVidaLaboral } from '../domain/evidenciaIndicioVidaLaboral
 import { useRestaurarFocoAlMontar } from '../hooks/useRestaurarFocoAlMontar.js'
 import { formatearPesos } from '../format/formatearDinero.js'
 import { formatearDiasFaltantesParaVentanaIBL } from '../format/aproximarDiasEnSemanasYMeses.js'
+import { formatearSemanasComoTexto, formatearPorcentaje } from './nivelCompletoAuditable.helpers.js'
 
 const TEXTO_SIN_HISTORIA =
   'Conocemos algunos datos generales de tu historia, pero esta lectura económica necesita ' +
@@ -246,7 +257,7 @@ function ExploraTuProyeccionRPM({
           <div className="insight">
             <p className="insight__label">Semanas observadas</p>
             <p className="insight__message">
-              {resultado.semanasObservadas.toFixed(1)} semanas cotizadas, según tu historia.
+              {formatearSemanasComoTexto(resultado.semanasObservadas)} cotizados, según tu historia.
             </p>
           </div>
 
@@ -254,7 +265,7 @@ function ExploraTuProyeccionRPM({
             <p className="insight__label">Tasa de reemplazo RPM</p>
             <p className="insight__message">
               La tasa de reemplazo es el porcentaje que la fórmula del RPM aplica a tu IBL. En tu caso es{' '}
-              {resultado.tasaReemplazo.toFixed(2)}%.
+              {formatearPorcentaje(resultado.tasaReemplazo)}.
             </p>
           </div>
 

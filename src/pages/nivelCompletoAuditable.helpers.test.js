@@ -8,6 +8,7 @@ import {
   tipoDeValor,
   formatearValorEscalar,
   formatearSemanasComoTexto,
+  formatearPorcentaje,
   formatearDeltaObjetivo,
   debeOcultarCampoAnidado,
   ETIQUETAS_PASO,
@@ -81,6 +82,16 @@ describe('formatearValorEscalar — nunca recalcula, solo presenta', () => {
     expect(formatearValorEscalar('tasaMaxima', 80)).toBe('80%')
     expect(formatearValorEscalar('tasaInicial', 64.35353674799146)).toBe('64,35%')
     expect(formatearValorEscalar('tasaFinalAplicada', 63.71520830218928)).toBe('63,72%')
+  })
+
+  // Corrección de auditoría visual (2026-09-26, Caso B): `formatearPorcentaje` se extrajo de
+  // dentro de `formatearValorEscalar` para que ExploraTuProyeccionRPM.jsx (pantalla "Lectura
+  // económica RPM con tu historia hasta hoy") reutilice el mismo criterio en vez de duplicar
+  // el formato — mismos valores exactos reportados por Carlos/Atlas sobre ese Preview.
+  it('formatearPorcentaje: máximo 2 decimales, coma decimal, sin ceros de más', () => {
+    expect(formatearPorcentaje(64.56)).toBe('64,56%')
+    expect(formatearPorcentaje(80)).toBe('80%')
+    expect(formatearPorcentaje(64.5)).toBe('64,5%')
   })
 
   it('semanasCotizadas agrega el sufijo "semanas" sobre el número literal', () => {
